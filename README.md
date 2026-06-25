@@ -1,55 +1,268 @@
 # Habit Quest Analytics
 
-A Streamlit analytics dashboard for tracking habits and to-do items as RPG-style quests. The app is structured around a small testable service and metrics layer so the UI can render prepared data instead of owning business rules.
+An RPG-inspired habit tracker and productivity analytics dashboard built with Streamlit.
+
+Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP scaffold: the project structure, database models, service layer, metric functions, tests, and placeholder Streamlit pages are in place, while quest CRUD and full dashboard analytics are planned next.
+
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
+![SQLite](https://img.shields.io/badge/SQLite-Local%20Database-lightgrey)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-brown)
+![Pandas](https://img.shields.io/badge/Pandas-Data%20Analysis-purple)
+![Plotly](https://img.shields.io/badge/Plotly-Charts-green)
+![Pytest](https://img.shields.io/badge/Tests-Pytest-yellow)
+![Status](https://img.shields.io/badge/Status-MVP%20%2F%20In%20Development-orange)
+
+## Table of Contents
+
+- [Project Goal](#project-goal)
+- [My Role](#my-role)
+- [Project Status](#project-status)
+- [Preview](#preview)
+- [Tech Stack](#tech-stack)
+- [What It Does](#what-it-does)
+- [Example Insights](#example-insights)
+- [Features](#features)
+- [App Sections](#app-sections)
+- [Key Technical Decisions](#key-technical-decisions)
+- [Data Flow](#data-flow)
+- [Architecture](#architecture)
+- [Data Model](#data-model)
+- [Metrics](#metrics)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Running The App](#running-the-app)
+- [Database Setup / Seeding](#database-setup--seeding)
+- [Tests](#tests)
+- [Design Principles](#design-principles)
+- [Limitations & Future Work](#limitations--future-work)
+- [Screenshots](#screenshots)
+
+## Project Goal
+
+Habit and to-do tools often track completion, but they rarely make progress feel tangible or show whether daily effort is becoming consistent over time.
+
+Habit Quest Analytics turns tasks into quests and combines habit tracking with lightweight analytics. The goal is to help a user answer:
+
+- what did I complete,
+- how much XP did that work generate,
+- which habits are becoming consistent,
+- which categories are being neglected,
+- how my character progression reflects real activity.
+
+## My Role
+
+I designed and scaffolded the application structure, including:
+
+- Streamlit multi-page app shell,
+- SQLite and SQLAlchemy data model,
+- default category seeding script,
+- XP and level calculation services,
+- basic metric functions,
+- documentation for the planned MVP,
+- pytest coverage for XP, level, and metric behavior.
+
+The next implementation step is building persistent quest management on top of this foundation.
+
+## Project Status
+
+This repository is currently an MVP scaffold.
+
+Implemented:
+
+- project scaffold and folder structure,
+- placeholder Streamlit pages,
+- SQLAlchemy models and SQLite setup,
+- default category seed script,
+- XP reward calculation by difficulty,
+- level calculation from total XP,
+- basic completion and consistency metric functions,
+- pytest tests for XP, level, and metrics.
+
+Planned next:
+
+- quest CRUD,
+- persistent quest management,
+- dashboard KPI cards backed by database data,
+- full habit analytics dashboard,
+- achievement unlock logic.
+
+## Preview
+
+Screenshots will be added once the first interactive MVP screens are implemented.
+
+Current UI state: Streamlit pages exist as placeholders for the Dashboard, Quest Log, Habit Analytics, and Character Profile sections.
+
+## Tech Stack
+
+- Python
+- Streamlit
+- SQLite
+- SQLAlchemy
+- Pandas
+- Plotly
+- Pytest
+
+## What It Does
+
+Habit Quest Analytics treats ordinary productivity tracking as a small RPG loop:
+
+- quests replace regular tasks,
+- difficulty controls XP rewards,
+- completed quests increase total XP,
+- total XP determines character level,
+- character stats reflect accumulated activity,
+- habit and productivity analytics show patterns over time.
+
+The current scaffold implements the structure and core formulas needed for this loop. The interactive task workflow and analytics charts are planned for the MVP implementation.
+
+## Example Insights
+
+The finished dashboard should answer questions such as:
+
+- Which days of the week are most productive?
+- Which quest categories are completed most often?
+- How much XP is gained each week?
+- Are planned tasks actually completed?
+- Which categories are neglected?
+- Is estimated time close to actual time?
+- Which habits are consistent and which ones are slipping?
+- How close is the character to the next level?
 
 ## Features
 
-- quest tracking for habits and tasks,
-- XP rewards based on quest difficulty,
-- player level calculation from total XP,
-- basic habit consistency metrics,
-- SQLite database models with SQLAlchemy,
-- placeholder Streamlit pages for the MVP workflow.
+### Implemented
+
+- Streamlit entrypoint and page placeholders.
+- SQLAlchemy models for quests, categories, profiles, achievements, and unlocked achievements.
+- SQLite database initialization.
+- Seed script for default categories.
+- XP calculation for `Easy`, `Medium`, `Hard`, and `Boss` quests.
+- Level calculation from total XP.
+- Basic completion rate and consistency score functions.
+- Pytest coverage for core formulas.
+
+### Planned MVP Features
+
+- Create, edit, complete, and archive quests.
+- Store quest history persistently in SQLite.
+- Assign categories, difficulty, due dates, and habit flags.
+- Update player XP after quest completion.
+- Render dashboard KPI cards from database records.
+- Show category completion and XP trends.
+- Track basic streaks and completion rates.
+- Display character profile progress and unlocked achievements.
+
+### Future Ideas
+
+- Calendar-based habit tracking.
+- Richer achievement rules.
+- Quest templates and recurring quests.
+- Planned vs actual time analysis.
+- Import and export for local backups.
+- Optional ML prediction for quest completion probability.
+
+## App Sections
+
+- `Dashboard` - planned high-level overview for active quests, completed quests, XP, level, and consistency KPIs.
+- `Quest Log` - planned quest creation, filtering, completion, and history view.
+- `Habit Analytics` - planned charts for completion rate, weekly XP, category balance, and streaks.
+- `Character Profile` - planned character name, total XP, level, XP to next level, and achievements.
+
+## Key Technical Decisions
+
+- Keep business rules outside Streamlit pages so they can be tested directly.
+- Use SQLite for simple local development and review.
+- Use SQLAlchemy models as the persistence boundary.
+- Keep metrics as small pure functions before adding chart-specific logic.
+- Introduce Pandas and Plotly when real quest records are available for analysis.
+- Avoid authentication, external APIs, and ML until the MVP is stable.
+
+## Data Flow
+
+```text
+Streamlit UI
+  -> Services
+  -> SQLAlchemy Models
+  -> SQLite Database
+  -> Analytics / Metrics
+  -> Dashboard Views
+```
+
+The intended flow is to keep Streamlit responsible for presentation, services responsible for workflows, SQLAlchemy responsible for persistence, and metrics responsible for calculations.
 
 ## Architecture
 
 The project is split into clear layers:
 
 ```text
-app/
-  main.py                  # Streamlit entrypoint
-  pages/                   # Streamlit page skeletons
-src/
-  database/                # SQLAlchemy setup, models, and seed data
-  services/                # quest, XP, and analytics services
-  analysis/                # pure metric calculation logic
-tests/                     # pytest coverage for pure logic
-docs/                      # project planning and data documentation
+habit-quest-analytics/
+  app/
+    main.py                  # Streamlit entrypoint
+    pages/                   # Streamlit page placeholders
+  src/
+    database/                # SQLAlchemy setup, models, and seed script
+    services/                # quest, XP, and analytics service functions
+    analysis/                # pure metric calculation functions
+  data/
+    sample/                  # placeholder for future sample data
+  docs/                      # project overview, MVP, data model, and metrics docs
+  tests/                     # pytest coverage for core logic
 ```
 
-Core rule: Streamlit pages should display data and call services. XP rules, level rules, and metrics should stay in plain Python functions with tests.
+Layer purpose:
+
+- `app/` contains the main Streamlit shell.
+- `app/pages/` contains the multi-page navigation targets.
+- `src/database/` contains the SQLite connection, SQLAlchemy models, and seed script.
+- `src/services/` contains application workflow functions.
+- `src/analysis/` contains metric formulas that should not depend on Streamlit.
+- `docs/` contains project planning and technical documentation.
+- `tests/` contains focused pytest coverage for behavior.
 
 ## Data Model
 
-The local SQLite database uses these SQLAlchemy models:
+The current SQLAlchemy model set includes:
 
-- `Quest`
-- `Category`
-- `PlayerProfile`
-- `Achievement`
-- `UnlockedAchievement`
+- `Quest` - a task or habit represented as an RPG quest.
+- `Category` - a grouping such as Health, Work, Learning, Home, or Social.
+- `PlayerProfile` - the user character profile with total XP.
+- `Achievement` - an unlockable milestone definition.
+- `UnlockedAchievement` - a join record linking a profile to an unlocked achievement.
 
-Default quest categories can be seeded with:
+Current relationships:
 
-```bash
-python -m src.database.seed
-```
+- one `Category` can have many `Quest` records,
+- one `PlayerProfile` can have many `UnlockedAchievement` records,
+- one `Achievement` can be unlocked by many profiles through `UnlockedAchievement`.
+
+## Metrics
+
+Implemented:
+
+- `total XP` - stored on the player profile and increased by completed quests in the planned workflow.
+- `level` - calculated with `total_xp // 500 + 1`.
+- `completion rate` - calculated as completed quests divided by total quests.
+
+Planned:
+
+- `XP to next level` - remaining XP before the next 500 XP threshold.
+- `weekly XP` - XP earned per week from completed quests.
+- `current streak` - consecutive days with completed habit activity.
+- `planned vs actual time` - comparison between estimated quest duration and actual time spent.
+
+XP rewards by difficulty:
+
+- `Easy`: 10 XP
+- `Medium`: 30 XP
+- `Hard`: 75 XP
+- `Boss`: 150 XP
 
 ## Requirements
 
-- Python 3.12 or newer
+- Python 3.11 or newer
 - dependencies from `requirements.txt`
-- local SQLite database stored in `data/habit_quest.db` by default
+- local SQLite database stored at `data/habit_quest.db` by default
 
 ## Installation
 
@@ -63,56 +276,62 @@ pip install -r requirements.txt
 
 ## Running The App
 
-Initialize the database and seed default categories:
+```bash
+streamlit run app/main.py
+```
+
+The current app opens a placeholder dashboard shell and page navigation for the planned MVP sections.
+
+## Database Setup / Seeding
+
+Create the SQLite database tables and seed default categories:
 
 ```bash
 python -m src.database.seed
 ```
 
-Run Streamlit:
+By default, the database is created at:
 
-```bash
-streamlit run app/main.py
+```text
+data/habit_quest.db
 ```
-
-The initial skeleton exposes these pages:
-
-- Dashboard
-- Quest Log
-- Habit Analytics
-- Character Profile
 
 ## Tests
 
-The test suite uses `pytest` and currently covers XP rewards, level calculation, and basic metric functions.
+The test suite uses `pytest` and currently covers XP reward rules, level calculation, completion rate, and consistency score.
 
 ```bash
 python -m pytest
+python -m compileall -q app src tests
 ```
-
-## MVP Scope
-
-- Create and complete quests.
-- Assign categories and difficulty levels.
-- Award XP for completed quests.
-- Calculate character level from total XP.
-- Show basic habit completion and consistency analytics.
-- Display achievements once achievement rules are added.
-
-## Planned Future Features
-
-- quest creation and editing forms,
-- calendar-based habit tracking,
-- XP progress charts with Plotly,
-- streak and consistency views,
-- achievement unlock rules,
-- richer character profile stats,
-- import and export for local data backups.
 
 ## Design Principles
 
-- keep Streamlit pages simple,
-- keep business logic in services and analysis modules,
-- use SQLite for local-first development,
-- test pure logic before expanding UI behavior,
-- avoid authentication, machine learning, and external APIs until the MVP is stable.
+- Keep business logic outside Streamlit views.
+- Keep metrics testable as plain Python functions.
+- Keep database access separated from calculation logic.
+- Avoid over-engineering while the MVP is still small.
+- Build the MVP step by step, with tests around rules before expanding UI behavior.
+- Keep unfinished features clearly labeled as planned or in progress.
+
+## Limitations & Future Work
+
+- Quest CRUD is not implemented yet.
+- Persistent quest management is planned.
+- Dashboard KPI cards are placeholders.
+- Analytics charts are planned after real quest data is available.
+- Character profile screens need XP progress and profile details.
+- Achievements need unlock rules and UI.
+- Planned vs actual time requires additional model fields.
+- Optional future ML prediction for quest completion probability may be explored later, but is intentionally out of scope for the MVP.
+
+## Screenshots
+
+Screenshots are not included yet because the current repository is a scaffold with placeholder pages.
+
+Planned screenshot sections:
+
+- Dashboard overview
+- Quest Log
+- Habit Analytics
+- Character Profile

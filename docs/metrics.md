@@ -1,19 +1,67 @@
 # Metrics
 
+This document defines the core metrics for Habit Quest Analytics. Some formulas are implemented in the scaffold; others describe the planned MVP analytics layer.
+
 ## XP Rewards
 
-Quest XP is based on difficulty:
+Quest XP is based on difficulty.
 
-- Easy: 10 XP
-- Medium: 30 XP
-- Hard: 75 XP
-- Boss: 150 XP
+| Difficulty | XP |
+| --- | ---: |
+| Easy | 10 |
+| Medium | 30 |
+| Hard | 75 |
+| Boss | 150 |
 
-## Level Calculation
+What it tells the user:
+
+- how much progress a completed quest contributes,
+- whether harder quests are meaningfully rewarded,
+- how daily actions translate into character progression.
+
+Status: implemented in `src/services/xp_service.py`.
+
+## Total XP
+
+```text
+total_xp = sum(xp_reward for completed quests)
+```
+
+What it tells the user:
+
+- cumulative progress across all completed work,
+- long-term activity level,
+- the base value used for character level.
+
+Status: model field exists on `PlayerProfile`; workflow update logic is planned.
+
+## Level
 
 ```text
 level = total_xp // 500 + 1
 ```
+
+What it tells the user:
+
+- the character's current progression tier,
+- a simple long-term reward for repeated completion.
+
+Status: implemented in `src/services/xp_service.py`.
+
+## XP To Next Level
+
+```text
+xp_to_next_level = 500 - (total_xp % 500)
+```
+
+If `total_xp` is exactly on a level boundary, the next level requires another `500` XP.
+
+What it tells the user:
+
+- how close the character is to leveling up,
+- how much work remains before the next progression milestone.
+
+Status: planned.
 
 ## Completion Rate
 
@@ -23,6 +71,42 @@ completion_rate = completed_quests / total_quests * 100
 
 If there are no quests, completion rate is `0.0`.
 
+What it tells the user:
+
+- whether planned work is actually getting finished,
+- whether the quest load is realistic,
+- how completion changes over time.
+
+Status: implemented as a pure metric function.
+
+## Weekly XP
+
+```text
+weekly_xp = sum(xp_reward for quests completed during the week)
+```
+
+What it tells the user:
+
+- how much progress was earned each week,
+- whether productivity is increasing, falling, or staying stable,
+- which weeks had unusually high or low activity.
+
+Status: planned.
+
+## Current Streak
+
+```text
+current_streak = consecutive days with at least one completed habit quest
+```
+
+What it tells the user:
+
+- whether habit activity is consistent,
+- how long the current routine has been maintained,
+- whether missed days are breaking momentum.
+
+Status: planned.
+
 ## Consistency Score
 
 ```text
@@ -30,3 +114,30 @@ consistency_score = completed_days / tracked_days * 100
 ```
 
 If there are no tracked days, consistency score is `0.0`.
+
+What it tells the user:
+
+- how often the user follows through across a tracked period,
+- whether a habit is stable enough to be considered reliable.
+
+Status: implemented as a pure metric function.
+
+## Planned Vs Actual Time
+
+```text
+time_accuracy = actual_minutes / estimated_minutes * 100
+```
+
+Alternative view:
+
+```text
+time_delta = actual_minutes - estimated_minutes
+```
+
+What it tells the user:
+
+- whether tasks are being underestimated or overestimated,
+- which categories consume more time than expected,
+- whether planning accuracy improves over time.
+
+Status: planned. The current data model does not yet include estimated or actual time fields.

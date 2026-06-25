@@ -1,26 +1,94 @@
 # MVP Specification
 
-## Scope
+The MVP should prove the core loop: create quests, complete quests, earn XP, level up, and review basic productivity patterns.
 
-The MVP should allow a user to:
+## MVP Scope
 
-- Create quests with a title, category, difficulty, and habit flag.
-- Mark quests as complete.
-- Earn XP based on quest difficulty.
-- View current level and total XP.
-- Review basic habit consistency metrics.
-- View unlocked achievements.
+The first usable version should include:
 
-## Pages
+- quest creation and editing,
+- quest completion with XP rewards,
+- categories for organizing work,
+- difficulty levels: Easy, Medium, Hard, Boss,
+- player profile with total XP and level,
+- basic dashboard KPIs,
+- simple habit consistency metrics,
+- local SQLite persistence,
+- tests for business rules.
 
-- Dashboard: high-level quest, XP, and consistency summary.
-- Quest Log: active and completed quests.
-- Habit Analytics: completion rate and streak-oriented charts.
-- Character Profile: player level, total XP, and achievements.
+## User Stories
 
-## Excluded From MVP
+- As a user, I want to create a quest so that I can track a habit or task.
+- As a user, I want to set quest difficulty so that harder work gives more XP.
+- As a user, I want to mark a quest complete so that my XP and progress update.
+- As a user, I want to view active and completed quests so that I can review my workload.
+- As a user, I want to see my level so that long-term progress is visible.
+- As a user, I want to review completion rates so that I can understand consistency.
+- As a user, I want categories so that I can see which areas of life are balanced or neglected.
 
-- User accounts.
-- Cloud sync.
-- External integrations.
+## App Sections
+
+- `Dashboard` - summary cards for active quests, completed quests, total XP, level, and consistency.
+- `Quest Log` - quest creation, filtering, completion, and history.
+- `Habit Analytics` - completion rate, weekly XP, category distribution, and streak-oriented charts.
+- `Character Profile` - character name, total XP, level, XP to next level, and achievements.
+
+## Implementation Phases
+
+### Phase 1: Scaffold
+
+Status: implemented.
+
+- Create project structure.
+- Add placeholder Streamlit pages.
+- Add SQLAlchemy models.
+- Add SQLite initialization.
+- Add default category seeding.
+- Add XP and level formulas.
+- Add initial tests.
+
+### Phase 2: Quest Management
+
+Status: planned next.
+
+- Add quest creation form.
+- Persist quests to SQLite.
+- List active and completed quests.
+- Mark quests complete.
+- Calculate and store XP rewards.
+
+### Phase 3: Dashboard Metrics
+
+Status: planned.
+
+- Load quest records into Pandas.
+- Add KPI cards for completion, XP, and level progress.
+- Add completion rate and weekly XP summaries.
+- Add basic category breakdowns.
+
+### Phase 4: Character And Achievements
+
+Status: planned.
+
+- Show character profile details.
+- Calculate XP to next level.
+- Define achievement rules.
+- Store and display unlocked achievements.
+
+## Future Features Outside MVP
+
+- Authentication and multi-user support.
+- Cloud database deployment.
+- External calendar or task integrations.
 - Machine learning recommendations.
+- Completion probability prediction.
+- Advanced recurring quest scheduling.
+- Data import and export workflows.
+
+## MVP Success Criteria
+
+- A user can create and complete quests locally.
+- XP and level update predictably.
+- Quest records persist in SQLite.
+- The dashboard summarizes real quest data.
+- Core formulas remain covered by tests.
