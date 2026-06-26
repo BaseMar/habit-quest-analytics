@@ -206,3 +206,25 @@ What it tells the user:
 - whether time planning is balanced across categories.
 
 Status: implemented.
+
+## RPG Stat XP
+
+```text
+rpg_stat_xp = sum(xp_reward for completed quests grouped by mapped category stat)
+```
+
+Default category mapping:
+
+- Learning -> Knowledge
+- Health -> Strength
+- Work -> Discipline
+- Social -> Creativity
+- Home -> Recovery
+
+What it tells the user:
+
+- which RPG-style character traits are growing,
+- how completed work is distributed across life areas,
+- whether the character profile reflects balanced activity.
+
+Status: implemented.

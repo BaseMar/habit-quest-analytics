@@ -6,9 +6,12 @@ from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Quest
 from src.services.analytics_service import (
+    build_xp_by_rpg_stat,
     build_completion_rate_by_weekday,
     build_quests_by_status,
     build_xp_by_day,
+    calculate_character_title,
+    get_character_profile_data,
     get_dashboard_kpis,
 )
 
@@ -143,3 +146,77 @@ def test_build_completion_rate_by_weekday(session):
             "Completion Rate": 0.0,
         },
     ]
+
+
+@pytest.mark.parametrize(
+    ("level", "expected_title"),
+    [
+        (1, "Novice Adventurer"),
+        (2, "Novice Adventurer"),
+        (3, "Disciplined Apprentice"),
+        (5, "Disciplined Apprentice"),
+        (6, "Quest Grinder"),
+        (10, "Quest Grinder"),
+        (11, "Habit Champion"),
+    ],
+)
+def test_calculate_character_title(level, expected_title):
+    assert calculate_character_title(level) == expected_title
+
+
+def test_build_xp_by_rpg_stat_counts_completed_quest_xp_by_category(session):
+    from src.database.models import Category
+
+    learning = Category(name="Learning")
+    health = Category(name="Health")
+    work = Category(name="Work")
+    social = Category(name="Social")
+
+    quests = [
+        Quest(title="Study", status="Completed", xp_reward=30, category=learning),
+        Quest(title="Lift", status="Completed", xp_reward=75, category=health),
+        Quest(title="Report", status="Completed", xp_reward=150, category=work),
+        Quest(title="Call friend", status="Completed", xp_reward=10, category=social),
+        Quest(title="Nap", status="Completed", xp_reward=10),
+        Quest(title="Planned study", status="Planned", xp_reward=150, category=learning),
+    ]
+
+    result = build_xp_by_rpg_stat(quests)
+
+    assert result[["Stat", "XP"]].to_dict("records") == [
+        {"Stat": "Knowledge", "XP": 30},
+        {"Stat": "Strength", "XP": 75},
+        {"Stat": "Discipline", "XP": 150},
+        {"Stat": "Creativity", "XP": 10},
+        {"Stat": "Recovery", "XP": 10},
+    ]
+
+
+def test_get_character_profile_data_summarizes_completed_quest_progress(session):
+    from src.database.models import Category
+
+    category = Category(name="Learning")
+    session.add(category)
+    session.commit()
+    session.add_all(
+        [
+            Quest(title="Read", status="Completed", xp_reward=300, category_id=category.id),
+            Quest(title="Course", status="Completed", xp_reward=250, category_id=category.id),
+            Quest(title="Plan", status="Planned", xp_reward=150, category_id=category.id),
+        ]
+    )
+    session.commit()
+
+    profile = get_character_profile_data(session=session)
+
+    assert profile["character_name"] == "Adventurer"
+    assert profile["current_level"] == 2
+    assert profile["character_title"] == "Novice Adventurer"
+    assert profile["total_xp"] == 550
+    assert profile["xp_to_next_level"] == 450
+    assert profile["level_progress"] == 0.1
+    assert profile["has_completed_quests"] is True
+    assert profile["rpg_stats"][["Stat", "XP"]].to_dict("records")[0] == {
+        "Stat": "Knowledge",
+        "XP": 550,
+    }

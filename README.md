@@ -2,7 +2,7 @@
 
 An RPG-inspired habit tracker and productivity analytics dashboard built with Streamlit.
 
-Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP scaffold with the first Quest Log workflow, Dashboard KPIs, and Habit Analytics charts implemented against the local SQLite database.
+Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP scaffold with the first Quest Log workflow, Dashboard KPIs, Habit Analytics charts, and Character Profile v1 implemented against the local SQLite database.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
@@ -77,6 +77,7 @@ Implemented:
 - Quest Log create, list, and status update workflow,
 - Dashboard KPI cards backed by persisted quest data,
 - Habit Analytics charts for XP, status, category, weekday completion, and estimated minutes,
+- Character Profile v1 with level progress and RPG stat XP,
 - XP reward calculation by difficulty,
 - level calculation from total XP,
 - basic completion and consistency metric functions,
@@ -92,7 +93,7 @@ Planned next:
 
 Screenshots will be added once the first interactive MVP screens are implemented.
 
-Current UI state: the Dashboard page shows real KPI cards from SQLite, the Quest Log page has the first interactive CRUD workflow, and Habit Analytics shows the first real Plotly charts. Character Profile remains a placeholder.
+Current UI state: the Dashboard page shows real KPI cards from SQLite, the Quest Log page has the first interactive CRUD workflow, Habit Analytics shows the first real Plotly charts, and Character Profile shows basic RPG progression. Achievement unlocking remains planned.
 
 ## Tech Stack
 
@@ -143,6 +144,7 @@ The finished dashboard should answer questions such as:
 - Quest status updates for `Planned`, `Completed`, `Failed`, and `Skipped`.
 - Dashboard KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - Habit Analytics charts for XP by day, quests by status, quests by category, completion rate by weekday, and estimated minutes by category.
+- Character Profile summary with character title, level progress, total XP, XP to next level, and RPG stats.
 - XP calculation for `Easy`, `Medium`, `Hard`, and `Boss` quests.
 - Level calculation from total XP.
 - Basic completion rate and consistency score functions.
@@ -155,7 +157,7 @@ The finished dashboard should answer questions such as:
 - Update player XP after quest completion.
 - Add dashboard and analytics filters.
 - Track basic streaks.
-- Display character profile progress and unlocked achievements.
+- Add achievement unlocking and richer profile details.
 
 ### Future Ideas
 
@@ -171,7 +173,7 @@ The finished dashboard should answer questions such as:
 - `Dashboard` - implemented KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - `Quest Log` - implemented quest creation, persisted quest listing, and status updates; editing and archive behavior are planned.
 - `Habit Analytics` - implemented first Plotly charts for XP by day, status counts, category counts, weekday completion rate, and estimated minutes by category.
-- `Character Profile` - planned character name, total XP, level, XP to next level, and achievements.
+- `Character Profile` - implemented character name, title, total XP, level, XP to next level, progress bar, and RPG stat XP; achievements are still planned.
 
 ## Key Technical Decisions
 
@@ -322,9 +324,8 @@ python -m compileall -q app src tests
 
 - Quest create/list/status update is implemented; edit and delete/archive are not implemented yet.
 - Persistent quest management is limited to the first Quest Log workflow.
-- Dashboard KPI cards and first Habit Analytics charts are implemented; advanced filters and charts are still planned.
-- Analytics charts are planned after real quest data is available.
-- Character profile screens need XP progress and profile details.
+- Dashboard KPI cards, first Habit Analytics charts, and Character Profile v1 are implemented; advanced filters and charts are still planned.
+- Character profile achievements and richer profile details are planned.
 - Achievements need unlock rules and UI.
 - Planned vs actual time requires an actual-time field; estimated minutes are already stored on quests.
 - Optional future ML prediction for quest completion probability may be explored later, but is intentionally out of scope for the MVP.

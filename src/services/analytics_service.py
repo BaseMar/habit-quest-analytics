@@ -10,6 +10,14 @@ from src.services.xp_service import calculate_level
 
 STATUS_ORDER = ("Planned", "Completed", "Failed", "Skipped")
 WEEKDAY_ORDER = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+RPG_STATS = ("Knowledge", "Strength", "Discipline", "Creativity", "Recovery")
+CATEGORY_STAT_MAP = {
+    "learning": "Knowledge",
+    "health": "Strength",
+    "work": "Discipline",
+    "home": "Recovery",
+    "social": "Creativity",
+}
 
 
 def build_quest_summary(quests: pd.DataFrame) -> dict:
@@ -80,6 +88,67 @@ def get_habit_analytics_data(session=None) -> dict:
     finally:
         if owns_session:
             session.close()
+
+
+def get_character_profile_data(session=None) -> dict:
+    """Return character progression data based on completed quests."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quests = session.query(Quest).options(joinedload(Quest.category)).all()
+        completed_quests = [quest for quest in quests if _is_completed(quest)]
+        total_xp = sum(quest.xp_reward or 0 for quest in completed_quests)
+        current_level = calculate_level(total_xp)
+        xp_to_next_level = calculate_xp_to_next_level(total_xp)
+
+        return {
+            "character_name": "Adventurer",
+            "character_title": calculate_character_title(current_level),
+            "current_level": current_level,
+            "total_xp": total_xp,
+            "xp_to_next_level": xp_to_next_level,
+            "level_progress": calculate_level_progress(total_xp),
+            "has_completed_quests": bool(completed_quests),
+            "rpg_stats": build_xp_by_rpg_stat(completed_quests),
+        }
+    finally:
+        if owns_session:
+            session.close()
+
+
+def calculate_character_title(level: int) -> str:
+    """Return the RPG title for a character level."""
+    if level < 1:
+        raise ValueError("Level must be at least 1.")
+    if level <= 2:
+        return "Novice Adventurer"
+    if level <= 5:
+        return "Disciplined Apprentice"
+    if level <= 10:
+        return "Quest Grinder"
+    return "Habit Champion"
+
+
+def calculate_level_progress(total_xp: int) -> float:
+    """Return progress toward the next level as a 0.0 to 1.0 value."""
+    if total_xp < 0:
+        raise ValueError("Total XP cannot be negative.")
+
+    return (total_xp % 500) / 500
+
+
+def build_xp_by_rpg_stat(quests: list[Quest]) -> pd.DataFrame:
+    """Return completed quest XP grouped by RPG stat."""
+    totals = {stat: 0 for stat in RPG_STATS}
+    for quest in quests:
+        if not _is_completed(quest):
+            continue
+        stat = _stat_for_category(_category_name(quest))
+        totals[stat] += quest.xp_reward or 0
+
+    return pd.DataFrame(
+        [{"Stat": stat, "XP": totals[stat], "Progress": min(totals[stat] / 500, 1.0)} for stat in RPG_STATS]
+    )
 
 
 def build_xp_by_day(quests: list[Quest]) -> pd.DataFrame:
@@ -205,3 +274,7 @@ def _quest_activity_date(quest: Quest) -> date | None:
     if quest.completed_at is not None:
         return quest.completed_at.date()
     return quest.due_date
+
+
+def _stat_for_category(category_name: str) -> str:
+    return CATEGORY_STAT_MAP.get(category_name.strip().lower(), "Recovery")

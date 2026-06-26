@@ -117,12 +117,28 @@ Still planned:
 
 ### Phase 4: Character And Achievements
 
-Status: planned.
+Status: partially implemented.
 
 - Show character profile details.
 - Calculate XP to next level.
 - Define achievement rules.
 - Store and display unlocked achievements.
+
+Implemented so far:
+
+- character name,
+- character title by level,
+- current level,
+- total XP from completed quests,
+- XP to next level,
+- progress bar toward the next level,
+- RPG stat XP from completed quests by category.
+
+Still planned:
+
+- persisted player profile editing,
+- achievement rules,
+- unlocked achievement display.
 
 ## Future Features Outside MVP
 
