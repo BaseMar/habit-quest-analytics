@@ -93,9 +93,27 @@ Implemented so far:
 
 Still planned:
 
-- category breakdowns,
-- trend charts,
 - dashboard filtering.
+- richer trend charts.
+
+### Phase 3b: Habit Analytics Charts
+
+Status: partially implemented.
+
+Implemented so far:
+
+- XP by day,
+- quests by status,
+- quests by category,
+- completion rate by planned weekday,
+- estimated minutes by category.
+
+Still planned:
+
+- date range filters,
+- habit-specific views,
+- streak charts,
+- trend comparisons over longer periods.
 
 ### Phase 4: Character And Achievements
 

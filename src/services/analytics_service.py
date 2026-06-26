@@ -1,11 +1,15 @@
 from datetime import date, datetime, time, timedelta
 
 import pandas as pd
+from sqlalchemy.orm import joinedload
 
 from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
 from src.database.db import get_session
 from src.database.models import Quest
 from src.services.xp_service import calculate_level
+
+STATUS_ORDER = ("Planned", "Completed", "Failed", "Skipped")
+WEEKDAY_ORDER = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
 def build_quest_summary(quests: pd.DataFrame) -> dict:
@@ -59,5 +63,145 @@ def get_dashboard_kpis(today: date | None = None, session=None) -> dict:
             session.close()
 
 
+def get_habit_analytics_data(session=None) -> dict:
+    """Return prepared dataframes for the Habit Analytics page."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quests = session.query(Quest).options(joinedload(Quest.category)).all()
+        return {
+            "has_quests": bool(quests),
+            "xp_by_day": build_xp_by_day(quests),
+            "quests_by_status": build_quests_by_status(quests),
+            "quests_by_category": build_quests_by_category(quests),
+            "completion_rate_by_weekday": build_completion_rate_by_weekday(quests),
+            "estimated_minutes_by_category": build_estimated_minutes_by_category(quests),
+        }
+    finally:
+        if owns_session:
+            session.close()
+
+
+def build_xp_by_day(quests: list[Quest]) -> pd.DataFrame:
+    """Return completed quest XP grouped by completion or planned date."""
+    rows = []
+    for quest in quests:
+        if not _is_completed(quest):
+            continue
+
+        activity_date = _quest_activity_date(quest)
+        if activity_date is None:
+            continue
+
+        rows.append({"Date": activity_date, "XP": quest.xp_reward or 0})
+
+    if not rows:
+        return pd.DataFrame(columns=["Date", "XP"])
+
+    return (
+        pd.DataFrame(rows)
+        .groupby("Date", as_index=False)["XP"]
+        .sum()
+        .sort_values("Date")
+        .reset_index(drop=True)
+    )
+
+
+def build_quests_by_status(quests: list[Quest]) -> pd.DataFrame:
+    """Return quest counts for the supported status values."""
+    rows = [{"Status": _normalize_status(quest.status), "Count": 1} for quest in quests]
+    counts = pd.DataFrame(rows).groupby("Status")["Count"].sum().to_dict() if rows else {}
+
+    return pd.DataFrame(
+        [{"Status": status, "Count": int(counts.get(status, 0))} for status in STATUS_ORDER]
+    )
+
+
+def build_quests_by_category(quests: list[Quest]) -> pd.DataFrame:
+    """Return quest counts grouped by category name."""
+    rows = [{"Category": _category_name(quest), "Count": 1} for quest in quests]
+    if not rows:
+        return pd.DataFrame(columns=["Category", "Count"])
+
+    return (
+        pd.DataFrame(rows)
+        .groupby("Category", as_index=False)["Count"]
+        .sum()
+        .sort_values(["Count", "Category"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+
+
+def build_completion_rate_by_weekday(quests: list[Quest]) -> pd.DataFrame:
+    """Return planned weekday completion rates."""
+    rows = []
+    for quest in quests:
+        if quest.due_date is None:
+            continue
+
+        rows.append(
+            {
+                "Weekday": quest.due_date.strftime("%A"),
+                "Weekday Number": quest.due_date.weekday(),
+                "Completed": 1 if _is_completed(quest) else 0,
+                "Total": 1,
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(columns=["Weekday", "Completed Quests", "Total Quests", "Completion Rate"])
+
+    grouped = (
+        pd.DataFrame(rows)
+        .groupby(["Weekday", "Weekday Number"], as_index=False)
+        .agg({"Completed": "sum", "Total": "sum"})
+        .sort_values("Weekday Number")
+    )
+    grouped["Completion Rate"] = grouped.apply(
+        lambda row: calculate_completion_rate(int(row["Completed"]), int(row["Total"])),
+        axis=1,
+    )
+
+    return grouped.rename(
+        columns={"Completed": "Completed Quests", "Total": "Total Quests"}
+    )[["Weekday", "Completed Quests", "Total Quests", "Completion Rate"]].reset_index(drop=True)
+
+
+def build_estimated_minutes_by_category(quests: list[Quest]) -> pd.DataFrame:
+    """Return estimated minutes grouped by category name."""
+    rows = [
+        {"Category": _category_name(quest), "Estimated Minutes": quest.estimated_minutes or 0}
+        for quest in quests
+    ]
+    if not rows:
+        return pd.DataFrame(columns=["Category", "Estimated Minutes"])
+
+    return (
+        pd.DataFrame(rows)
+        .groupby("Category", as_index=False)["Estimated Minutes"]
+        .sum()
+        .sort_values(["Estimated Minutes", "Category"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+
+
 def _is_completed(quest: Quest) -> bool:
     return (quest.status or "").strip().lower() == "completed"
+
+
+def _normalize_status(status: str | None) -> str:
+    value = (status or "").strip().lower()
+    for valid_status in STATUS_ORDER:
+        if value == valid_status.lower():
+            return valid_status
+    return "Planned"
+
+
+def _category_name(quest: Quest) -> str:
+    return quest.category.name if quest.category else "Uncategorized"
+
+
+def _quest_activity_date(quest: Quest) -> date | None:
+    if quest.completed_at is not None:
+        return quest.completed_at.date()
+    return quest.due_date

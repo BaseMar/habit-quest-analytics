@@ -93,6 +93,57 @@ What it tells the user:
 
 Status: implemented for quests completed in the current week.
 
+## XP By Day
+
+```text
+xp_by_day = sum(xp_reward for completed quests grouped by activity date)
+```
+
+The activity date uses `completed_at` when available and falls back to the planned date.
+
+What it tells the user:
+
+- which days produced the most XP,
+- whether completed effort is clustered or consistent,
+- how quest completion translates into daily progress.
+
+Status: implemented.
+
+## Quests By Status
+
+```text
+quests_by_status = count(quests grouped by status)
+```
+
+Supported status values:
+
+- Planned
+- Completed
+- Failed
+- Skipped
+
+What it tells the user:
+
+- how much work is still planned,
+- how much work was completed,
+- whether skipped or failed quests are accumulating.
+
+Status: implemented.
+
+## Quests By Category
+
+```text
+quests_by_category = count(quests grouped by category)
+```
+
+What it tells the user:
+
+- which life or work areas receive the most attention,
+- whether categories are balanced,
+- which categories may be neglected.
+
+Status: implemented.
+
 ## Current Streak
 
 ```text
@@ -141,3 +192,17 @@ What it tells the user:
 - whether planning accuracy improves over time.
 
 Status: planned. The current data model includes `estimated_minutes`; an actual-time field is still needed before this metric can be implemented.
+
+## Estimated Minutes By Category
+
+```text
+estimated_minutes_by_category = sum(estimated_minutes grouped by category)
+```
+
+What it tells the user:
+
+- where planned time is being allocated,
+- which categories carry the largest planned workload,
+- whether time planning is balanced across categories.
+
+Status: implemented.
