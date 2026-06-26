@@ -32,6 +32,7 @@ Stores tasks and habits represented as quests.
 | `is_habit` | Marks whether the quest represents a habit rather than a one-time task. |
 | `xp_reward` | XP value assigned to the quest. |
 | `due_date` | Optional due date. |
+| `estimated_minutes` | Optional planned duration in minutes. |
 | `completed_at` | Timestamp set when the quest is completed. |
 | `created_at` | Timestamp set when the quest is created. |
 | `category_id` | Optional foreign key to `categories.id`. |
@@ -111,6 +112,7 @@ erDiagram
         boolean is_habit
         int xp_reward
         date due_date
+        int estimated_minutes
         datetime completed_at
         datetime created_at
         int category_id FK
@@ -141,7 +143,7 @@ erDiagram
 
 ## Notes For Future Development
 
-- Planned vs actual time analysis will require additional quest fields.
+- Planned vs actual time analysis will require an actual-time field; `estimated_minutes` already exists.
 - Recurring habits may need a separate completion history table.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - Database migrations are not included yet; schema changes should be made carefully while the project is still small.

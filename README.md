@@ -2,7 +2,7 @@
 
 An RPG-inspired habit tracker and productivity analytics dashboard built with Streamlit.
 
-Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP scaffold: the project structure, database models, service layer, metric functions, tests, and placeholder Streamlit pages are in place, while quest CRUD and full dashboard analytics are planned next.
+Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP scaffold with the first Quest Log workflow implemented: quests can be created, listed, and moved between statuses in the local SQLite database.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
@@ -74,15 +74,15 @@ Implemented:
 - placeholder Streamlit pages,
 - SQLAlchemy models and SQLite setup,
 - default category seed script,
+- Quest Log create, list, and status update workflow,
 - XP reward calculation by difficulty,
 - level calculation from total XP,
 - basic completion and consistency metric functions,
-- pytest tests for XP, level, and metrics.
+- pytest tests for XP, level, metrics, and quest service behavior.
 
 Planned next:
 
-- quest CRUD,
-- persistent quest management,
+- quest editing and delete/archive behavior,
 - dashboard KPI cards backed by database data,
 - full habit analytics dashboard,
 - achievement unlock logic.
@@ -91,7 +91,7 @@ Planned next:
 
 Screenshots will be added once the first interactive MVP screens are implemented.
 
-Current UI state: Streamlit pages exist as placeholders for the Dashboard, Quest Log, Habit Analytics, and Character Profile sections.
+Current UI state: the Quest Log page has the first interactive CRUD workflow. Dashboard, Habit Analytics, and Character Profile remain placeholders.
 
 ## Tech Stack
 
@@ -137,6 +137,9 @@ The finished dashboard should answer questions such as:
 - SQLAlchemy models for quests, categories, profiles, achievements, and unlocked achievements.
 - SQLite database initialization.
 - Seed script for default categories.
+- Quest creation form on the Quest Log page.
+- Quest table showing persisted records from SQLite.
+- Quest status updates for `Planned`, `Completed`, `Failed`, and `Skipped`.
 - XP calculation for `Easy`, `Medium`, `Hard`, and `Boss` quests.
 - Level calculation from total XP.
 - Basic completion rate and consistency score functions.
@@ -144,9 +147,8 @@ The finished dashboard should answer questions such as:
 
 ### Planned MVP Features
 
-- Create, edit, complete, and archive quests.
-- Store quest history persistently in SQLite.
-- Assign categories, difficulty, due dates, and habit flags.
+- Edit and archive quests.
+- Add habit flags to the Quest Log form.
 - Update player XP after quest completion.
 - Render dashboard KPI cards from database records.
 - Show category completion and XP trends.
@@ -165,7 +167,7 @@ The finished dashboard should answer questions such as:
 ## App Sections
 
 - `Dashboard` - planned high-level overview for active quests, completed quests, XP, level, and consistency KPIs.
-- `Quest Log` - planned quest creation, filtering, completion, and history view.
+- `Quest Log` - implemented quest creation, persisted quest listing, and status updates; editing and archive behavior are planned.
 - `Habit Analytics` - planned charts for completion rate, weekly XP, category balance, and streaks.
 - `Character Profile` - planned character name, total XP, level, XP to next level, and achievements.
 
@@ -280,7 +282,7 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-The current app opens a placeholder dashboard shell and page navigation for the planned MVP sections.
+The current app opens a placeholder dashboard shell and includes an interactive Quest Log page for creating, listing, and updating quest status.
 
 ## Database Setup / Seeding
 
@@ -316,13 +318,13 @@ python -m compileall -q app src tests
 
 ## Limitations & Future Work
 
-- Quest CRUD is not implemented yet.
-- Persistent quest management is planned.
+- Quest create/list/status update is implemented; edit and delete/archive are not implemented yet.
+- Persistent quest management is limited to the first Quest Log workflow.
 - Dashboard KPI cards are placeholders.
 - Analytics charts are planned after real quest data is available.
 - Character profile screens need XP progress and profile details.
 - Achievements need unlock rules and UI.
-- Planned vs actual time requires additional model fields.
+- Planned vs actual time requires an actual-time field; estimated minutes are already stored on quests.
 - Optional future ML prediction for quest completion probability may be explored later, but is intentionally out of scope for the MVP.
 
 ## Screenshots

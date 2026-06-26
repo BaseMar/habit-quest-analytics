@@ -140,4 +140,4 @@ What it tells the user:
 - which categories consume more time than expected,
 - whether planning accuracy improves over time.
 
-Status: planned. The current data model does not yet include estimated or actual time fields.
+Status: planned. The current data model includes `estimated_minutes`; an actual-time field is still needed before this metric can be implemented.

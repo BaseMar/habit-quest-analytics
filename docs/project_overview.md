@@ -23,14 +23,15 @@ The target user is a single person who wants a local-first productivity dashboar
 
 The repository currently contains the initial scaffold:
 
-- placeholder Streamlit pages,
+- placeholder Streamlit pages plus an interactive Quest Log page,
 - SQLite and SQLAlchemy setup,
 - models for quests, categories, player profiles, and achievements,
 - seed data for default categories,
+- quest create, list, and status update behavior,
 - XP, level, completion, and consistency calculations,
 - pytest coverage for core formulas.
 
-Quest CRUD, persistence workflows, analytics charts, and achievement unlocking are planned next.
+Quest editing, delete/archive behavior, analytics charts, player XP updates, and achievement unlocking are planned next.
 
 ## Non-Goals For The MVP
 

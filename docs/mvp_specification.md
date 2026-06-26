@@ -49,13 +49,28 @@ Status: implemented.
 
 ### Phase 2: Quest Management
 
-Status: planned next.
+Status: partially implemented.
 
 - Add quest creation form.
 - Persist quests to SQLite.
 - List active and completed quests.
 - Mark quests complete.
 - Calculate and store XP rewards.
+
+Implemented so far:
+
+- create quests from the Quest Log page,
+- store title, description, category, difficulty, planned date, estimated minutes, status, and XP reward,
+- list persisted quests,
+- update status to Planned, Completed, Failed, or Skipped,
+- set `completed_at` when a quest is completed for the first time.
+
+Still planned:
+
+- edit existing quests,
+- delete or archive quests,
+- habit flag controls,
+- player profile XP updates.
 
 ### Phase 3: Dashboard Metrics
 
