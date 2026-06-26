@@ -28,10 +28,11 @@ The repository currently contains the initial scaffold:
 - models for quests, categories, player profiles, and achievements,
 - seed data for default categories,
 - quest create, list, and status update behavior,
+- dashboard KPI cards powered by persisted quests,
 - XP, level, completion, and consistency calculations,
 - pytest coverage for core formulas.
 
-Quest editing, delete/archive behavior, analytics charts, player XP updates, and achievement unlocking are planned next.
+Quest editing, delete/archive behavior, advanced analytics charts, player XP updates, and achievement unlocking are planned next.
 
 ## Non-Goals For The MVP
 

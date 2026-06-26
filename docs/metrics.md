@@ -61,7 +61,7 @@ What it tells the user:
 - how close the character is to leveling up,
 - how much work remains before the next progression milestone.
 
-Status: planned.
+Status: implemented.
 
 ## Completion Rate
 
@@ -91,7 +91,7 @@ What it tells the user:
 - whether productivity is increasing, falling, or staying stable,
 - which weeks had unusually high or low activity.
 
-Status: planned.
+Status: implemented for quests completed in the current week.
 
 ## Current Streak
 

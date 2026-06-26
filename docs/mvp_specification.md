@@ -74,12 +74,28 @@ Still planned:
 
 ### Phase 3: Dashboard Metrics
 
-Status: planned.
+Status: partially implemented.
 
 - Load quest records into Pandas.
 - Add KPI cards for completion, XP, and level progress.
 - Add completion rate and weekly XP summaries.
 - Add basic category breakdowns.
+
+Implemented so far:
+
+- total quests,
+- completed quests,
+- completion rate,
+- total XP from completed quests,
+- weekly XP from quests completed in the current week,
+- current level,
+- XP to next level.
+
+Still planned:
+
+- category breakdowns,
+- trend charts,
+- dashboard filtering.
 
 ### Phase 4: Character And Achievements
 
