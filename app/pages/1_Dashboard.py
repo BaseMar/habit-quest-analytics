@@ -12,6 +12,7 @@ from src.services.analytics_service import get_dashboard_kpis
 
 
 st.title("Dashboard")
+st.write("Review your quest ledger at a glance: completion, XP, weekly progress, and level growth.")
 
 init_db()
 kpis = get_dashboard_kpis()
@@ -30,5 +31,10 @@ xp_col1.metric("Total XP", kpis["total_xp"])
 xp_col2.metric("Weekly XP", kpis["weekly_xp"])
 xp_col3.metric("Current Level", kpis["current_level"])
 xp_col4.metric("XP to Next Level", kpis["xp_to_next_level"])
+
+if kpis["total_quests"] == 0:
+    st.info("No quest records yet. Create your first quest in Quest Log to activate the dashboard.")
+elif kpis["completed_quests"] == 0:
+    st.info("Your quests are planned, but none are completed yet. Mark a quest as Completed to start earning XP.")
 
 st.caption("KPI values are calculated from quests stored in the local SQLite database.")

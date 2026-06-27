@@ -171,13 +171,14 @@ def test_build_xp_by_rpg_stat_counts_completed_quest_xp_by_category(session):
     health = Category(name="Health")
     work = Category(name="Work")
     social = Category(name="Social")
+    home = Category(name="Home")
 
     quests = [
         Quest(title="Study", status="Completed", xp_reward=30, category=learning),
         Quest(title="Lift", status="Completed", xp_reward=75, category=health),
         Quest(title="Report", status="Completed", xp_reward=150, category=work),
         Quest(title="Call friend", status="Completed", xp_reward=10, category=social),
-        Quest(title="Nap", status="Completed", xp_reward=10),
+        Quest(title="Home reset", status="Completed", xp_reward=10, category=home),
         Quest(title="Planned study", status="Planned", xp_reward=150, category=learning),
     ]
 

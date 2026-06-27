@@ -12,14 +12,28 @@ from src.database.db import init_db
 from src.services.analytics_service import get_habit_analytics_data
 
 
+def _render_centered_chart(fig):
+    _, chart_col, _ = st.columns([1, 5, 1])
+    with chart_col:
+        st.plotly_chart(fig, width="stretch")
+
+
+def _format_date_labels(dataframe):
+    chart_data = dataframe.copy()
+    chart_data["Date"] = chart_data["Date"].map(
+        lambda value: value.strftime("%Y-%m-%d") if hasattr(value, "strftime") else str(value)
+    )
+    return chart_data
+
+
 st.title("Habit Analytics")
-st.write("Analyze quest history, XP patterns, and habit consistency using persisted quest data.")
+st.write("Analyze your quest history, XP rhythm, category balance, and habit consistency.")
 
 init_db()
 analytics = get_habit_analytics_data()
 
 if not analytics["has_quests"]:
-    st.info("No quests yet. Create quests in the Quest Log page to unlock analytics charts.")
+    st.info("No data to chart yet. Add your first quests in Quest Log to unlock analytics.")
 else:
     xp_by_day = analytics["xp_by_day"]
     quests_by_status = analytics["quests_by_status"]
@@ -29,14 +43,16 @@ else:
 
     st.header("Progress")
     if xp_by_day.empty:
-        st.info("Complete quests to see XP by day.")
+        st.info("No completed quests yet. Complete quests to see XP by day.")
     else:
-        fig = px.bar(xp_by_day, x="Date", y="XP", title="XP by Day")
-        fig.update_layout(xaxis_title="Date", yaxis_title="XP", showlegend=False)
-        st.plotly_chart(fig, width="stretch")
+        xp_by_day_chart = _format_date_labels(xp_by_day)
+        fig = px.bar(xp_by_day_chart, x="Date", y="XP", title="XP by Day")
+        fig.update_layout(xaxis_title="Quest Date", yaxis_title="XP Earned", showlegend=False, height=320)
+        fig.update_xaxes(type="category")
+        _render_centered_chart(fig)
 
     st.header("Quest Breakdown")
-    col1, col2 = st.columns(2)
+    _, col1, col2, _ = st.columns([1, 4, 4, 1])
 
     with col1:
         if quests_by_status.empty:
@@ -47,9 +63,9 @@ else:
                 x="Status",
                 y="Count",
                 title="Quests by Status",
-                category_orders={"Status": ["Planned", "Completed", "Failed", "Skipped"]},
+                category_orders={"Status": quests_by_status["Status"].tolist()},
             )
-            fig.update_layout(xaxis_title="Status", yaxis_title="Quests", showlegend=False)
+            fig.update_layout(xaxis_title="Quest Status", yaxis_title="Quest Count", showlegend=False, height=320)
             st.plotly_chart(fig, width="stretch")
 
     with col2:
@@ -57,12 +73,12 @@ else:
             st.info("No category data available yet.")
         else:
             fig = px.bar(quests_by_category, x="Category", y="Count", title="Quests by Category")
-            fig.update_layout(xaxis_title="Category", yaxis_title="Quests", showlegend=False)
+            fig.update_layout(xaxis_title="Category", yaxis_title="Quest Count", showlegend=False, height=320)
             st.plotly_chart(fig, width="stretch")
 
     st.header("Consistency")
     if completion_rate_by_weekday.empty:
-        st.info("Add planned dates to quests to see completion rate by weekday.")
+        st.info("No planned dates found. Add planned dates to see completion rate by weekday.")
     else:
         fig = px.bar(
             completion_rate_by_weekday,
@@ -82,12 +98,12 @@ else:
                 ]
             },
         )
-        fig.update_layout(xaxis_title="Planned Weekday", yaxis_title="Completion Rate (%)", showlegend=False)
-        st.plotly_chart(fig, width="stretch")
+        fig.update_layout(xaxis_title="Planned Weekday", yaxis_title="Completion Rate (%)", showlegend=False, height=320)
+        _render_centered_chart(fig)
 
     st.header("Planning")
     if estimated_minutes_by_category.empty or estimated_minutes_by_category["Estimated Minutes"].sum() == 0:
-        st.info("Add estimated minutes to quests to see planning effort by category.")
+        st.info("No estimated time recorded yet. Add estimated minutes to compare planned effort by category.")
     else:
         fig = px.bar(
             estimated_minutes_by_category,
@@ -95,5 +111,5 @@ else:
             y="Estimated Minutes",
             title="Estimated Minutes by Category",
         )
-        fig.update_layout(xaxis_title="Category", yaxis_title="Estimated Minutes", showlegend=False)
-        st.plotly_chart(fig, width="stretch")
+        fig.update_layout(xaxis_title="Category", yaxis_title="Estimated Minutes", showlegend=False, height=320)
+        _render_centered_chart(fig)

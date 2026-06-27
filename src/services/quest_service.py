@@ -4,10 +4,11 @@ from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
 from src.database.models import Category, Quest
+from src.constants import QUEST_STATUSES
 from src.services.xp_service import calculate_xp
 
 
-VALID_QUEST_STATUSES = ("Planned", "Completed", "Failed", "Skipped")
+VALID_QUEST_STATUSES = QUEST_STATUSES
 
 
 def get_quest_xp_reward(difficulty: str) -> int:

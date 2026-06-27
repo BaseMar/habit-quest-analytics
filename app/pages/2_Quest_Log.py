@@ -8,6 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.constants import QUEST_DIFFICULTIES
 from src.database.db import init_db
 from src.database.seed import seed_default_categories
 from src.services.quest_service import (
@@ -20,6 +21,7 @@ from src.services.quest_service import (
 
 
 st.title("Quest Log")
+st.write("Create quests, assign difficulty, and keep your quest ledger up to date.")
 
 init_db()
 categories = get_categories()
@@ -29,16 +31,20 @@ if not categories:
 
 category_options = {category.name: category.id for category in categories}
 
-st.header("Create Quest")
+if not category_options:
+    st.warning("No categories are available yet. Run the seed script to prepare the quest categories.")
+    st.stop()
+
+st.header("Create a Quest")
 
 with st.form("create_quest_form", clear_on_submit=True):
-    title = st.text_input("Title")
-    description = st.text_area("Description")
+    title = st.text_input("Quest title")
+    description = st.text_area("Quest notes")
 
     col1, col2 = st.columns(2)
     with col1:
         category_name = st.selectbox("Category", list(category_options.keys()))
-        difficulty = st.selectbox("Difficulty", ["Easy", "Medium", "Hard", "Boss"])
+        difficulty = st.selectbox("Difficulty", list(QUEST_DIFFICULTIES))
     with col2:
         planned_date = st.date_input("Planned date")
         estimated_minutes = st.number_input(
@@ -49,10 +55,10 @@ with st.form("create_quest_form", clear_on_submit=True):
             step=5,
         )
 
-    submitted = st.form_submit_button("Create Quest")
+    submitted = st.form_submit_button("Add Quest")
     if submitted:
         if not title.strip():
-            st.error("Quest title is required.")
+            st.error("Every quest needs a title.")
         else:
             create_quest(
                 title=title,
@@ -62,7 +68,7 @@ with st.form("create_quest_form", clear_on_submit=True):
                 planned_date=planned_date,
                 estimated_minutes=estimated_minutes,
             )
-            st.success("Quest created.")
+            st.success("Quest added to your log.")
             st.rerun()
 
 st.header("Existing Quests")
@@ -70,7 +76,7 @@ st.header("Existing Quests")
 quests = get_all_quests()
 
 if not quests:
-    st.info("No quests yet. Create your first quest above.")
+    st.info("No quests yet. Add your first quest above to start building your adventure log.")
 else:
     quest_rows = [
         {
@@ -86,7 +92,7 @@ else:
         }
         for quest in quests
     ]
-    st.dataframe(pd.DataFrame(quest_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(quest_rows), width="stretch", hide_index=True)
 
     st.subheader("Update Quest Status")
     quest_labels = {f"#{quest.id} - {quest.title}": quest.id for quest in quests}

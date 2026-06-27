@@ -8,28 +8,21 @@ st.set_page_config(
 )
 
 st.title("Habit Quest Analytics")
-st.subheader("RPG-style habit and to-do dashboard")
+st.subheader("RPG-style habit and productivity dashboard")
 
 st.write(
-    "Track quests, earn XP, level up your character, and review habit consistency. "
-    "This scaffold contains the initial app shell, database models, services, and tests."
+    "Turn daily tasks into quests, earn XP for completed work, and review your progress "
+    "through dashboard KPIs, habit charts, and character stats."
 )
 
-col1, col2, col3 = st.columns(3)
+st.info("Start in Quest Log to create your first quest, then return to Dashboard and Habit Analytics to inspect your progress.")
 
-with col1:
-    st.metric("Active Quests", "0")
-
-with col2:
-    st.metric("Total XP", "0")
-
-with col3:
-    st.metric("Current Level", "1")
-
-st.divider()
-
-st.header("Today")
-st.info("Quest cards and daily habit check-ins will appear here in the MVP.")
-
-st.header("Progress")
-st.info("XP charts, streaks, and completion trends will be added in later iterations.")
+st.header("Current Sections")
+st.markdown(
+    """
+    - **Dashboard**: summary KPIs from persisted quests.
+    - **Quest Log**: create quests and update quest status.
+    - **Habit Analytics**: charts for XP, categories, status, and consistency.
+    - **Character Profile**: RPG level, XP progress, and stat growth.
+    """
+)

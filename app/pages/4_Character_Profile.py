@@ -13,6 +13,7 @@ from src.services.analytics_service import get_character_profile_data
 
 
 st.title("Character Profile")
+st.write("Track how completed quests shape your RPG character progression.")
 
 init_db()
 profile = get_character_profile_data()
@@ -31,7 +32,7 @@ st.progress(profile["level_progress"])
 st.caption(f"{int(profile['level_progress'] * 100)}% progress toward the next level")
 
 if not profile["has_completed_quests"]:
-    st.info("Complete quests in the Quest Log to earn XP and grow your character stats.")
+    st.info("No completed quests yet. Complete quests in Quest Log to earn XP and grow your RPG stats.")
 else:
     st.header("RPG Stats")
     rpg_stats = profile["rpg_stats"]
@@ -45,8 +46,8 @@ else:
     st.dataframe(rpg_stats[["Stat", "XP"]], hide_index=True, width="stretch")
 
     fig = px.bar(rpg_stats, x="Stat", y="XP", title="XP by RPG Stat")
-    fig.update_layout(xaxis_title="RPG Stat", yaxis_title="XP", showlegend=False)
+    fig.update_layout(xaxis_title="RPG Stat", yaxis_title="XP Earned", showlegend=False, height=360)
     st.plotly_chart(fig, width="stretch")
 
 st.header("Achievements")
-st.info("Achievement unlocking is planned for a later MVP step.")
+st.info("Achievements are not unlocked yet. This section will remain quiet until achievement rules are added.")

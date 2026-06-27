@@ -1,14 +1,6 @@
 from src.database.db import get_session, init_db
 from src.database.models import Category
-
-
-DEFAULT_CATEGORIES = [
-    ("Health", "Fitness, nutrition, sleep, and recovery quests."),
-    ("Work", "Professional tasks and focused work quests."),
-    ("Learning", "Study, reading, and skill-building quests."),
-    ("Home", "Chores, errands, and personal admin quests."),
-    ("Social", "Relationships, family, and community quests."),
-]
+from src.constants import DEFAULT_CATEGORIES
 
 
 def seed_default_categories() -> None:

@@ -4,28 +4,20 @@ import pandas as pd
 from sqlalchemy.orm import joinedload
 
 from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
+from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
 from src.database.models import Quest
 from src.services.xp_service import calculate_level
 
-STATUS_ORDER = ("Planned", "Completed", "Failed", "Skipped")
-WEEKDAY_ORDER = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-RPG_STATS = ("Knowledge", "Strength", "Discipline", "Creativity", "Recovery")
-CATEGORY_STAT_MAP = {
-    "learning": "Knowledge",
-    "health": "Strength",
-    "work": "Discipline",
-    "home": "Recovery",
-    "social": "Creativity",
-}
+STATUS_ORDER = QUEST_STATUSES
 
 
 def build_quest_summary(quests: pd.DataFrame) -> dict:
     """Build a small summary from a quest dataframe."""
-    if quests.empty:
+    if quests.empty or "status" not in quests:
         return {"total": 0, "completed": 0, "completion_rate": 0.0}
 
-    completed = int((quests["status"].str.lower() == "completed").sum())
+    completed = int((quests["status"].fillna("").str.lower() == "completed").sum())
     total = int(len(quests))
 
     return {
@@ -277,4 +269,4 @@ def _quest_activity_date(quest: Quest) -> date | None:
 
 
 def _stat_for_category(category_name: str) -> str:
-    return CATEGORY_STAT_MAP.get(category_name.strip().lower(), "Recovery")
+    return CATEGORY_TO_RPG_STAT.get(category_name.strip().lower(), "Recovery")
