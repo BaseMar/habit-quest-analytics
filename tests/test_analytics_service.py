@@ -6,9 +6,11 @@ from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Quest
 from src.services.analytics_service import (
+    build_character_activity_stats,
     build_xp_by_rpg_stat,
     build_completion_rate_by_weekday,
     build_quests_by_status,
+    calculate_weekly_xp,
     build_xp_by_day,
     calculate_character_title,
     get_character_profile_data,
@@ -193,6 +195,78 @@ def test_build_xp_by_rpg_stat_counts_completed_quest_xp_by_category(session):
     ]
 
 
+def test_calculate_weekly_xp_counts_current_week_completed_quests(session):
+    quests = [
+        Quest(
+            title="This week",
+            status="Completed",
+            xp_reward=75,
+            completed_at=datetime(2026, 6, 23, 9, 0),
+        ),
+        Quest(
+            title="Last week",
+            status="Completed",
+            xp_reward=150,
+            completed_at=datetime(2026, 6, 15, 9, 0),
+        ),
+        Quest(title="No completion date", status="Completed", xp_reward=30),
+    ]
+
+    assert calculate_weekly_xp(quests, today=date(2026, 6, 26)) == 75
+
+
+def test_build_character_activity_stats_returns_compact_profile_metrics(session):
+    from src.database.models import Category
+
+    learning = Category(name="Learning")
+    work = Category(name="Work")
+    quests = [
+        Quest(
+            title="Read",
+            status="Completed",
+            difficulty="Easy",
+            xp_reward=10,
+            due_date=date(2026, 6, 22),
+            category=learning,
+        ),
+        Quest(
+            title="Ship report",
+            status="Completed",
+            difficulty="Boss",
+            xp_reward=150,
+            due_date=date(2026, 6, 23),
+            category=work,
+        ),
+        Quest(
+            title="Deep work",
+            status="Completed",
+            difficulty="Hard",
+            xp_reward=75,
+            due_date=date(2026, 6, 23),
+            category=work,
+        ),
+    ]
+    rpg_stats = build_xp_by_rpg_stat(quests)
+
+    result = build_character_activity_stats(
+        completed_quests=quests,
+        rpg_stats=rpg_stats,
+        completion_rate=80.0,
+        weekly_xp=225,
+    )
+
+    assert result == [
+        {"label": "Completed Quests", "value": 3},
+        {"label": "Completion Rate", "value": "80.0%"},
+        {"label": "Weekly XP", "value": 225},
+        {"label": "Boss Quests Completed", "value": 1},
+        {"label": "Average XP / Completed Quest", "value": 78.3},
+        {"label": "Most Active Category", "value": "Work"},
+        {"label": "Strongest RPG Stat", "value": "Discipline (225 XP)"},
+        {"label": "Most Productive Weekday", "value": "Tuesday"},
+    ]
+
+
 def test_get_character_profile_data_summarizes_completed_quest_progress(session):
     from src.database.models import Category
 
@@ -208,15 +282,20 @@ def test_get_character_profile_data_summarizes_completed_quest_progress(session)
     )
     session.commit()
 
-    profile = get_character_profile_data(session=session)
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
 
     assert profile["character_name"] == "Adventurer"
+    assert profile["avatar_path"] is None
     assert profile["current_level"] == 2
     assert profile["character_title"] == "Novice Adventurer"
     assert profile["total_xp"] == 550
     assert profile["xp_to_next_level"] == 450
     assert profile["level_progress"] == 0.1
     assert profile["has_completed_quests"] is True
+    assert profile["completed_quests"] == 2
+    assert profile["completion_rate"] == 66.67
+    assert profile["weekly_xp"] == 0
+    assert profile["activity_stats"][0] == {"label": "Completed Quests", "value": 2}
     assert profile["rpg_stats"][["Stat", "XP"]].to_dict("records")[0] == {
         "Stat": "Knowledge",
         "XP": 550,

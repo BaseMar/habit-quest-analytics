@@ -52,6 +52,7 @@ class PlayerProfile(Base):
     id = Column(Integer, primary_key=True)
     character_name = Column(String(100), nullable=False, default="Adventurer")
     total_xp = Column(Integer, nullable=False, default=0)
+    avatar_path = Column(String(255), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 

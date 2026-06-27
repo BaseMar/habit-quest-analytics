@@ -50,6 +50,7 @@ Stores the user's RPG-style character profile.
 | `id` | Primary key. |
 | `character_name` | Display name for the character. |
 | `total_xp` | Total XP earned across completed quests. |
+| `avatar_path` | Optional local path to the uploaded character avatar image. |
 | `created_at` | Timestamp set when the profile is created. |
 | `updated_at` | Timestamp updated when the profile changes. |
 
@@ -122,6 +123,7 @@ erDiagram
         int id PK
         string character_name
         int total_xp
+        string avatar_path
         datetime created_at
         datetime updated_at
     }
@@ -147,3 +149,4 @@ erDiagram
 - Recurring habits may need a separate completion history table.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - Database migrations are not included yet; schema changes should be made carefully while the project is still small.
+- Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.

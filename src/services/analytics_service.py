@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
 from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
-from src.database.models import Quest
+from src.database.models import PlayerProfile, Quest
 from src.services.xp_service import calculate_level
 
 STATUS_ORDER = QUEST_STATUSES
@@ -82,8 +82,9 @@ def get_habit_analytics_data(session=None) -> dict:
             session.close()
 
 
-def get_character_profile_data(session=None) -> dict:
+def get_character_profile_data(today: date | None = None, session=None) -> dict:
     """Return character progression data based on completed quests."""
+    today = today or date.today()
     owns_session = session is None
     session = session or get_session()
     try:
@@ -92,16 +93,32 @@ def get_character_profile_data(session=None) -> dict:
         total_xp = sum(quest.xp_reward or 0 for quest in completed_quests)
         current_level = calculate_level(total_xp)
         xp_to_next_level = calculate_xp_to_next_level(total_xp)
+        player_profile = session.query(PlayerProfile).order_by(PlayerProfile.id).first()
+        character_name = player_profile.character_name if player_profile else "Adventurer"
+        avatar_path = player_profile.avatar_path if player_profile else None
+        completion_rate = calculate_completion_rate(len(completed_quests), len(quests))
+        weekly_xp = calculate_weekly_xp(completed_quests, today)
+        rpg_stats = build_xp_by_rpg_stat(completed_quests)
 
         return {
-            "character_name": "Adventurer",
+            "character_name": character_name,
             "character_title": calculate_character_title(current_level),
+            "avatar_path": avatar_path,
             "current_level": current_level,
             "total_xp": total_xp,
             "xp_to_next_level": xp_to_next_level,
             "level_progress": calculate_level_progress(total_xp),
             "has_completed_quests": bool(completed_quests),
-            "rpg_stats": build_xp_by_rpg_stat(completed_quests),
+            "completed_quests": len(completed_quests),
+            "completion_rate": completion_rate,
+            "weekly_xp": weekly_xp,
+            "rpg_stats": rpg_stats,
+            "activity_stats": build_character_activity_stats(
+                completed_quests=completed_quests,
+                rpg_stats=rpg_stats,
+                completion_rate=completion_rate,
+                weekly_xp=weekly_xp,
+            ),
         }
     finally:
         if owns_session:
@@ -141,6 +158,45 @@ def build_xp_by_rpg_stat(quests: list[Quest]) -> pd.DataFrame:
     return pd.DataFrame(
         [{"Stat": stat, "XP": totals[stat], "Progress": min(totals[stat] / 500, 1.0)} for stat in RPG_STATS]
     )
+
+
+def calculate_weekly_xp(quests: list[Quest], today: date) -> int:
+    """Return completed quest XP earned in the week containing today."""
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+    week_start_at = datetime.combine(week_start, time.min)
+    week_end_at = datetime.combine(week_end, time.min)
+
+    return sum(
+        quest.xp_reward or 0
+        for quest in quests
+        if _is_completed(quest)
+        and quest.completed_at is not None
+        and week_start_at <= quest.completed_at < week_end_at
+    )
+
+
+def build_character_activity_stats(
+    completed_quests: list[Quest],
+    rpg_stats: pd.DataFrame,
+    completion_rate: float,
+    weekly_xp: int,
+) -> list[dict]:
+    """Return compact character activity stats for the profile sheet."""
+    completed_count = len(completed_quests)
+    total_xp = sum(quest.xp_reward or 0 for quest in completed_quests)
+    average_xp = round(total_xp / completed_count, 1) if completed_count else 0
+
+    return [
+        {"label": "Completed Quests", "value": completed_count},
+        {"label": "Completion Rate", "value": f"{completion_rate}%"},
+        {"label": "Weekly XP", "value": weekly_xp},
+        {"label": "Boss Quests Completed", "value": _count_boss_quests(completed_quests)},
+        {"label": "Average XP / Completed Quest", "value": average_xp},
+        {"label": "Most Active Category", "value": _most_active_category(completed_quests)},
+        {"label": "Strongest RPG Stat", "value": _strongest_rpg_stat(rpg_stats)},
+        {"label": "Most Productive Weekday", "value": _most_productive_weekday(completed_quests)},
+    ]
 
 
 def build_xp_by_day(quests: list[Quest]) -> pd.DataFrame:
@@ -270,3 +326,43 @@ def _quest_activity_date(quest: Quest) -> date | None:
 
 def _stat_for_category(category_name: str) -> str:
     return CATEGORY_TO_RPG_STAT.get(category_name.strip().lower(), "Recovery")
+
+
+def _count_boss_quests(quests: list[Quest]) -> int:
+    return sum(1 for quest in quests if (quest.difficulty or "").strip().lower() == "boss")
+
+
+def _most_active_category(quests: list[Quest]) -> str:
+    category_counts: dict[str, int] = {}
+    for quest in quests:
+        category = _category_name(quest)
+        category_counts[category] = category_counts.get(category, 0) + 1
+
+    if not category_counts:
+        return "Not enough data"
+
+    return sorted(category_counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _strongest_rpg_stat(rpg_stats: pd.DataFrame) -> str:
+    if rpg_stats.empty or int(rpg_stats["XP"].max()) == 0:
+        return "Not enough data"
+
+    strongest = rpg_stats.sort_values(["XP", "Stat"], ascending=[False, True]).iloc[0]
+    return f"{strongest['Stat']} ({int(strongest['XP'])} XP)"
+
+
+def _most_productive_weekday(quests: list[Quest]) -> str:
+    weekday_counts: dict[tuple[int, str], int] = {}
+    for quest in quests:
+        activity_date = _quest_activity_date(quest)
+        if activity_date is None:
+            continue
+
+        key = (activity_date.weekday(), activity_date.strftime("%A"))
+        weekday_counts[key] = weekday_counts.get(key, 0) + 1
+
+    if not weekday_counts:
+        return "Not enough data"
+
+    return sorted(weekday_counts.items(), key=lambda item: (-item[1], item[0][0]))[0][0][1]

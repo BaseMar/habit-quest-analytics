@@ -2,7 +2,7 @@
 
 An RPG-inspired habit tracker and productivity analytics dashboard built with Streamlit.
 
-Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP implementation with the first Quest Log workflow, Dashboard KPIs, Habit Analytics charts, Character Profile v1, and a polished dark RPG dashboard UI backed by the local SQLite database.
+Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP implementation with the first Quest Log workflow, Dashboard KPIs, Habit Analytics charts, an RPG-style Character Profile with local avatar upload, and a polished dark RPG dashboard UI backed by the local SQLite database.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
@@ -78,7 +78,7 @@ Implemented:
 - Quest Log create, list, and status update workflow,
 - Dashboard KPI cards backed by persisted quest data,
 - Habit Analytics charts for XP, status, category, weekday completion, and estimated minutes,
-- Character Profile v1 with level progress and RPG stat XP,
+- RPG-style Character Profile with level progress, RPG stat XP, compact stat rows, radar chart, achievements placeholder, and local avatar upload,
 - XP reward calculation by difficulty,
 - level calculation from total XP,
 - basic completion and consistency metric functions,
@@ -94,7 +94,7 @@ Planned next:
 
 Screenshots will be added after the current UI is captured from a representative local dataset.
 
-Current UI state: the Command Center page shows real KPI cards from SQLite, the Quest Log page has the first interactive CRUD workflow, Habit Analytics shows Plotly charts, and Character Profile shows basic RPG progression. Achievement unlocking remains planned.
+Current UI state: the Command Center page shows real KPI cards from SQLite, the Quest Log page has the first interactive CRUD workflow, Habit Analytics shows Plotly charts, and Character Profile shows an RPG-style character sheet with stat balance and avatar upload. Achievement unlocking remains planned.
 
 ## Tech Stack
 
@@ -146,7 +146,7 @@ The finished dashboard should answer questions such as:
 - Quest status updates for `Planned`, `Completed`, `Failed`, and `Skipped`.
 - Dashboard KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - Habit Analytics charts for XP by day, quests by status, quests by category, completion rate by weekday, and estimated minutes by category.
-- Character Profile summary with character title, level progress, total XP, XP to next level, and RPG stats.
+- Character Profile sheet with avatar upload, character title, level progress, total XP, XP to next level, RPG stats, radar chart, compact stat rows, and achievements placeholder.
 - XP calculation for `Easy`, `Medium`, `Hard`, and `Boss` quests.
 - Level calculation from total XP.
 - Basic completion rate and consistency score functions.
@@ -159,7 +159,7 @@ The finished dashboard should answer questions such as:
 - Update player XP after quest completion.
 - Add dashboard and analytics filters.
 - Track basic streaks.
-- Add achievement unlocking and richer profile details.
+- Add achievement unlocking.
 
 ### Future Ideas
 
@@ -175,7 +175,7 @@ The finished dashboard should answer questions such as:
 - `Dashboard` - implemented KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - `Quest Log` - implemented quest creation, persisted quest listing, and status updates; editing and archive behavior are planned.
 - `Habit Analytics` - implemented first Plotly charts for XP by day, status counts, category counts, weekday completion rate, and estimated minutes by category.
-- `Character Profile` - implemented character name, title, total XP, level, XP to next level, progress bar, and RPG stat XP; achievements are still planned.
+- `Character Profile` - implemented character name, title, avatar upload, total XP, level, XP to next level, progress bar, RPG stat XP, radar chart, compact stat rows, and achievements placeholder; achievement unlock logic is still planned.
 
 ## Key Technical Decisions
 
@@ -234,7 +234,7 @@ The current SQLAlchemy model set includes:
 
 - `Quest` - a task or habit represented as an RPG quest.
 - `Category` - a grouping such as Health, Work, Learning, Home, or Social.
-- `PlayerProfile` - the user character profile with total XP.
+- `PlayerProfile` - the user character profile with total XP and optional local avatar path.
 - `Achievement` - an unlockable milestone definition.
 - `UnlockedAchievement` - a join record linking a profile to an unlocked achievement.
 
@@ -248,14 +248,14 @@ Current relationships:
 
 Implemented:
 
-- `total XP` - stored on the player profile and increased by completed quests in the planned workflow.
+- `total XP` - calculated from completed quest XP.
 - `level` - calculated with `total_xp // 500 + 1`.
+- `XP to next level` - remaining XP before the next 500 XP threshold.
 - `completion rate` - calculated as completed quests divided by total quests.
+- `weekly XP` - XP earned in the current week from completed quests.
 
 Planned:
 
-- `XP to next level` - remaining XP before the next 500 XP threshold.
-- `weekly XP` - XP earned in the current week from completed quests.
 - `current streak` - consecutive days with completed habit activity.
 - `planned vs actual time` - comparison between estimated quest duration and actual time spent.
 
@@ -327,8 +327,8 @@ python -m compileall -q app src tests
 
 - Quest create/list/status update is implemented; edit and delete/archive are not implemented yet.
 - Persistent quest management is limited to the first Quest Log workflow.
-- Dashboard KPI cards, first Habit Analytics charts, and Character Profile v1 are implemented; advanced filters and charts are still planned.
-- Character profile achievements and richer profile details are planned.
+- Dashboard KPI cards, first Habit Analytics charts, and the RPG-style Character Profile are implemented; advanced filters and charts are still planned.
+- Character profile achievements are planned.
 - Achievements need unlock rules and UI.
 - Planned vs actual time requires an actual-time field; estimated minutes are already stored on quests.
 - Optional future ML prediction for quest completion probability may be explored later, but is intentionally out of scope for the MVP.

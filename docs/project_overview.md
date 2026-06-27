@@ -30,11 +30,11 @@ The repository currently contains the initial scaffold:
 - quest create, list, and status update behavior,
 - dashboard KPI cards powered by persisted quests,
 - first Habit Analytics charts powered by persisted quests,
-- Character Profile v1 with level progress and RPG stat XP,
+- RPG-style Character Profile with level progress, RPG stat XP, radar chart, compact stat rows, achievements placeholder, and local avatar upload,
 - XP, level, completion, and consistency calculations,
 - pytest coverage for core formulas.
 
-Quest editing, delete/archive behavior, analytics filters, persisted player profile updates, and achievement unlocking are planned next.
+Quest editing, delete/archive behavior, analytics filters, and achievement unlocking are planned next.
 
 ## Non-Goals For The MVP
 

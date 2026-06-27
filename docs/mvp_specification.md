@@ -31,7 +31,7 @@ The first usable version should include:
 - `Dashboard` - summary cards for active quests, completed quests, total XP, level, and consistency.
 - `Quest Log` - quest creation, filtering, completion, and history.
 - `Habit Analytics` - completion rate, weekly XP, category distribution, and streak-oriented charts.
-- `Character Profile` - character name, total XP, level, XP to next level, and achievements.
+- `Character Profile` - character name, avatar, total XP, level, XP to next level, RPG stats, and planned achievements.
 
 ## Implementation Phases
 
@@ -121,6 +121,7 @@ Status: partially implemented.
 
 - Show character profile details.
 - Calculate XP to next level.
+- Upload and display a local avatar.
 - Define achievement rules.
 - Store and display unlocked achievements.
 
@@ -132,7 +133,11 @@ Implemented so far:
 - total XP from completed quests,
 - XP to next level,
 - progress bar toward the next level,
-- RPG stat XP from completed quests by category.
+- RPG stat XP from completed quests by category,
+- radar chart for RPG stat balance,
+- compact profile stat rows,
+- achievements placeholder,
+- local avatar upload path on the player profile.
 
 Still planned:
 

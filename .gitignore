@@ -23,6 +23,7 @@ streamlit.*.log
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/uploads/
 
 # OS and editors
 .DS_Store
