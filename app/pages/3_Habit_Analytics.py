@@ -10,6 +10,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.database.db import init_db
 from src.services.analytics_service import get_habit_analytics_data
+from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title, style_chart
+
+
+st.set_page_config(page_title="Habit Analytics", page_icon="HQ", layout="wide")
 
 
 def _render_centered_chart(fig):
@@ -26,14 +30,18 @@ def _format_date_labels(dataframe):
     return chart_data
 
 
-st.title("Habit Analytics")
-st.write("Analyze your quest history, XP rhythm, category balance, and habit consistency.")
+apply_theme()
+render_page_header(
+    "Analytics",
+    "Habit Analytics",
+    "Analyze your quest history, XP rhythm, category balance, and habit consistency.",
+)
 
 init_db()
 analytics = get_habit_analytics_data()
 
 if not analytics["has_quests"]:
-    st.info("No data to chart yet. Add your first quests in Quest Log to unlock analytics.")
+    render_empty_state("No analytics data yet", "Add your first quests in Quest Log to unlock charts.")
 else:
     xp_by_day = analytics["xp_by_day"]
     quests_by_status = analytics["quests_by_status"]
@@ -41,22 +49,22 @@ else:
     completion_rate_by_weekday = analytics["completion_rate_by_weekday"]
     estimated_minutes_by_category = analytics["estimated_minutes_by_category"]
 
-    st.header("Progress")
+    render_section_title("Progress", "XP earned from completed quests, grouped by day.")
     if xp_by_day.empty:
-        st.info("No completed quests yet. Complete quests to see XP by day.")
+        render_empty_state("No completed quests yet", "Complete quests to see XP by day.")
     else:
         xp_by_day_chart = _format_date_labels(xp_by_day)
-        fig = px.bar(xp_by_day_chart, x="Date", y="XP", title="XP by Day")
+        fig = px.bar(xp_by_day_chart, x="Date", y="XP", title="XP by Day", color_discrete_sequence=["#8B5CF6"])
         fig.update_layout(xaxis_title="Quest Date", yaxis_title="XP Earned", showlegend=False, height=320)
         fig.update_xaxes(type="category")
-        _render_centered_chart(fig)
+        _render_centered_chart(style_chart(fig))
 
-    st.header("Quest Breakdown")
+    render_section_title("Quest Breakdown", "Status and category distribution across your quest ledger.")
     _, col1, col2, _ = st.columns([1, 4, 4, 1])
 
     with col1:
         if quests_by_status.empty:
-            st.info("No status data available yet.")
+            render_empty_state("No status data", "Add quests to see the status breakdown.")
         else:
             fig = px.bar(
                 quests_by_status,
@@ -64,21 +72,28 @@ else:
                 y="Count",
                 title="Quests by Status",
                 category_orders={"Status": quests_by_status["Status"].tolist()},
+                color_discrete_sequence=["#38BDF8"],
             )
             fig.update_layout(xaxis_title="Quest Status", yaxis_title="Quest Count", showlegend=False, height=320)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(style_chart(fig), width="stretch")
 
     with col2:
         if quests_by_category.empty:
-            st.info("No category data available yet.")
+            render_empty_state("No category data", "Add categorized quests to see category balance.")
         else:
-            fig = px.bar(quests_by_category, x="Category", y="Count", title="Quests by Category")
+            fig = px.bar(
+                quests_by_category,
+                x="Category",
+                y="Count",
+                title="Quests by Category",
+                color_discrete_sequence=["#22C55E"],
+            )
             fig.update_layout(xaxis_title="Category", yaxis_title="Quest Count", showlegend=False, height=320)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(style_chart(fig), width="stretch")
 
-    st.header("Consistency")
+    render_section_title("Consistency", "Completion rate by the weekday originally planned for each quest.")
     if completion_rate_by_weekday.empty:
-        st.info("No planned dates found. Add planned dates to see completion rate by weekday.")
+        render_empty_state("No planned dates found", "Add planned dates to see completion rate by weekday.")
     else:
         fig = px.bar(
             completion_rate_by_weekday,
@@ -86,6 +101,7 @@ else:
             y="Completion Rate",
             title="Completion Rate by Weekday",
             hover_data=["Completed Quests", "Total Quests"],
+            color_discrete_sequence=["#F59E0B"],
             category_orders={
                 "Weekday": [
                     "Monday",
@@ -99,17 +115,21 @@ else:
             },
         )
         fig.update_layout(xaxis_title="Planned Weekday", yaxis_title="Completion Rate (%)", showlegend=False, height=320)
-        _render_centered_chart(fig)
+        _render_centered_chart(style_chart(fig))
 
-    st.header("Planning")
+    render_section_title("Planning", "Estimated effort grouped by quest category.")
     if estimated_minutes_by_category.empty or estimated_minutes_by_category["Estimated Minutes"].sum() == 0:
-        st.info("No estimated time recorded yet. Add estimated minutes to compare planned effort by category.")
+        render_empty_state(
+            "No estimated time recorded",
+            "Add estimated minutes to compare planned effort by category.",
+        )
     else:
         fig = px.bar(
             estimated_minutes_by_category,
             x="Category",
             y="Estimated Minutes",
             title="Estimated Minutes by Category",
+            color_discrete_sequence=["#8B5CF6"],
         )
         fig.update_layout(xaxis_title="Category", yaxis_title="Estimated Minutes", showlegend=False, height=320)
-        _render_centered_chart(fig)
+        _render_centered_chart(style_chart(fig))

@@ -26,7 +26,33 @@ Implementation note:
 - This should stay practical and app-like, not become a marketing landing page.
 - Improve existing screens before adding new ones.
 
-## Priority 2. Quest Editing
+## Priority 2. Quest Status Flow
+
+What it adds:
+
+- Clear product rules for quest statuses:
+  - Planned: scheduled but not yet historically evaluated.
+  - Completed: finished and grants XP.
+  - Failed: not completed despite being planned and grants no XP.
+  - Skipped: consciously skipped, grants no XP, and may be excluded from selected metrics.
+
+Why it matters:
+
+- Status rules affect XP, dashboard KPIs, analytics charts, weekly reviews, and user trust.
+- Planned quests should not distort historical performance before their date has passed.
+
+Positive value:
+
+- Makes analytics more accurate.
+- Prevents unclear interpretation of failed vs skipped work.
+- Creates a stronger product foundation before adding more metrics.
+
+Implementation note:
+
+- This is partly product design and partly code.
+- Start by documenting rules, then align KPI and analytics calculations.
+
+## Priority 3. Quest Editing
 
 What it adds:
 
@@ -43,7 +69,7 @@ Positive value:
 - Improves usability and trust in persisted data.
 - Makes the app more realistic as a daily productivity tool.
 
-## Priority 3. Quest Archive / Soft Delete
+## Priority 4. Quest Archive / Soft Delete
 
 What it adds:
 
@@ -59,7 +85,34 @@ Positive value:
 - Keeps the UI clean while preserving analytics integrity.
 - Supports better long-term tracking.
 
-## Priority 4. Date Filters for Dashboard and Analytics
+## Priority 5. Today View / Daily Command Center
+
+What it adds:
+
+- A daily operational section showing:
+  - today's quests,
+  - quick status updates for Completed, Failed, and Skipped,
+  - XP available today,
+  - daily progress,
+  - daily completion rate.
+
+Why it matters:
+
+- A habit app is not only for analyzing history. Users need a daily answer to: what should I do today?
+- This makes the app useful as a daily workflow tool, not just an analytics dashboard.
+
+Positive value:
+
+- Increases real-world daily usefulness.
+- Makes the app feel actionable immediately after opening.
+- Connects planning, execution, XP, and analytics in one flow.
+
+Implementation note:
+
+- This can live at the top of Dashboard or become a separate page later.
+- Keep the first version simple and based on existing quest dates/statuses.
+
+## Priority 6. Date Filters for Dashboard and Analytics
 
 What it adds:
 
@@ -75,7 +128,7 @@ Positive value:
 - Makes analytics more useful without changing the core quest model.
 - Helps compare recent behavior against long-term trends.
 
-## Priority 5. Recurring Quests / Habit Templates
+## Priority 7. Recurring Quests / Habit Templates
 
 What it adds:
 
@@ -91,7 +144,7 @@ Positive value:
 - Makes the product more useful for daily habit loops.
 - Increases retention because recurring behavior becomes easier to track.
 
-## Priority 6. Streak Tracking
+## Priority 8. Streak Tracking
 
 What it adds:
 
@@ -111,7 +164,38 @@ Dependency note:
 
 - More valuable after recurring quests or clearer habit tracking exists.
 
-## Priority 7. Achievement Rules
+## Priority 9. Weekly Review
+
+What it adds:
+
+- A weekly review page or section showing:
+  - planned quests,
+  - completed quests,
+  - completion rate,
+  - XP earned,
+  - strongest category,
+  - neglected category,
+  - largest time estimation gap,
+  - simple rule-based recommendation for next week.
+
+Why it matters:
+
+- It turns raw analytics into a useful productivity review.
+- It gives the app a strong data analyst / productivity angle without machine learning.
+
+Positive value:
+
+- Makes the project more impressive as a portfolio piece.
+- Helps users reflect and improve weekly planning.
+- Creates a clear narrative from quest data.
+
+Implementation note:
+
+- Do not use ML for this.
+- Use simple deterministic rules.
+- Best implemented after status rules, date filters, and enough weekly data are stable.
+
+## Priority 10. Achievement Rules
 
 What it adds:
 
@@ -126,7 +210,7 @@ Positive value:
 - Gives users milestone feedback.
 - Makes progression feel more complete.
 
-## Priority 8. XP Progress Timeline
+## Priority 11. XP Progress Timeline
 
 What it adds:
 
@@ -141,7 +225,7 @@ Positive value:
 - Makes progress easier to understand at a glance.
 - Reinforces the level-up mechanic.
 
-## Priority 9. Category Balance View
+## Priority 12. Category Balance View
 
 What it adds:
 
@@ -156,7 +240,7 @@ Positive value:
 - Turns the app from a task list into a personal balance dashboard.
 - Helps users notice neglected areas earlier.
 
-## Priority 10. Production Database
+## Priority 13. Production Database
 
 What it adds:
 
@@ -178,7 +262,7 @@ Implementation note:
 - This should be planned carefully because it affects configuration, migrations, deployment, secrets, and possibly tests.
 - Do not implement without confirming the target provider and migration strategy.
 
-## Priority 11. Data Export
+## Priority 14. Data Export
 
 What it adds:
 
@@ -193,7 +277,7 @@ Positive value:
 - Builds trust.
 - Allows further personal analysis outside the app.
 
-## Priority 12. Planned vs Actual Time
+## Priority 15. Planned vs Actual Time
 
 What it adds:
 
@@ -209,7 +293,36 @@ Positive value:
 - Adds productivity insight beyond completion.
 - Helps users understand whether they underestimate tasks.
 
-## Priority 13. Quest Difficulty Review
+## Priority 16. Quest Priority
+
+What it adds:
+
+- Separate quest importance from quest difficulty:
+  - Difficulty: how much effort a quest costs.
+  - Priority: how important the quest is.
+
+Possible values:
+
+- Low
+- Medium
+- High
+
+Why it matters:
+
+- Difficulty and importance are different concepts.
+- A short walk can be Easy but High priority; a large refactor can be Hard but Medium priority.
+
+Positive value:
+
+- Improves planning quality.
+- Enables future analytics around high-priority completion.
+
+Implementation note:
+
+- This requires a model change and UI updates.
+- Do not implement too early; first stabilize editing, status flow, and daily usage.
+
+## Priority 17. Quest Difficulty Review
 
 What it adds:
 
@@ -224,7 +337,7 @@ Positive value:
 - Helps evaluate challenge balance.
 - Supports better XP tuning later.
 
-## Priority 14. Character Profile Customization
+## Priority 18. Character Profile Customization
 
 What it adds:
 
@@ -240,7 +353,7 @@ Positive value:
 - Improves emotional connection to the dashboard.
 - Adds polish without changing the analytics engine.
 
-## Priority 15. Optional Design Patterns
+## Priority 19. Optional Design Patterns
 
 What it adds:
 

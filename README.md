@@ -2,7 +2,7 @@
 
 An RPG-inspired habit tracker and productivity analytics dashboard built with Streamlit.
 
-Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP scaffold with the first Quest Log workflow, Dashboard KPIs, Habit Analytics charts, and Character Profile v1 implemented against the local SQLite database.
+Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP implementation with the first Quest Log workflow, Dashboard KPIs, Habit Analytics charts, Character Profile v1, and a polished dark RPG dashboard UI backed by the local SQLite database.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
@@ -52,26 +52,27 @@ Habit Quest Analytics turns tasks into quests and combines habit tracking with l
 
 ## My Role
 
-I designed and scaffolded the application structure, including:
+I designed and built the MVP foundation, including:
 
 - Streamlit multi-page app shell,
 - SQLite and SQLAlchemy data model,
 - default category seeding script,
 - XP and level calculation services,
 - basic metric functions,
+- a consistent dark Streamlit UI layer,
 - documentation for the planned MVP,
 - pytest coverage for XP, level, and metric behavior.
 
-The next implementation step is building persistent quest management on top of this foundation.
+The next implementation step is refining the quest lifecycle and daily workflow on top of this foundation.
 
 ## Project Status
 
-This repository is currently an MVP scaffold.
+This repository is currently an MVP in development.
 
 Implemented:
 
 - project scaffold and folder structure,
-- placeholder Streamlit pages,
+- Streamlit multi-page app with polished dark RPG dashboard styling,
 - SQLAlchemy models and SQLite setup,
 - default category seed script,
 - Quest Log create, list, and status update workflow,
@@ -91,9 +92,9 @@ Planned next:
 
 ## Preview
 
-Screenshots will be added once the first interactive MVP screens are implemented.
+Screenshots will be added after the current UI is captured from a representative local dataset.
 
-Current UI state: the Dashboard page shows real KPI cards from SQLite, the Quest Log page has the first interactive CRUD workflow, Habit Analytics shows the first real Plotly charts, and Character Profile shows basic RPG progression. Achievement unlocking remains planned.
+Current UI state: the Command Center page shows real KPI cards from SQLite, the Quest Log page has the first interactive CRUD workflow, Habit Analytics shows Plotly charts, and Character Profile shows basic RPG progression. Achievement unlocking remains planned.
 
 ## Tech Stack
 
@@ -116,7 +117,7 @@ Habit Quest Analytics treats ordinary productivity tracking as a small RPG loop:
 - character stats reflect accumulated activity,
 - habit and productivity analytics show patterns over time.
 
-The current scaffold implements the structure and core formulas needed for this loop. The interactive task workflow and analytics charts are planned for the MVP implementation.
+The current MVP implements the first interactive task workflow, core formulas, KPI cards, analytics charts, and RPG character summary needed for this loop.
 
 ## Example Insights
 
@@ -135,7 +136,8 @@ The finished dashboard should answer questions such as:
 
 ### Implemented
 
-- Streamlit entrypoint and page placeholders.
+- Streamlit entrypoint and implemented multi-page app sections.
+- Reusable dark UI styling helpers for page headers, cards, metrics, charts, and empty states.
 - SQLAlchemy models for quests, categories, profiles, achievements, and unlocked achievements.
 - SQLite database initialization.
 - Seed script for default categories.
@@ -205,7 +207,7 @@ The project is split into clear layers:
 habit-quest-analytics/
   app/
     main.py                  # Streamlit entrypoint
-    pages/                   # Streamlit page placeholders
+    pages/                   # Streamlit page views
   src/
     database/                # SQLAlchemy setup, models, and seed script
     services/                # quest, XP, and analytics service functions
@@ -286,7 +288,7 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-The current app opens a placeholder dashboard shell and includes an interactive Quest Log page for creating, listing, and updating quest status.
+The current app opens a polished Streamlit dashboard shell with KPI, quest management, analytics, and character profile pages.
 
 ## Database Setup / Seeding
 
@@ -316,6 +318,7 @@ python -m compileall -q app src tests
 - Keep business logic outside Streamlit views.
 - Keep metrics testable as plain Python functions.
 - Keep database access separated from calculation logic.
+- Keep UI styling consistent, practical, and readable for portfolio review.
 - Avoid over-engineering while the MVP is still small.
 - Build the MVP step by step, with tests around rules before expanding UI behavior.
 - Keep unfinished features clearly labeled as planned or in progress.
@@ -332,7 +335,7 @@ python -m compileall -q app src tests
 
 ## Screenshots
 
-Screenshots are not included yet because the current repository is a scaffold with placeholder pages.
+Screenshots are not included yet. Capture them after seeding representative quest data so the dashboard, charts, and character profile show meaningful values.
 
 Planned screenshot sections:
 
