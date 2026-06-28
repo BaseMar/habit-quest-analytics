@@ -63,6 +63,67 @@ def get_dashboard_kpis(today: date | None = None, session=None) -> dict:
             session.close()
 
 
+def get_command_center_data(today: date | None = None, session=None) -> dict:
+    """Return operational quest metrics for the Command Center page."""
+    today = today or date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+    week_start_at = datetime.combine(week_start, time.min)
+    week_end_at = datetime.combine(week_end, time.min)
+
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quests = session.query(Quest).options(joinedload(Quest.category)).all()
+        status_counts = build_status_counts(quests)
+        completed_count = status_counts["Completed"]
+        total_quests = len(quests)
+        weekly_quests = build_quests_in_week(quests, week_start_at, week_end_at)
+        completed_this_week = sum(1 for quest in weekly_quests if _is_completed(quest))
+        failed_this_week = sum(1 for quest in weekly_quests if _normalize_status(quest.status) == "Failed")
+        weekly_xp = sum(quest.xp_reward or 0 for quest in weekly_quests if _is_completed(quest))
+        due_today = [
+            quest
+            for quest in quests
+            if quest.due_date == today and _normalize_status(quest.status) != "Completed"
+        ]
+        overdue_quests = [
+            quest
+            for quest in quests
+            if quest.due_date is not None
+            and quest.due_date < today
+            and _normalize_status(quest.status) == "Planned"
+        ]
+        completed_today = [
+            quest
+            for quest in quests
+            if quest.completed_at is not None and quest.completed_at.date() == today
+        ]
+
+        return {
+            "has_quests": bool(quests),
+            "total_quests": total_quests,
+            "completed_quests": completed_count,
+            "planned_quests": status_counts["Planned"],
+            "due_today": len(due_today),
+            "overdue_quests": len(overdue_quests),
+            "completed_today": len(completed_today),
+            "failed_quests": status_counts["Failed"],
+            "skipped_quests": status_counts["Skipped"],
+            "completion_rate": calculate_completion_rate(completed_count, total_quests),
+            "weekly_xp": weekly_xp,
+            "completed_this_week": completed_this_week,
+            "failed_this_week": failed_this_week,
+            "total_quests_this_week": len(weekly_quests),
+            "weekly_completion_rate": calculate_completion_rate(completed_this_week, len(weekly_quests)),
+            "status_counts": status_counts,
+            "today_quests": build_today_focus_rows(quests, today),
+        }
+    finally:
+        if owns_session:
+            session.close()
+
+
 def get_habit_analytics_data(session=None) -> dict:
     """Return prepared dataframes for the Habit Analytics page."""
     owns_session = session is None
@@ -234,6 +295,45 @@ def build_quests_by_status(quests: list[Quest]) -> pd.DataFrame:
     )
 
 
+def build_status_counts(quests: list[Quest]) -> dict[str, int]:
+    """Return quest counts keyed by supported status."""
+    counts = {status: 0 for status in STATUS_ORDER}
+    for quest in quests:
+        counts[_normalize_status(quest.status)] += 1
+    return counts
+
+
+def build_quests_in_week(quests: list[Quest], week_start_at: datetime, week_end_at: datetime) -> list[Quest]:
+    """Return quests with planned or completed activity inside a week window."""
+    weekly_quests = []
+    for quest in quests:
+        activity_at = _quest_activity_datetime(quest)
+        if activity_at is not None and week_start_at <= activity_at < week_end_at:
+            weekly_quests.append(quest)
+    return weekly_quests
+
+
+def build_today_focus_rows(quests: list[Quest], today: date) -> list[dict]:
+    """Return compact display rows for quests planned for today."""
+    today_quests = [
+        quest
+        for quest in quests
+        if quest.due_date == today
+    ]
+    today_quests.sort(key=lambda quest: (_normalize_status(quest.status), quest.title.lower()))
+
+    return [
+        {
+            "Title": quest.title,
+            "Category": _category_name(quest),
+            "Difficulty": quest.difficulty,
+            "Status": _normalize_status(quest.status),
+            "XP": quest.xp_reward or 0,
+        }
+        for quest in today_quests
+    ]
+
+
 def build_quests_by_category(quests: list[Quest]) -> pd.DataFrame:
     """Return quest counts grouped by category name."""
     rows = [{"Category": _category_name(quest), "Count": 1} for quest in quests]
@@ -322,6 +422,14 @@ def _quest_activity_date(quest: Quest) -> date | None:
     if quest.completed_at is not None:
         return quest.completed_at.date()
     return quest.due_date
+
+
+def _quest_activity_datetime(quest: Quest) -> datetime | None:
+    if quest.completed_at is not None:
+        return quest.completed_at
+    if quest.due_date is not None:
+        return datetime.combine(quest.due_date, time.min)
+    return None
 
 
 def _stat_for_category(category_name: str) -> str:

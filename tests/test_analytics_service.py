@@ -7,12 +7,14 @@ from sqlalchemy.orm import sessionmaker
 from src.database.models import Base, Quest
 from src.services.analytics_service import (
     build_character_activity_stats,
+    build_status_counts,
     build_xp_by_rpg_stat,
     build_completion_rate_by_weekday,
     build_quests_by_status,
     calculate_weekly_xp,
     build_xp_by_day,
     calculate_character_title,
+    get_command_center_data,
     get_character_profile_data,
     get_dashboard_kpis,
 )
@@ -121,6 +123,82 @@ def test_build_quests_by_status_counts_supported_statuses(session):
         {"Status": "Completed", "Count": 2},
         {"Status": "Failed", "Count": 1},
         {"Status": "Skipped", "Count": 1},
+    ]
+
+
+def test_build_status_counts_returns_supported_status_counts(session):
+    quests = [
+        Quest(title="One", status="Planned"),
+        Quest(title="Two", status="Completed"),
+        Quest(title="Three", status="Completed"),
+        Quest(title="Four", status="Failed"),
+        Quest(title="Five", status="Skipped"),
+        Quest(title="Unknown status", status=""),
+    ]
+
+    assert build_status_counts(quests) == {
+        "Planned": 2,
+        "Completed": 2,
+        "Failed": 1,
+        "Skipped": 1,
+    }
+
+
+def test_get_command_center_data_returns_operational_quest_metrics(session):
+    session.add_all(
+        [
+            Quest(
+                title="Workout",
+                status="Completed",
+                xp_reward=75,
+                due_date=date(2026, 6, 22),
+                completed_at=datetime(2026, 6, 23, 9, 0),
+            ),
+            Quest(
+                title="Report",
+                status="Completed",
+                xp_reward=150,
+                due_date=date(2026, 6, 24),
+                completed_at=datetime(2026, 6, 26, 14, 0),
+            ),
+            Quest(title="Plan meals", status="Planned", xp_reward=10, due_date=date(2026, 6, 25)),
+            Quest(title="Missed task", status="Failed", xp_reward=30, due_date=date(2026, 6, 26)),
+            Quest(title="Skipped task", status="Skipped", xp_reward=10, due_date=date(2026, 6, 15)),
+        ]
+    )
+    session.commit()
+
+    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+
+    assert result["has_quests"] is True
+    assert result["total_quests"] == 5
+    assert result["completed_quests"] == 2
+    assert result["planned_quests"] == 1
+    assert result["due_today"] == 1
+    assert result["overdue_quests"] == 1
+    assert result["completed_today"] == 1
+    assert result["failed_quests"] == 1
+    assert result["skipped_quests"] == 1
+    assert result["completion_rate"] == 40.0
+    assert result["weekly_xp"] == 225
+    assert result["completed_this_week"] == 2
+    assert result["failed_this_week"] == 1
+    assert result["total_quests_this_week"] == 4
+    assert result["weekly_completion_rate"] == 50.0
+    assert result["status_counts"] == {
+        "Planned": 1,
+        "Completed": 2,
+        "Failed": 1,
+        "Skipped": 1,
+    }
+    assert result["today_quests"] == [
+        {
+            "Title": "Missed task",
+            "Category": "Uncategorized",
+            "Difficulty": "Easy",
+            "Status": "Failed",
+            "XP": 30,
+        }
     ]
 
 
