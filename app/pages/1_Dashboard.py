@@ -28,7 +28,6 @@ def render_mission_brief(command_center: dict) -> None:
         message = f"Today's mission: {today_count} {quest_word} planned. {attention_count} {attention_word} attention."
 
     with st.container(border=True):
-        st.subheader("Mission Brief")
         st.write(f"**{message}**")
         if command_center["overdue_quests"] > 0:
             st.caption(f"{command_center['overdue_quests']} overdue quests need review in Quest Log.")
@@ -49,78 +48,90 @@ def render_todays_focus(today_quests: list[dict]) -> None:
     )
 
 
-def render_needs_attention(command_center: dict) -> None:
-    attention_items = (
+def render_status_kpis(command_center: dict) -> None:
+    status_items = (
         ("Overdue", command_center["overdue_quests"], "warning"),
         ("Failed", command_center["failed_quests"], "danger"),
         ("Planned", command_center["planned_quests"], "info"),
         ("Completed Today", command_center["completed_today"], "success"),
     )
-    chips = "\n".join(
+    cards = "\n".join(
         f"""
-        <div class="attention-chip {tone}">
-            <span class="attention-label">{label}</span>
-            <span class="attention-value">{value}</span>
+        <div class="command-status-card {tone}">
+            <span class="command-status-label">{label}</span>
+            <span class="command-status-value">{value}</span>
         </div>
         """
-        for label, value, tone in attention_items
+        for label, value, tone in status_items
     )
 
     st.markdown(
         f"""
         <style>
-            .attention-strip {{
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.55rem;
-                align-items: center;
-                margin: 0.15rem 0 0.35rem;
+            .command-status-row {{
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 0.75rem;
+                margin: 0.15rem 0 1rem;
             }}
 
-            .attention-chip {{
-                display: inline-flex;
+            .command-status-card {{
+                display: flex;
                 align-items: center;
-                gap: 0.45rem;
-                min-height: 30px;
-                padding: 0.28rem 0.62rem;
+                justify-content: space-between;
+                gap: 0.75rem;
+                min-height: 54px;
+                padding: 0.65rem 0.85rem;
                 border: 1px solid rgba(148, 163, 184, 0.22);
-                border-left-width: 3px;
-                border-radius: 999px;
-                background: rgba(15, 23, 42, 0.58);
+                border-left-width: 4px;
+                border-radius: 8px;
+                background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.62));
                 box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
             }}
 
-            .attention-chip.warning {{
+            .command-status-card.warning {{
                 border-left-color: #f59e0b;
             }}
 
-            .attention-chip.danger {{
+            .command-status-card.danger {{
                 border-left-color: #ef4444;
             }}
 
-            .attention-chip.info {{
+            .command-status-card.info {{
                 border-left-color: #38bdf8;
             }}
 
-            .attention-chip.success {{
+            .command-status-card.success {{
                 border-left-color: #22c55e;
             }}
 
-            .attention-label {{
+            .command-status-label {{
                 color: rgba(226, 232, 240, 0.68);
-                font-size: 0.78rem;
+                font-size: 0.82rem;
+                line-height: 1.15;
+            }}
+
+            .command-status-value {{
+                color: #f8fafc;
+                font-size: 1.18rem;
+                font-weight: 800;
                 line-height: 1;
             }}
 
-            .attention-value {{
-                color: #f8fafc;
-                font-size: 0.9rem;
-                font-weight: 700;
-                line-height: 1;
+            @media (max-width: 900px) {{
+                .command-status-row {{
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }}
+            }}
+
+            @media (max-width: 520px) {{
+                .command-status-row {{
+                    grid-template-columns: 1fr;
+                }}
             }}
         </style>
-        <div class="attention-strip">
-            {chips}
+        <div class="command-status-row">
+            {cards}
         </div>
         """,
         unsafe_allow_html=True,
@@ -143,12 +154,10 @@ if not command_center["has_quests"]:
         "Create a quest in Quest Log to start today's mission.",
     )
 else:
+    render_status_kpis(command_center)
     render_mission_brief(command_center)
 
     render_section_title("Today's Focus", "Quests planned for today. Updates still happen in Quest Log.")
     render_todays_focus(command_center["today_quests"])
-
-    render_section_title("Needs Attention", "Operational items worth reviewing before planning more work.")
-    render_needs_attention(command_center)
 
 st.caption("Data source: local SQLite quest records.")
