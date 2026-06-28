@@ -1,9 +1,9 @@
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
-from src.database.models import Category, Quest
+from src.database.models import Category, Quest, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.xp_service import calculate_xp
 
@@ -103,7 +103,7 @@ def update_quest_status(quest_id: int, status: str, session=None) -> Quest:
 
         quest.status = normalized_status
         if normalized_status == "Completed" and quest.completed_at is None:
-            quest.completed_at = datetime.utcnow()
+            quest.completed_at = utc_now()
 
         session.commit()
         session.refresh(quest)

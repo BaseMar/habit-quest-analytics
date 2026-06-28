@@ -150,3 +150,4 @@ erDiagram
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - Database migrations are not included yet; schema changes should be made carefully while the project is still small.
 - Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.
+- Local avatar storage is suitable for the local-first MVP and demos. On Streamlit Community Cloud, files stored locally may be lost after reboot, redeploy, or instance reset; durable production persistence would require external storage or a production database later.

@@ -33,6 +33,7 @@ Daily tasks are represented as quests. Users earn XP for completed quests, level
 - [Installation](#installation)
 - [Running The App](#running-the-app)
 - [Database Setup / Seeding](#database-setup--seeding)
+- [Local Storage Notes](#local-storage-notes)
 - [Tests](#tests)
 - [Design Principles](#design-principles)
 - [Limitations & Future Work](#limitations--future-work)
@@ -303,6 +304,12 @@ By default, the database is created at:
 ```text
 data/habit_quest.db
 ```
+
+## Local Storage Notes
+
+Avatar uploads are stored locally under `data/uploads/`, and the SQLite database is stored locally under `data/` by default. This is suitable for the current local-first MVP and demo workflow.
+
+On Streamlit Community Cloud, local file storage is not guaranteed to persist after an app reboot, redeploy, or instance reset. Production-grade persistence for avatars or durable user data would require external storage or a production database later.
 
 ## Tests
 
