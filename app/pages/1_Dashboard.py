@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -21,7 +20,7 @@ def render_mission_brief(command_center: dict) -> None:
     attention_count = command_center["overdue_quests"] + command_center["failed_quests"]
 
     if today_count == 0:
-        message = "No quests planned for today. Create a quest in Quest Log to start today's mission."
+        message = "No quests planned for today. Plan your day in Quest Log to start today's mission."
     else:
         quest_word = "quest" if today_count == 1 else "quests"
         attention_word = "item needs" if attention_count == 1 else "items need"
@@ -37,15 +36,20 @@ def render_todays_focus(today_quests: list[dict]) -> None:
     if not today_quests:
         render_empty_state(
             "No quests planned for today",
-            "Create a quest in Quest Log to start today's mission.",
+            "Plan your day in Quest Log.",
         )
         return
 
-    st.dataframe(
-        pd.DataFrame(today_quests),
-        hide_index=True,
-        width="stretch",
-    )
+    for quest in today_quests:
+        with st.container(border=True):
+            time_col, detail_col, xp_col = st.columns([0.24, 0.58, 0.18], vertical_alignment="center")
+            with time_col:
+                st.write(f"**{quest['Time']}**")
+            with detail_col:
+                st.write(f"**{quest['Title']}**")
+                st.caption(f"{quest['Category']} | {quest['Difficulty']} | {quest['Status']}")
+            with xp_col:
+                st.write(f"**{quest['XP']}**")
 
 
 def render_status_kpis(command_center: dict) -> None:
@@ -157,7 +161,7 @@ else:
     render_status_kpis(command_center)
     render_mission_brief(command_center)
 
-    render_section_title("Today's Focus", "Quests planned for today. Updates still happen in Quest Log.")
+    render_section_title("Today's Focus", "Today’s planned quests. Manage details and status updates in Quest Log.")
     render_todays_focus(command_center["today_quests"])
 
 st.caption("Data source: local SQLite quest records.")

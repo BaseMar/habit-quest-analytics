@@ -314,21 +314,28 @@ def build_quests_in_week(quests: list[Quest], week_start_at: datetime, week_end_
 
 
 def build_today_focus_rows(quests: list[Quest], today: date) -> list[dict]:
-    """Return compact display rows for quests planned for today."""
+    """Return compact schedule rows for quests planned for today."""
     today_quests = [
         quest
         for quest in quests
-        if quest.due_date == today
+        if quest.due_date == today or (quest.planned_start_at is not None and quest.planned_start_at.date() == today)
     ]
-    today_quests.sort(key=lambda quest: (_normalize_status(quest.status), quest.title.lower()))
+    today_quests.sort(
+        key=lambda quest: (
+            quest.planned_start_at is None,
+            quest.planned_start_at or quest.created_at or datetime.max,
+            quest.title.lower(),
+        )
+    )
 
     return [
         {
+            "Time": _quest_time_range(quest),
             "Title": quest.title,
             "Category": _category_name(quest),
-            "Difficulty": quest.difficulty,
+            "Difficulty": quest.difficulty or "Easy",
             "Status": _normalize_status(quest.status),
-            "XP": quest.xp_reward or 0,
+            "XP": f"{quest.xp_reward or 0} XP",
         }
         for quest in today_quests
     ]
@@ -430,6 +437,14 @@ def _quest_activity_datetime(quest: Quest) -> datetime | None:
     if quest.due_date is not None:
         return datetime.combine(quest.due_date, time.min)
     return None
+
+
+def _quest_time_range(quest: Quest) -> str:
+    if quest.planned_start_at is not None and quest.planned_end_at is not None:
+        return f"{quest.planned_start_at:%H:%M} - {quest.planned_end_at:%H:%M}"
+    if quest.planned_start_at is not None:
+        return f"{quest.planned_start_at:%H:%M}"
+    return "All day"
 
 
 def _stat_for_category(category_name: str) -> str:

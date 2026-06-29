@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from src.database.models import Base, Quest
 from src.services.analytics_service import (
     build_character_activity_stats,
+    build_today_focus_rows,
     build_status_counts,
     build_xp_by_rpg_stat,
     build_completion_rate_by_weekday,
@@ -193,12 +194,78 @@ def test_get_command_center_data_returns_operational_quest_metrics(session):
     }
     assert result["today_quests"] == [
         {
+            "Time": "All day",
             "Title": "Missed task",
             "Category": "Uncategorized",
             "Difficulty": "Easy",
             "Status": "Failed",
-            "XP": 30,
+            "XP": "30 XP",
         }
+    ]
+
+
+def test_build_today_focus_rows_sorts_scheduled_quests_before_legacy_due_date_only():
+    quests = [
+        Quest(
+            title="Legacy all day",
+            status="Planned",
+            xp_reward=10,
+            due_date=date(2026, 6, 26),
+            created_at=datetime(2026, 6, 20, 8, 0),
+        ),
+        Quest(
+            title="Later scheduled",
+            status="Planned",
+            difficulty="Medium",
+            xp_reward=30,
+            due_date=date(2026, 6, 26),
+            planned_start_at=datetime(2026, 6, 26, 13, 0),
+            planned_end_at=datetime(2026, 6, 26, 14, 0),
+        ),
+        Quest(
+            title="Earlier scheduled",
+            status="Completed",
+            difficulty="Hard",
+            xp_reward=75,
+            due_date=date(2026, 6, 26),
+            planned_start_at=datetime(2026, 6, 26, 9, 0),
+            planned_end_at=datetime(2026, 6, 26, 11, 0),
+        ),
+        Quest(
+            title="Other day",
+            status="Planned",
+            xp_reward=10,
+            due_date=date(2026, 6, 27),
+        ),
+    ]
+
+    result = build_today_focus_rows(quests, date(2026, 6, 26))
+
+    assert result == [
+        {
+            "Time": "09:00 - 11:00",
+            "Title": "Earlier scheduled",
+            "Category": "Uncategorized",
+            "Difficulty": "Hard",
+            "Status": "Completed",
+            "XP": "75 XP",
+        },
+        {
+            "Time": "13:00 - 14:00",
+            "Title": "Later scheduled",
+            "Category": "Uncategorized",
+            "Difficulty": "Medium",
+            "Status": "Planned",
+            "XP": "30 XP",
+        },
+        {
+            "Time": "All day",
+            "Title": "Legacy all day",
+            "Category": "Uncategorized",
+            "Difficulty": "Easy",
+            "Status": "Planned",
+            "XP": "10 XP",
+        },
     ]
 
 
