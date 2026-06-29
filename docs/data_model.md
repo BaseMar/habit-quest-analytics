@@ -28,10 +28,12 @@ Stores tasks and habits represented as quests.
 | `title` | Quest name shown to the user. |
 | `description` | Optional quest details. |
 | `difficulty` | Difficulty label used for XP rewards. |
-| `status` | Quest state, currently expected to start as `active`. |
+| `status` | Quest state, currently expected to start as `Planned`. |
 | `is_habit` | Marks whether the quest represents a habit rather than a one-time task. |
 | `xp_reward` | XP value assigned to the quest. |
-| `due_date` | Optional due date. |
+| `due_date` | Optional planned date kept for compatibility with existing analytics. |
+| `planned_start_at` | Optional scheduled start datetime for calendar planning. |
+| `planned_end_at` | Optional scheduled end datetime for calendar planning. |
 | `estimated_minutes` | Optional planned duration in minutes. |
 | `completed_at` | Timestamp set when the quest is completed. |
 | `created_at` | Timestamp set when the quest is created. |
@@ -113,6 +115,8 @@ erDiagram
         boolean is_habit
         int xp_reward
         date due_date
+        datetime planned_start_at
+        datetime planned_end_at
         int estimated_minutes
         datetime completed_at
         datetime created_at

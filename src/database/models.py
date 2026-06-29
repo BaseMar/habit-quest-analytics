@@ -43,6 +43,8 @@ class Quest(Base):
     is_habit = Column(Boolean, nullable=False, default=False)
     xp_reward = Column(Integer, nullable=False, default=10)
     due_date = Column(Date, nullable=True)
+    planned_start_at = Column(DateTime, nullable=True)
+    planned_end_at = Column(DateTime, nullable=True)
     estimated_minutes = Column(Integer, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_now)

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time
 
 import pytest
 from sqlalchemy import create_engine
@@ -7,9 +7,14 @@ from sqlalchemy.orm import sessionmaker
 from src.database.models import Base, Category
 from src.services.quest_service import (
     create_quest,
+    create_scheduled_quest,
     get_all_quests,
     get_quests_by_date,
+    get_quests_for_calendar,
+    get_quests_for_day,
+    quest_to_calendar_event,
     update_quest_status,
+    validate_schedule_times,
 )
 
 
@@ -48,6 +53,33 @@ def test_create_quest_persists_xp_reward_and_details(session):
     assert quest.estimated_minutes == 45
 
 
+def test_create_scheduled_quest_sets_planned_datetimes_and_duration(session):
+    category = session.query(Category).one()
+
+    quest = create_scheduled_quest(
+        title="Morning workout",
+        description="Complete strength training",
+        category_id=category.id,
+        difficulty="Medium",
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(11, 0),
+        session=session,
+    )
+
+    assert quest.status == "Planned"
+    assert quest.xp_reward == 30
+    assert quest.due_date == date(2026, 6, 26)
+    assert quest.planned_start_at == datetime(2026, 6, 26, 9, 0)
+    assert quest.planned_end_at == datetime(2026, 6, 26, 11, 0)
+    assert quest.estimated_minutes == 120
+
+
+def test_validate_schedule_times_rejects_end_before_start():
+    with pytest.raises(ValueError, match="End time must be after start time"):
+        validate_schedule_times(date(2026, 6, 26), time(11, 0), time(10, 0))
+
+
 def test_get_all_quests_returns_created_quests(session):
     category = session.query(Category).one()
     create_quest("Read", category_id=category.id, difficulty="Easy", session=session)
@@ -68,6 +100,95 @@ def test_get_quests_by_date_filters_by_planned_date(session):
     quests = get_quests_by_date(target_date, session=session)
 
     assert [quest.title for quest in quests] == ["Target day"]
+
+
+def test_get_quests_for_day_sorts_by_start_time_then_created_at(session):
+    category = session.query(Category).one()
+    target_date = date(2026, 6, 26)
+    legacy = create_quest("Legacy task", category_id=category.id, planned_date=target_date, session=session)
+    later = create_scheduled_quest(
+        "Later task",
+        category_id=category.id,
+        planned_date=target_date,
+        start_time=time(15, 0),
+        end_time=time(16, 0),
+        session=session,
+    )
+    earlier = create_scheduled_quest(
+        "Earlier task",
+        category_id=category.id,
+        planned_date=target_date,
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    create_scheduled_quest(
+        "Other day",
+        category_id=category.id,
+        planned_date=date(2026, 6, 27),
+        start_time=time(8, 0),
+        end_time=time(9, 0),
+        session=session,
+    )
+
+    quests = get_quests_for_day(target_date, session=session)
+
+    assert [quest.title for quest in quests] == [earlier.title, later.title, legacy.title]
+
+
+def test_get_quests_for_calendar_returns_event_dicts(session):
+    category = session.query(Category).one()
+    create_scheduled_quest(
+        "SQL study",
+        category_id=category.id,
+        difficulty="Hard",
+        planned_date=date(2026, 6, 26),
+        start_time=time(11, 30),
+        end_time=time(13, 0),
+        session=session,
+    )
+
+    events = get_quests_for_calendar(session=session)
+
+    assert events == [
+        {
+            "id": "1",
+            "title": "SQL study",
+            "start": "2026-06-26T11:30:00",
+            "end": "2026-06-26T13:00:00",
+            "status": "Planned",
+            "category": "Health",
+            "difficulty": "Hard",
+            "xp_reward": 75,
+            "color": "#38bdf8",
+            "backgroundColor": "#38bdf8",
+            "borderColor": "#38bdf8",
+            "extendedProps": {
+                "status": "Planned",
+                "category": "Health",
+                "difficulty": "Hard",
+                "xp_reward": 75,
+            },
+        }
+    ]
+
+
+def test_quest_to_calendar_event_supports_legacy_planned_date(session):
+    category = session.query(Category).one()
+    quest = create_quest(
+        "Legacy planned task",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        session=session,
+    )
+
+    event = quest_to_calendar_event(quest)
+
+    assert event["start"] == "2026-06-26"
+    assert event["end"] is None
+    assert event["allDay"] is True
+    assert event["status"] == "Planned"
+    assert event["category"] == "Health"
 
 
 def test_update_quest_status_sets_completed_at_once(session):

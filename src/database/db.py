@@ -43,6 +43,12 @@ def _ensure_sqlite_schema() -> None:
     if "estimated_minutes" not in quest_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE quests ADD COLUMN estimated_minutes INTEGER"))
+    if "planned_start_at" not in quest_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE quests ADD COLUMN planned_start_at DATETIME"))
+    if "planned_end_at" not in quest_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE quests ADD COLUMN planned_end_at DATETIME"))
 
     if "player_profiles" not in inspector.get_table_names():
         return
