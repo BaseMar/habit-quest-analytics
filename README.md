@@ -76,7 +76,7 @@ Implemented:
 - Streamlit multi-page app with polished dark RPG dashboard styling,
 - SQLAlchemy models and SQLite setup,
 - default category seed script,
-- calendar-based Quest Log planning, list, and status update workflow,
+- calendar-based Quest Log planning, list, and temporary status update workflow,
 - Dashboard KPI cards backed by persisted quest data,
 - Habit Analytics charts for XP, status, category, weekday completion, and estimated minutes,
 - RPG-style Character Profile with level progress, RPG stat XP, compact stat rows, radar chart, achievements placeholder, and local avatar upload,
@@ -146,7 +146,7 @@ The finished dashboard should answer questions such as:
 - Calendar-based Quest Log planner with scheduled quest creation.
 - Selected-day schedule list showing planned quest times, category, difficulty, status, and XP.
 - Quest table showing persisted records from SQLite.
-- Quest status updates for `Planned`, `Completed`, `Failed`, and `Skipped`.
+- Temporary Quest status updates for `Planned`, `Completed`, `Failed`, and `Skipped`.
 - Dashboard KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - Habit Analytics charts for XP by day, quests by status, quests by category, completion rate by weekday, and estimated minutes by category.
 - Character Profile sheet with avatar upload, character title, level progress, total XP, XP to next level, RPG stats, radar chart, compact stat rows, and achievements placeholder.
@@ -176,7 +176,7 @@ The finished dashboard should answer questions such as:
 ## App Sections
 
 - `Dashboard` - implemented KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
-- `Quest Log` - implemented calendar-based quest planning, persisted quest listing, selected-day schedules, and status updates; editing and archive behavior are planned.
+- `Quest Log` - implemented calendar-based quest planning, persisted quest listing, selected-day schedules, and temporary status updates; editing and archive behavior are planned.
 - `Habit Analytics` - implemented first Plotly charts for XP by day, status counts, category counts, weekday completion rate, and estimated minutes by category.
 - `Character Profile` - implemented character name, title, avatar upload, total XP, level, XP to next level, progress bar, RPG stat XP, radar chart, compact stat rows, and achievements placeholder; achievement unlock logic is still planned.
 
@@ -334,7 +334,7 @@ python -m compileall -q app src tests
 
 ## Limitations & Future Work
 
-- Quest calendar planning, list, and status update are implemented; edit and delete/archive are not implemented yet.
+- Quest calendar planning, list, and temporary status update are implemented; edit, delete/archive, and the final habit completion checklist are not implemented yet.
 - Persistent quest management is limited to scheduled one-time quests; recurring quests and external calendar sync are not implemented.
 - Dashboard KPI cards, first Habit Analytics charts, and the RPG-style Character Profile are implemented; advanced filters and charts are still planned.
 - Character profile achievements are planned.
