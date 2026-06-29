@@ -295,7 +295,7 @@ The current app opens a polished Streamlit dashboard shell with KPI, quest manag
 
 ## Database Setup / Seeding
 
-Create the SQLite database tables and seed default categories:
+The app automatically initializes the SQLite tables and default categories on startup. You can also run the seed command manually for local setup or reset checks:
 
 ```bash
 python -m src.database.seed

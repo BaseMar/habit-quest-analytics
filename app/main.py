@@ -8,6 +8,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ui import apply_theme, render_page_header
+from src.database.db import init_db
+from src.database.seed import ensure_default_categories
 
 
 st.set_page_config(
@@ -16,6 +18,8 @@ st.set_page_config(
     layout="wide",
 )
 apply_theme()
+init_db()
+ensure_default_categories()
 
 render_page_header(
     "Habit Quest Analytics",

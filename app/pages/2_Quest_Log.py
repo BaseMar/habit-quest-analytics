@@ -16,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.constants import QUEST_DIFFICULTIES
 from src.database.db import init_db
+from src.database.seed import ensure_default_categories
 from src.services.quest_service import (
     VALID_QUEST_STATUSES,
     create_scheduled_quest,
@@ -228,6 +229,7 @@ render_page_header(
 )
 
 init_db()
+ensure_default_categories()
 categories = get_categories()
 category_options = {category.name: category.id for category in categories}
 
