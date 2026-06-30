@@ -124,14 +124,29 @@ def get_command_center_data(today: date | None = None, session=None) -> dict:
             session.close()
 
 
-def get_habit_analytics_data(session=None) -> dict:
+def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
     """Return prepared dataframes for the Habit Analytics page."""
+    today = today or date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+    week_start_at = datetime.combine(week_start, time.min)
+    week_end_at = datetime.combine(week_end, time.min)
+
     owns_session = session is None
     session = session or get_session()
     try:
         quests = session.query(Quest).options(joinedload(Quest.category)).all()
+        weekly_quests = build_quests_in_week(quests, week_start_at, week_end_at)
+        completed_this_week = sum(1 for quest in weekly_quests if _is_completed(quest))
+        failed_this_week = sum(1 for quest in weekly_quests if _normalize_status(quest.status) == "Failed")
         return {
             "has_quests": bool(quests),
+            "weekly_pulse": {
+                "weekly_xp": sum(quest.xp_reward or 0 for quest in weekly_quests if _is_completed(quest)),
+                "completed_this_week": completed_this_week,
+                "failed_this_week": failed_this_week,
+                "weekly_completion_rate": calculate_completion_rate(completed_this_week, len(weekly_quests)),
+            },
             "xp_by_day": build_xp_by_day(quests),
             "quests_by_status": build_quests_by_status(quests),
             "quests_by_category": build_quests_by_category(quests),

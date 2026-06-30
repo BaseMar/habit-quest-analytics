@@ -18,6 +18,7 @@ from src.services.analytics_service import (
     get_command_center_data,
     get_character_profile_data,
     get_dashboard_kpis,
+    get_habit_analytics_data,
 )
 
 
@@ -77,6 +78,55 @@ def test_get_dashboard_kpis_handles_empty_database(session):
         "weekly_xp": 0,
         "current_level": 1,
         "xp_to_next_level": 500,
+    }
+
+
+def test_get_habit_analytics_data_includes_weekly_pulse(session):
+    session.add_all(
+        [
+            Quest(
+                title="Completed this week",
+                status="Completed",
+                xp_reward=75,
+                due_date=date(2026, 6, 22),
+                completed_at=datetime(2026, 6, 23, 9, 0),
+            ),
+            Quest(
+                title="Failed this week",
+                status="Failed",
+                xp_reward=30,
+                due_date=date(2026, 6, 24),
+            ),
+            Quest(
+                title="Completed last week",
+                status="Completed",
+                xp_reward=150,
+                due_date=date(2026, 6, 15),
+                completed_at=datetime(2026, 6, 15, 9, 0),
+            ),
+        ]
+    )
+    session.commit()
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["weekly_pulse"] == {
+        "weekly_xp": 75,
+        "completed_this_week": 1,
+        "failed_this_week": 1,
+        "weekly_completion_rate": 50.0,
+    }
+
+
+def test_get_habit_analytics_data_returns_empty_safe_weekly_pulse(session):
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["has_quests"] is False
+    assert result["weekly_pulse"] == {
+        "weekly_xp": 0,
+        "completed_this_week": 0,
+        "failed_this_week": 0,
+        "weekly_completion_rate": 0.0,
     }
 
 
