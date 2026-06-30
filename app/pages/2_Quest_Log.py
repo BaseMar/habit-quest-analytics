@@ -22,7 +22,6 @@ from src.services.quest_service import (
     create_scheduled_quest,
     get_all_quests,
     get_categories,
-    get_quest_xp_reward,
     get_quests_for_calendar,
     get_quests_for_day,
     update_quest_status,
@@ -42,15 +41,25 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         "selectable": True,
         "editable": False,
         "eventResizableFromStart": False,
+        "height": "auto",
+        "contentHeight": "auto",
+        "expandRows": True,
+        "stickyHeaderDates": True,
         "headerToolbar": {
             "left": "prev,next today",
             "center": "title",
             "right": "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
         },
-        "height": 560,
         "nowIndicator": True,
         "slotMinTime": "06:00:00",
         "slotMaxTime": "22:00:00",
+        "slotDuration": "00:30:00",
+        "slotLabelInterval": "01:00:00",
+        "slotEventOverlap": False,
+        "displayEventEnd": True,
+        "eventDisplay": "block",
+        "eventMinHeight": 26,
+        "eventShortHeight": 24,
         "eventTimeFormat": {
             "hour": "2-digit",
             "minute": "2-digit",
@@ -58,32 +67,134 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         },
     }
     custom_css = """
+        .fc {
+            --fc-page-bg-color: rgba(15, 23, 42, 0);
+            --fc-neutral-bg-color: rgba(15, 23, 42, 0.78);
+            --fc-border-color: rgba(148, 163, 184, 0.18);
+            --fc-today-bg-color: rgba(56, 189, 248, 0.08);
+            color: #e5e7eb;
+            min-height: 760px;
+            width: 100%;
+        }
+        .fc .fc-view-harness {
+            min-height: 660px;
+        }
+        .fc .fc-scroller,
+        .fc .fc-scroller-liquid {
+            scrollbar-color: rgba(139, 92, 246, 0.55) rgba(15, 23, 42, 0.42);
+            scrollbar-width: thin;
+        }
+        .fc .fc-timegrid-body,
+        .fc .fc-timegrid-body table,
+        .fc .fc-timegrid-slots table {
+            width: 100% !important;
+        }
         .fc-theme-standard .fc-scrollgrid,
         .fc-theme-standard td,
         .fc-theme-standard th {
             border-color: rgba(148, 163, 184, 0.18);
         }
+        .fc-theme-standard .fc-scrollgrid {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+        .fc .fc-col-header-cell {
+            background: rgba(15, 23, 42, 0.9);
+        }
+        .fc .fc-col-header-cell-cushion,
+        .fc .fc-timegrid-axis-cushion,
+        .fc .fc-timegrid-slot-label-cushion {
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
         .fc .fc-toolbar-title {
             color: #f8fafc;
-            font-size: 1.2rem;
+            font-size: 1.28rem;
+            font-weight: 850;
+        }
+        .fc .fc-toolbar {
+            gap: 0.75rem;
+            margin-bottom: 0.85rem;
         }
         .fc .fc-button-primary {
             background: rgba(56, 189, 248, 0.18);
             border-color: rgba(56, 189, 248, 0.38);
+            border-radius: 5px;
+            box-shadow: none;
             color: #f8fafc;
+            font-size: 0.82rem;
+            font-weight: 750;
+            padding: 0.42rem 0.62rem;
+            transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+        }
+        .fc .fc-button-primary:hover {
+            background: rgba(56, 189, 248, 0.28);
+            border-color: rgba(125, 211, 252, 0.58);
+            transform: translateY(-1px);
         }
         .fc .fc-button-primary:not(:disabled).fc-button-active,
         .fc .fc-button-primary:not(:disabled):active {
             background: rgba(139, 92, 246, 0.48);
             border-color: rgba(196, 181, 253, 0.62);
         }
+        .fc .fc-timegrid-slot {
+            height: 2.15rem;
+        }
         .fc .fc-daygrid-day.fc-day-today,
         .fc .fc-timegrid-col.fc-day-today {
             background: rgba(56, 189, 248, 0.08);
         }
+        .fc .fc-timegrid-now-indicator-line {
+            border-color: #f59e0b;
+        }
+        .fc .fc-timegrid-now-indicator-arrow {
+            border-color: #f59e0b;
+            border-bottom-color: transparent;
+            border-top-color: transparent;
+        }
+        .fc .fc-event {
+            border-radius: 5px;
+            box-shadow: 0 8px 18px rgba(2, 6, 23, 0.24);
+            padding: 0.12rem 0.18rem;
+        }
+        .fc .fc-timegrid-event {
+            min-height: 26px;
+        }
+        .fc .fc-event-main {
+            color: #f8fafc;
+            overflow: hidden;
+            padding: 0.12rem 0.2rem;
+        }
+        .fc .fc-event-time {
+            color: rgba(248, 250, 252, 0.78);
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1.15;
+            margin-bottom: 0.05rem;
+            white-space: nowrap;
+        }
+        .fc .fc-event-title {
+            color: #ffffff;
+            font-size: 0.78rem;
+            font-weight: 800;
+            line-height: 1.18;
+            overflow-wrap: anywhere;
+        }
+        .fc .fc-daygrid-event {
+            padding: 0.14rem 0.3rem;
+        }
+        .fc .fc-daygrid-day-frame {
+            min-height: 112px;
+        }
         .fc .fc-list,
         .fc .fc-list-day-cushion {
             background: rgba(15, 23, 42, 0.72);
+        }
+        .fc .fc-list-event:hover td {
+            background: rgba(30, 41, 59, 0.92);
         }
     """
 
@@ -271,28 +382,22 @@ with planner_col:
     default_end = time(10, 0)
 
     with st.container(border=True):
-        title = st.text_input("Title")
+        title = st.text_input("Title", placeholder="Quest title")
 
-        category_col, difficulty_col, xp_col = st.columns([1.2, 1, 0.8])
+        category_col, difficulty_col = st.columns([1.15, 0.85])
         with category_col:
             category_name = st.selectbox("Category", list(category_options.keys()))
         with difficulty_col:
             difficulty = st.selectbox("Difficulty", list(QUEST_DIFFICULTIES))
-        with xp_col:
-            xp_reward = get_quest_xp_reward(difficulty)
-            st.text_input("XP Reward", value=f"{xp_reward} XP", disabled=True)
 
-        start_col, end_col, estimate_col = st.columns(3)
+        start_col, end_col = st.columns(2)
         with start_col:
             start_time = st.time_input("Start Time", value=default_start, step=300)
         with end_col:
             end_time = st.time_input("End Time", value=default_end, step=300)
-        with estimate_col:
-            estimated_minutes = _calculate_duration_minutes(start_time, end_time)
-            estimate_label = f"{estimated_minutes} min" if estimated_minutes is not None else "Invalid range"
-            st.text_input("Duration", value=estimate_label, disabled=True)
 
-        notes = st.text_area("Notes", height=72, placeholder="Optional notes")
+        estimated_minutes = _calculate_duration_minutes(start_time, end_time)
+        notes = st.text_area("Notes", height=64, placeholder="Optional notes")
 
         if estimated_minutes is None:
             st.error("End time must be after start time.")

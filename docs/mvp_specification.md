@@ -155,6 +155,25 @@ Still planned:
 - Advanced recurring quest scheduling.
 - Data import and export workflows.
 
+## Advanced Future Extensions
+
+These are roadmap ideas for later phases. They are not currently implemented and should remain separate from MVP scope.
+
+- Google Calendar integration - sync scheduled quests with Google Calendar and allow planned habits or tasks to appear alongside real calendar events.
+- User authentication - add login support so each user has separate quests, calendar, character profile, and analytics. This would likely require PostgreSQL or another production database plus user-specific data model changes.
+- AI planning assistant - add an LLM-powered assistant that can understand natural language planning requests. Example: a user writes "Schedule gym tomorrow from 9 to 11" and the assistant creates a scheduled quest.
+- Voice quest capture - add microphone or voice input so users can speak tasks or habit plans. The assistant could convert spoken requests into scheduled quests. This depends on the future AI assistant and should come after the core planner is stable.
+
+Suggested implementation order:
+
+1. Monthly habit checklist
+2. Recurring habits
+3. PostgreSQL / production persistence
+4. Authentication
+5. Google Calendar sync
+6. AI planning assistant
+7. Voice input
+
 ## MVP Success Criteria
 
 - A user can create and complete quests locally.

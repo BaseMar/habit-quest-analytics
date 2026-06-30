@@ -376,6 +376,67 @@ Implementation note:
 - Do not add patterns just for architecture aesthetics.
 - Introduce a pattern only when there is clear duplication or complexity to reduce.
 
+## Advanced Future Extensions
+
+These are later roadmap ideas. They should not be implemented until the core planner, habit flow, persistence strategy, and MVP analytics are stable.
+
+### Google Calendar Integration
+
+What it adds:
+
+- Sync scheduled quests with Google Calendar.
+- Allow planned habits and tasks to appear alongside real calendar events.
+
+Implementation note:
+
+- This is future work and is not currently implemented.
+- It introduces an external API dependency, account permissions, token handling, and calendar conflict questions.
+
+### User Authentication
+
+What it adds:
+
+- Login support so each user has separate quests, calendar, character profile, and analytics.
+
+Implementation note:
+
+- This is future work and is not currently implemented.
+- It would likely require a production database, user-specific data model changes, and careful migration planning.
+
+### AI Planning Assistant
+
+What it adds:
+
+- An LLM-powered assistant that understands natural language planning requests.
+- Example: a user writes "Schedule gym tomorrow from 9 to 11" and the assistant creates a scheduled quest.
+
+Implementation note:
+
+- This is future work and is not currently implemented.
+- It should come after the planner rules, status flow, and persistence model are stable.
+
+### Voice Quest Capture
+
+What it adds:
+
+- Microphone or voice input so users can speak tasks or habit plans.
+- The assistant could convert spoken requests into scheduled quests.
+
+Implementation note:
+
+- This is future work and is not currently implemented.
+- It depends on the future AI planning assistant and should come after the core planner is stable.
+
+### Suggested Implementation Order
+
+1. Monthly habit checklist
+2. Recurring habits
+3. PostgreSQL / production persistence
+4. Authentication
+5. Google Calendar sync
+6. AI planning assistant
+7. Voice input
+
 ## Deferred Ideas
 
 These are intentionally not near-term MVP items:
@@ -384,6 +445,9 @@ These are intentionally not near-term MVP items:
 - External API integrations.
 - Cloud sync.
 - Machine learning predictions.
+- Google Calendar sync.
+- AI planning assistant.
+- Voice input.
 - Social or multiplayer features.
 
 They may be useful later, but only after the local MVP is stable.

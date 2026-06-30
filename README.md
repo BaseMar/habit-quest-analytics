@@ -174,6 +174,25 @@ The finished dashboard should answer questions such as:
 - Import and export for local backups.
 - Optional ML prediction for quest completion probability.
 
+### Advanced Future Extensions
+
+These items are future roadmap ideas, not implemented MVP features:
+
+- Google Calendar integration - sync scheduled quests with Google Calendar so planned habits and tasks can appear alongside real calendar events.
+- User authentication - add login support so each user has separate quests, calendar, character profile, and analytics. This would likely require a production database and a user-specific data model.
+- AI planning assistant - add an LLM-powered assistant that can understand natural language planning requests, such as "Schedule gym tomorrow from 9 to 11", and turn them into scheduled quests.
+- Voice quest capture - add microphone input so users can speak tasks or habit plans. This should depend on the future AI planning assistant and come after the core planner is stable.
+
+Suggested implementation order:
+
+1. Monthly habit checklist
+2. Recurring habits
+3. PostgreSQL / production persistence
+4. Authentication
+5. Google Calendar sync
+6. AI planning assistant
+7. Voice input
+
 ## App Sections
 
 - `Home Base` - implemented onboarding hub with mission briefing, app map, app loop, and local-first MVP note.
@@ -343,6 +362,7 @@ python -m compileall -q app src tests
 - Achievements need unlock rules and UI.
 - Planned vs actual time requires an actual-time field; estimated minutes are already stored on quests.
 - Optional future ML prediction for quest completion probability may be explored later, but is intentionally out of scope for the MVP.
+- Google Calendar sync, authentication, AI planning, and voice input are future roadmap ideas only; none are currently implemented.
 
 ## Screenshots
 

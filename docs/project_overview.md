@@ -43,3 +43,22 @@ Quest editing, delete/archive behavior, analytics filters, and achievement unloc
 - External APIs.
 - Machine learning.
 - Cloud sync.
+
+## Advanced Future Extensions
+
+These ideas are intentionally outside the current local-first MVP and should not be treated as implemented features.
+
+- Google Calendar integration - sync scheduled quests with Google Calendar so planned habits and tasks can appear alongside real calendar events.
+- User authentication - add login support so each user has separate quests, calendar, character profile, and analytics. This would likely require a production database and a user-specific data model.
+- AI planning assistant - add an LLM-powered assistant that understands natural language planning requests, such as "Schedule gym tomorrow from 9 to 11", and creates scheduled quests.
+- Voice quest capture - add microphone input so users can speak tasks or habit plans. This depends on the future AI planning assistant and should come after the core planner is stable.
+
+Suggested implementation order:
+
+1. Monthly habit checklist
+2. Recurring habits
+3. PostgreSQL / production persistence
+4. Authentication
+5. Google Calendar sync
+6. AI planning assistant
+7. Voice input

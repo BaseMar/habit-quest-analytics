@@ -32,15 +32,17 @@ def render_xp_by_day(xp_by_day) -> None:
         return
 
     chart_data = _format_date_labels(xp_by_day)
-    fig = px.bar(
+    fig = px.line(
         chart_data,
         x="Date",
         y="XP",
-        title="XP by Day",
+        title="XP Trend by Day",
+        markers=True,
         color_discrete_sequence=["#8B5CF6"],
     )
     fig.update_layout(xaxis_title="Quest Date", yaxis_title="XP Earned", showlegend=False, height=360)
     fig.update_xaxes(type="category")
+    fig.update_traces(line={"width": 3}, marker={"size": 8})
     st.plotly_chart(style_chart(fig, height=360), width="stretch")
 
 
