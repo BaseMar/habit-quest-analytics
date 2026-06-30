@@ -31,9 +31,6 @@ from src.services.quest_service import (
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
 
 
-st.set_page_config(page_title="Quest Log", page_icon="HQ", layout="wide")
-
-
 def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
     if calendar is None:
         st.info("Calendar component unavailable. Use the selected date field below to plan quests.")
@@ -224,7 +221,7 @@ def _pluralize(word: str, count: int) -> str:
 apply_theme()
 render_page_header(
     "Quest Planning",
-    "Quest Log",
+    "Quest Planner",
     "Plan quests, schedule habits, and manage your daily quest flow.",
 )
 

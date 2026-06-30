@@ -16,9 +16,6 @@ from src.services.profile_service import remove_avatar, resolve_avatar_path, sav
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
 
 
-st.set_page_config(page_title="Character Profile", page_icon="HQ", layout="wide")
-
-
 def apply_character_profile_styles() -> None:
     st.markdown(
         """
@@ -384,13 +381,13 @@ with right_col:
         else:
             render_empty_state(
                 "No RPG stat data yet",
-                "Complete quests in Quest Log to populate the stat radar.",
+                "Complete quests in Quest Planner to populate the stat radar.",
             )
 
 if not profile["has_completed_quests"]:
     render_empty_state(
         "No completed quests yet",
-        "Complete quests in Quest Log to earn XP, level up, and grow your RPG stats.",
+        "Complete quests in Quest Planner to earn XP, level up, and grow your RPG stats.",
     )
 
 render_section_title("Basic Stats", "Compact activity stats that complement the hero progression panel.")

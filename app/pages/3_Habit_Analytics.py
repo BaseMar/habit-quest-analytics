@@ -13,9 +13,6 @@ from src.services.analytics_service import get_habit_analytics_data
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title, style_chart
 
 
-st.set_page_config(page_title="Habit Analytics", page_icon="HQ", layout="wide")
-
-
 def render_weekly_pulse(weekly_pulse: dict) -> None:
     metric_cols = st.columns(4)
     metrics = (
@@ -182,7 +179,7 @@ analytics = get_habit_analytics_data()
 if not analytics["has_quests"]:
     render_empty_state(
         "No analytics data yet",
-        "Complete or schedule quests in Quest Log to generate insights.",
+        "Complete or schedule quests in Quest Planner to generate insights.",
     )
 else:
     render_section_title("Weekly Pulse", "Compact performance readout for the current week.")

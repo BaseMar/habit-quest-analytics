@@ -12,15 +12,12 @@ from src.services.analytics_service import get_command_center_data
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
 
 
-st.set_page_config(page_title="Command Center", page_icon="HQ", layout="wide")
-
-
 def render_mission_brief(command_center: dict) -> None:
     today_count = len(command_center["today_quests"])
     attention_count = command_center["overdue_quests"] + command_center["failed_quests"]
 
     if today_count == 0:
-        message = "No quests planned for today. Plan your day in Quest Log to start today's mission."
+        message = "No quests planned for today. Plan your day in Quest Planner to start today's mission."
     else:
         quest_word = "quest" if today_count == 1 else "quests"
         attention_word = "item needs" if attention_count == 1 else "items need"
@@ -29,14 +26,14 @@ def render_mission_brief(command_center: dict) -> None:
     with st.container(border=True):
         st.write(f"**{message}**")
         if command_center["overdue_quests"] > 0:
-            st.caption(f"{command_center['overdue_quests']} overdue quests need review in Quest Log.")
+            st.caption(f"{command_center['overdue_quests']} overdue quests need review in Quest Planner.")
 
 
 def render_todays_focus(today_quests: list[dict]) -> None:
     if not today_quests:
         render_empty_state(
             "No quests planned for today",
-            "Plan your day in Quest Log.",
+            "Plan your day in Quest Planner.",
         )
         return
 
@@ -155,13 +152,13 @@ command_center = get_command_center_data()
 if not command_center["has_quests"]:
     render_empty_state(
         "No quest data yet",
-        "Create a quest in Quest Log to start today's mission.",
+        "Create a quest in Quest Planner to start today's mission.",
     )
 else:
     render_status_kpis(command_center)
     render_mission_brief(command_center)
 
-    render_section_title("Today's Focus", "Today’s planned quests. Manage details and status updates in Quest Log.")
+    render_section_title("Today's Focus", "Today’s planned quests. Manage details and status updates in Quest Planner.")
     render_todays_focus(command_center["today_quests"])
 
 st.caption("Data source: local SQLite quest records.")
