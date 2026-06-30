@@ -2,7 +2,7 @@
 
 An RPG-inspired habit tracker and productivity analytics dashboard built with Streamlit.
 
-Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP implementation with calendar-based Quest Log planning, Dashboard KPIs, Habit Analytics charts, an RPG-style Character Profile with local avatar upload, and a polished dark RPG dashboard UI backed by the local SQLite database.
+Daily tasks are represented as quests. Users earn XP for completed quests, level up a character profile, and analyze habit consistency over time. The current repository is an MVP implementation with a Home Base onboarding hub, calendar-based Quest Log planning, Command Center KPIs, Habit Analytics charts, an RPG-style Character Profile with local avatar upload, and a polished dark RPG dashboard UI backed by the local SQLite database.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red)
@@ -77,7 +77,8 @@ Implemented:
 - SQLAlchemy models and SQLite setup,
 - default category seed script,
 - calendar-based Quest Log planning, list, and temporary status update workflow,
-- Dashboard KPI cards backed by persisted quest data,
+- Home Base onboarding and app map page,
+- Command Center KPI cards backed by persisted quest data,
 - Habit Analytics charts for XP, status, category, weekday completion, and estimated minutes,
 - RPG-style Character Profile with level progress, RPG stat XP, compact stat rows, radar chart, achievements placeholder, and local avatar upload,
 - XP reward calculation by difficulty,
@@ -95,7 +96,7 @@ Planned next:
 
 Screenshots will be added after the current UI is captured from a representative local dataset.
 
-Current UI state: the Command Center page shows real KPI cards from SQLite, the Quest Log page has calendar-based planning with selected-day schedules, Habit Analytics shows Plotly charts, and Character Profile shows an RPG-style character sheet with stat balance and avatar upload. Achievement unlocking remains planned.
+Current UI state: the Home Base page explains the app loop and maps the main sections, the Command Center page shows real KPI cards from SQLite, the Quest Log page has calendar-based planning with selected-day schedules, Habit Analytics shows Plotly charts, and Character Profile shows an RPG-style character sheet with stat balance and avatar upload. Achievement unlocking remains planned.
 
 ## Tech Stack
 
@@ -138,7 +139,7 @@ The finished dashboard should answer questions such as:
 
 ### Implemented
 
-- Streamlit entrypoint and implemented multi-page app sections.
+- Home Base Streamlit entrypoint and implemented multi-page app sections.
 - Reusable dark UI styling helpers for page headers, cards, metrics, charts, and empty states.
 - SQLAlchemy models for quests, categories, profiles, achievements, and unlocked achievements.
 - SQLite database initialization.
@@ -147,7 +148,7 @@ The finished dashboard should answer questions such as:
 - Selected-day schedule list showing planned quest times, category, difficulty, status, and XP.
 - Quest table showing persisted records from SQLite.
 - Temporary Quest status updates for `Planned`, `Completed`, `Failed`, and `Skipped`.
-- Dashboard KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
+- Command Center KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - Habit Analytics charts for XP by day, quests by status, quests by category, completion rate by weekday, and estimated minutes by category.
 - Character Profile sheet with avatar upload, character title, level progress, total XP, XP to next level, RPG stats, radar chart, compact stat rows, and achievements placeholder.
 - XP calculation for `Easy`, `Medium`, `Hard`, and `Boss` quests.
@@ -175,7 +176,8 @@ The finished dashboard should answer questions such as:
 
 ## App Sections
 
-- `Dashboard` - implemented KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
+- `Home Base` - implemented onboarding hub with mission briefing, app map, app loop, and local-first MVP note.
+- `Command Center` - implemented KPI cards for total quests, completed quests, completion rate, total XP, weekly XP, current level, and XP to next level.
 - `Quest Log` - implemented calendar-based quest planning, persisted quest listing, selected-day schedules, and temporary status updates; editing and archive behavior are planned.
 - `Habit Analytics` - implemented first Plotly charts for XP by day, status counts, category counts, weekday completion rate, and estimated minutes by category.
 - `Character Profile` - implemented character name, title, avatar upload, total XP, level, XP to next level, progress bar, RPG stat XP, radar chart, compact stat rows, and achievements placeholder; achievement unlock logic is still planned.
@@ -209,7 +211,7 @@ The project is split into clear layers:
 ```text
 habit-quest-analytics/
   app/
-    main.py                  # Streamlit entrypoint
+    main.py                  # Home Base Streamlit entrypoint
     pages/                   # Streamlit page views
   src/
     database/                # SQLAlchemy setup, models, and seed script
@@ -291,7 +293,7 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-The current app opens a polished Streamlit dashboard shell with KPI, quest management, analytics, and character profile pages.
+The current app opens a polished Home Base hub with Command Center KPI, quest management, analytics, and character profile pages.
 
 ## Database Setup / Seeding
 
@@ -336,7 +338,7 @@ python -m compileall -q app src tests
 
 - Quest calendar planning, list, and temporary status update are implemented; edit, delete/archive, and the final habit completion checklist are not implemented yet.
 - Persistent quest management is limited to scheduled one-time quests; recurring quests and external calendar sync are not implemented.
-- Dashboard KPI cards, first Habit Analytics charts, and the RPG-style Character Profile are implemented; advanced filters and charts are still planned.
+- Command Center KPI cards, first Habit Analytics charts, and the RPG-style Character Profile are implemented; advanced filters and charts are still planned.
 - Character profile achievements are planned.
 - Achievements need unlock rules and UI.
 - Planned vs actual time requires an actual-time field; estimated minutes are already stored on quests.
@@ -348,7 +350,8 @@ Screenshots are not included yet. Capture them after seeding representative ques
 
 Planned screenshot sections:
 
-- Dashboard overview
+- Home Base
+- Command Center overview
 - Quest Log
 - Habit Analytics
 - Character Profile
