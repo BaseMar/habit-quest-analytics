@@ -193,6 +193,10 @@ Suggested implementation order:
 6. AI planning assistant
 7. Voice input
 
+Design reference:
+
+- [Monthly Habit Checklist v1 Design](docs/monthly_checklist_design.md)
+
 ## App Sections
 
 - `Home Base` - implemented onboarding hub with mission briefing, app map, app loop, and local-first MVP note.
@@ -238,7 +242,7 @@ habit-quest-analytics/
     analysis/                # pure metric calculation functions
   data/
     sample/                  # placeholder for future sample data
-  docs/                      # project overview, MVP, data model, and metrics docs
+  docs/                      # project overview, MVP, data model, metrics, and design docs
   tests/                     # pytest coverage for core logic
 ```
 
