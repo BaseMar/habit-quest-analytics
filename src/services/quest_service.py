@@ -6,6 +6,7 @@ from sqlalchemy.orm import joinedload
 from src.database.db import get_session
 from src.database.models import Category, Quest, utc_now
 from src.constants import QUEST_STATUSES
+from src.services.checklist_service import ensure_checkin
 from src.services.xp_service import calculate_xp
 
 
@@ -100,6 +101,8 @@ def create_scheduled_quest(
         )
         session.add(quest)
         session.commit()
+        session.refresh(quest)
+        ensure_checkin(quest.id, planned_date, session=session)
         session.refresh(quest)
         return quest
     except Exception:

@@ -4,7 +4,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category
+from src.database.models import Base, Category, QuestCheckin
+from src.services.checklist_service import ensure_checkin
 from src.services.quest_service import (
     create_quest,
     create_scheduled_quest,
@@ -73,6 +74,44 @@ def test_create_scheduled_quest_sets_planned_datetimes_and_duration(session):
     assert quest.planned_start_at == datetime(2026, 6, 26, 9, 0)
     assert quest.planned_end_at == datetime(2026, 6, 26, 11, 0)
     assert quest.estimated_minutes == 120
+
+
+def test_create_scheduled_quest_creates_planned_checkin(session):
+    category = session.query(Category).one()
+
+    quest = create_scheduled_quest(
+        title="Morning workout",
+        category_id=category.id,
+        difficulty="Hard",
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+
+    assert checkin.status == "Planned"
+    assert checkin.xp_awarded == 0
+    assert checkin.checkin_date == date(2026, 6, 26)
+
+
+def test_create_scheduled_quest_checkin_is_not_duplicated_by_ensure_checkin(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        title="Morning workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    existing_checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+    ensured_checkin = ensure_checkin(quest.id, date(2026, 6, 26), session=session)
+
+    assert ensured_checkin.id == existing_checkin.id
+    assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 1
 
 
 def test_validate_schedule_times_rejects_end_before_start():
