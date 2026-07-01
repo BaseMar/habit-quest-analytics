@@ -42,6 +42,29 @@ Stores tasks and habits represented as quests.
 Relationships:
 
 - Many quests can belong to one category.
+- One quest can have many daily check-ins.
+
+### quest_checkins
+
+Stores planned and resolved daily completion records for quests. This is the data model foundation for the planned Monthly Habit Checklist; the checklist UI and check-in services are not implemented yet.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key. |
+| `quest_id` | Required foreign key to `quests.id`. |
+| `checkin_date` | Date this quest check-in belongs to. |
+| `status` | Daily check-in state, defaulting to `Planned`. |
+| `xp_awarded` | XP awarded for this check-in, defaulting to `0`. |
+| `completed_at` | Timestamp set when the check-in is completed. |
+| `skipped_at` | Timestamp set when the check-in is skipped. |
+| `failed_at` | Timestamp set when the check-in is failed. |
+| `created_at` | Timestamp set when the check-in is created. |
+| `updated_at` | Timestamp updated when the check-in changes. |
+
+Relationships:
+
+- Many check-ins belong to one quest.
+- The pair `quest_id` and `checkin_date` is unique.
 
 ### player_profiles
 
@@ -97,6 +120,7 @@ Relationships:
 ```mermaid
 erDiagram
     categories ||--o{ quests : groups
+    quests ||--o{ quest_checkins : tracks
     player_profiles ||--o{ unlocked_achievements : earns
     achievements ||--o{ unlocked_achievements : unlocked_as
 
@@ -121,6 +145,19 @@ erDiagram
         datetime completed_at
         datetime created_at
         int category_id FK
+    }
+
+    quest_checkins {
+        int id PK
+        int quest_id FK
+        date checkin_date
+        string status
+        int xp_awarded
+        datetime completed_at
+        datetime skipped_at
+        datetime failed_at
+        datetime created_at
+        datetime updated_at
     }
 
     player_profiles {
@@ -150,7 +187,7 @@ erDiagram
 ## Notes For Future Development
 
 - Planned vs actual time analysis will require an actual-time field; `estimated_minutes` already exists.
-- Recurring habits may need a separate completion history table.
+- Recurring habits can build on `quest_checkins`, but recurrence generation is not implemented yet.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - Database migrations are not included yet; schema changes should be made carefully while the project is still small.
 - Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.

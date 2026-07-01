@@ -51,6 +51,27 @@ class Quest(Base):
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     category = relationship("Category", back_populates="quests")
+    checkins = relationship("QuestCheckin", back_populates="quest")
+
+
+class QuestCheckin(Base):
+    __tablename__ = "quest_checkins"
+    __table_args__ = (
+        UniqueConstraint("quest_id", "checkin_date", name="uq_quest_checkin_date"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
+    checkin_date = Column(Date, nullable=False)
+    status = Column(String(30), nullable=False, default="Planned")
+    xp_awarded = Column(Integer, nullable=False, default=0)
+    completed_at = Column(DateTime, nullable=True)
+    skipped_at = Column(DateTime, nullable=True)
+    failed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    quest = relationship("Quest", back_populates="checkins")
 
 
 class PlayerProfile(Base):

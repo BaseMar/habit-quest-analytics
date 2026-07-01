@@ -2,7 +2,7 @@
 
 This document describes a future design for replacing the temporary Quest Planner status dropdown with a checklist-based daily completion system.
 
-Status: planned design only. This feature is not implemented.
+Status: planned design. The `QuestCheckin` data model foundation exists, but checklist services, UI, and analytics integration are not implemented.
 
 ## Goal
 
@@ -47,9 +47,9 @@ The auto-fail rule should use 3 days as the default grace period. For example, a
 - `Skipped` - The user intentionally skipped the quest. No XP is awarded, and it should be treated separately from failure.
 - `Failed` - The quest was planned but not completed or skipped. No XP is awarded, and it should count as a missed planned action.
 
-## Future Data Model Concept
+## Data Model Foundation
 
-Add a future table concept named `quest_checkins`.
+The checklist uses a table named `quest_checkins`.
 
 Proposed `QuestCheckin` fields:
 
