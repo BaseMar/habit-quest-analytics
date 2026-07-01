@@ -1,3 +1,4 @@
+from calendar import month_name
 from datetime import date, datetime, time
 import sys
 from pathlib import Path
@@ -17,6 +18,13 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.constants import QUEST_DIFFICULTIES
 from src.database.db import init_db
 from src.database.seed import ensure_default_categories
+from src.services.checklist_service import (
+    complete_checkin,
+    fail_checkin,
+    get_month_checklist,
+    reset_checkin,
+    skip_checkin,
+)
 from src.services.quest_service import (
     VALID_QUEST_STATUSES,
     create_scheduled_quest,
@@ -28,6 +36,22 @@ from src.services.quest_service import (
     validate_schedule_times,
 )
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
+
+
+CHECKLIST_STATUS_LABELS = {
+    None: "Empty / not scheduled",
+    "Planned": "Planned",
+    "Completed": "Completed",
+    "Skipped": "Skipped",
+    "Failed": "Failed",
+}
+CHECKLIST_STATUS_MARKERS = {
+    None: "",
+    "Planned": "P",
+    "Completed": "C",
+    "Skipped": "S",
+    "Failed": "F",
+}
 
 
 def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
@@ -244,6 +268,154 @@ def render_day_summary(quests: list) -> None:
     complete_col.metric("Completed", completed_count)
 
 
+def render_monthly_checklist() -> None:
+    today = date.today()
+    selected_date = st.session_state.get("selected_date", today)
+
+    if "checklist_month" not in st.session_state:
+        st.session_state["checklist_month"] = selected_date.month
+    if "checklist_year" not in st.session_state:
+        st.session_state["checklist_year"] = selected_date.year
+
+    control_col, year_col = st.columns([0.58, 0.42])
+    with control_col:
+        selected_month_name = st.selectbox(
+            "Month",
+            list(month_name)[1:],
+            index=st.session_state["checklist_month"] - 1,
+            key="checklist_month_name",
+        )
+        selected_month = list(month_name).index(selected_month_name)
+        st.session_state["checklist_month"] = selected_month
+    with year_col:
+        selected_year = st.number_input(
+            "Year",
+            min_value=2000,
+            max_value=2100,
+            value=int(st.session_state["checklist_year"]),
+            step=1,
+            key="checklist_year_input",
+        )
+        st.session_state["checklist_year"] = int(selected_year)
+
+    checklist = get_month_checklist(int(selected_year), selected_month)
+    _render_checklist_legend()
+
+    status_message = st.session_state.pop("checklist_status_message", None)
+    if status_message:
+        st.success(status_message)
+
+    if not checklist["rows"]:
+        render_empty_state(
+            "No planned quest days for this month yet.",
+            "Add quests in the planner above to start tracking your checklist.",
+        )
+        return
+
+    checklist_df = _build_checklist_dataframe(checklist)
+    st.dataframe(
+        checklist_df,
+        width="stretch",
+        hide_index=True,
+        height=min(420, 92 + (len(checklist_df) * 35)),
+    )
+
+    st.divider()
+    st.write("**Update Daily Status**")
+    st.caption("Choose a quest and day, then apply a checklist status.")
+
+    row_lookup = {row["quest_id"]: row for row in checklist["rows"]}
+    quest_labels = _build_checklist_quest_labels(checklist["rows"])
+    editor_col, status_col = st.columns([0.68, 0.32], gap="large")
+
+    if st.session_state.get("checklist_selected_quest") not in row_lookup:
+        st.session_state["checklist_selected_quest"] = next(iter(row_lookup))
+    if st.session_state.get("checklist_selected_date") not in checklist["days"]:
+        st.session_state["checklist_selected_date"] = checklist["days"][0]
+
+    with editor_col:
+        quest_col, date_col = st.columns([0.62, 0.38])
+        with quest_col:
+            selected_quest_id = st.selectbox(
+                "Quest",
+                list(row_lookup.keys()),
+                format_func=lambda quest_id: quest_labels[quest_id],
+                key="checklist_selected_quest",
+            )
+        with date_col:
+            selected_checklist_date = st.selectbox(
+                "Date",
+                checklist["days"],
+                format_func=lambda day: day.strftime("%b %d"),
+                key="checklist_selected_date",
+            )
+
+    selected_row = row_lookup[selected_quest_id]
+    selected_cell = selected_row["cells"][selected_checklist_date]
+    current_status = CHECKLIST_STATUS_LABELS.get(selected_cell["status"], "Unknown")
+
+    with status_col:
+        marker = CHECKLIST_STATUS_MARKERS.get(selected_cell["status"], "")
+        status_prefix = f"{marker} - " if marker else ""
+        st.info(f"Current: {status_prefix}{current_status}")
+
+    action_cols = st.columns(4)
+    actions = (
+        ("Complete", complete_checkin, "checklist_complete"),
+        ("Skip", skip_checkin, "checklist_skip"),
+        ("Fail", fail_checkin, "checklist_fail"),
+        ("Reset", reset_checkin, "checklist_reset"),
+    )
+    for column, (label, action, key) in zip(action_cols, actions):
+        with column:
+            if st.button(label, use_container_width=True, key=key):
+                action(selected_quest_id, selected_checklist_date)
+                st.session_state["checklist_status_message"] = (
+                    f"{label} saved for {selected_checklist_date:%Y-%m-%d}."
+                )
+                st.rerun()
+
+
+def _render_checklist_legend() -> None:
+    legend_items = (
+        ("blank", "Empty / not scheduled"),
+        ("P", "Planned"),
+        ("C", "Completed"),
+        ("S", "Skipped"),
+        ("F", "Failed"),
+    )
+    legend_cols = st.columns(len(legend_items))
+    for column, (marker, label) in zip(legend_cols, legend_items):
+        column.caption(f"{marker} = {label}")
+
+
+def _build_checklist_dataframe(checklist: dict) -> pd.DataFrame:
+    rows = []
+    for row in checklist["rows"]:
+        table_row = {
+            "Quest": row["title"],
+            "Category": row["category"] or "Uncategorized",
+            "Difficulty": row["difficulty"],
+        }
+        for day in checklist["days"]:
+            table_row[str(day.day)] = CHECKLIST_STATUS_MARKERS.get(row["cells"][day]["status"], "")
+        rows.append(table_row)
+    return pd.DataFrame(rows)
+
+
+def _build_checklist_quest_labels(rows: list[dict]) -> dict[int, str]:
+    base_labels = {
+        row["quest_id"]: f"{row['title']} | {row['category'] or 'Uncategorized'} | {row['difficulty']}"
+        for row in rows
+    }
+    label_counts: dict[str, int] = {}
+    labels: dict[int, str] = {}
+    for quest_id, label in base_labels.items():
+        label_counts[label] = label_counts.get(label, 0) + 1
+        labels[quest_id] = label if label_counts[label] == 1 else f"{label} ({label_counts[label]})"
+    return labels
+
+
 def _extract_calendar_date(calendar_state) -> date | None:
     if not isinstance(calendar_state, dict):
         return None
@@ -426,6 +598,10 @@ with planner_col:
                     st.success("Quest scheduled.")
                     st.rerun()
 
+render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
+with st.container(border=True):
+    render_monthly_checklist()
+
 quests = get_all_quests()
 
 if not quests:
@@ -453,9 +629,8 @@ else:
             st.caption("Review persisted quest history without taking focus from the planner.")
             st.dataframe(pd.DataFrame(quest_rows), width="stretch", hide_index=True)
 
-        # Temporary v1 status control. Replace later with a monthly habit checklist for per-day completion.
-        with st.expander("Temporary Status Controls", expanded=False):
-            st.caption("Temporary workflow. This will later be replaced by a monthly habit checklist.")
+        with st.expander("Legacy Status Controls", expanded=False):
+            st.caption("Temporary fallback while Monthly Checklist is being introduced.")
             quest_labels = {f"#{quest.id} - {quest.title}": quest.id for quest in quests}
             with st.form("update_quest_status_form"):
                 selected_quest = st.selectbox("Quest", list(quest_labels.keys()))
