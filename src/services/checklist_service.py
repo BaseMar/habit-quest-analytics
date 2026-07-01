@@ -1,10 +1,90 @@
-from datetime import date, timedelta
+from calendar import monthrange
+from datetime import date, datetime, time, timedelta
+
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
 from src.database.models import Quest, QuestCheckin, utc_now
 
 
 VALID_CHECKIN_STATUSES = ("Planned", "Completed", "Skipped", "Failed")
+
+
+def build_month_days(year: int, month: int) -> list[date]:
+    """Return every date in a selected calendar month."""
+    if month < 1 or month > 12:
+        raise ValueError("month must be between 1 and 12.")
+
+    day_count = monthrange(year, month)[1]
+    return [date(year, month, day) for day in range(1, day_count + 1)]
+
+
+def get_month_checklist(year: int, month: int, session=None) -> dict:
+    """Build quest rows and daily check-in cells for a selected month."""
+    days = build_month_days(year, month)
+    month_start = days[0]
+    month_end = days[-1]
+    month_start_at = datetime.combine(month_start, time.min)
+    next_month_start_at = datetime.combine(month_end + timedelta(days=1), time.min)
+
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quests = (
+            session.query(Quest)
+            .options(joinedload(Quest.category))
+            .filter(
+                or_(
+                    and_(Quest.due_date >= month_start, Quest.due_date <= month_end),
+                    and_(
+                        Quest.planned_start_at >= month_start_at,
+                        Quest.planned_start_at < next_month_start_at,
+                    ),
+                    Quest.checkins.any(
+                        and_(
+                            QuestCheckin.checkin_date >= month_start,
+                            QuestCheckin.checkin_date <= month_end,
+                        )
+                    ),
+                )
+            )
+            .order_by(
+                Quest.due_date.is_(None),
+                Quest.due_date,
+                Quest.planned_start_at.is_(None),
+                Quest.planned_start_at,
+                Quest.created_at,
+                Quest.id,
+            )
+            .all()
+        )
+
+        for quest in quests:
+            scheduled_date = _get_scheduled_date_in_month(quest, month_start, month_end)
+            if scheduled_date is not None:
+                ensure_checkin(quest.id, scheduled_date, session=session)
+
+        quest_ids = [quest.id for quest in quests]
+        checkins_by_quest_and_date = _get_month_checkins_by_quest_and_date(
+            session,
+            quest_ids,
+            month_start,
+            month_end,
+        )
+
+        return {
+            "year": year,
+            "month": month,
+            "days": days,
+            "rows": [
+                _build_month_row(quest, days, checkins_by_quest_and_date.get(quest.id, {}))
+                for quest in quests
+            ],
+        }
+    finally:
+        if owns_session:
+            session.close()
 
 
 def ensure_checkin(quest_id: int, checkin_date: date, session=None) -> QuestCheckin:
@@ -140,6 +220,90 @@ def _get_checkin(session, quest_id: int, checkin_date: date) -> QuestCheckin | N
         )
         .one_or_none()
     )
+
+
+def _get_month_checkins_by_quest_and_date(
+    session,
+    quest_ids: list[int],
+    month_start: date,
+    month_end: date,
+) -> dict[int, dict[date, QuestCheckin]]:
+    if not quest_ids:
+        return {}
+
+    checkins = (
+        session.query(QuestCheckin)
+        .filter(
+            QuestCheckin.quest_id.in_(quest_ids),
+            QuestCheckin.checkin_date >= month_start,
+            QuestCheckin.checkin_date <= month_end,
+        )
+        .all()
+    )
+    grouped: dict[int, dict[date, QuestCheckin]] = {}
+    for checkin in checkins:
+        grouped.setdefault(checkin.quest_id, {})[checkin.checkin_date] = checkin
+    return grouped
+
+
+def _build_month_row(
+    quest: Quest,
+    days: list[date],
+    checkins_by_date: dict[date, QuestCheckin],
+) -> dict:
+    return {
+        "quest_id": quest.id,
+        "title": quest.title,
+        "category": quest.category.name if quest.category else None,
+        "difficulty": quest.difficulty,
+        "xp_reward": quest.xp_reward,
+        "estimated_minutes": quest.estimated_minutes,
+        "cells": {
+            day: _build_month_cell(day, checkins_by_date.get(day))
+            for day in days
+        },
+    }
+
+
+def _build_month_cell(day: date, checkin: QuestCheckin | None) -> dict:
+    if checkin is None:
+        return {
+            "date": day,
+            "checkin_date": day,
+            "checkin_id": None,
+            "status": None,
+            "xp_awarded": 0,
+            "completed_at": None,
+            "skipped_at": None,
+            "failed_at": None,
+        }
+
+    return {
+        "date": day,
+        "checkin_date": checkin.checkin_date,
+        "checkin_id": checkin.id,
+        "status": checkin.status,
+        "xp_awarded": checkin.xp_awarded,
+        "completed_at": checkin.completed_at,
+        "skipped_at": checkin.skipped_at,
+        "failed_at": checkin.failed_at,
+    }
+
+
+def _get_scheduled_date_in_month(
+    quest: Quest,
+    month_start: date,
+    month_end: date,
+) -> date | None:
+    if quest.planned_start_at is not None:
+        scheduled_date = quest.planned_start_at.date()
+        if month_start <= scheduled_date <= month_end:
+            return scheduled_date
+
+    if quest.due_date is not None and month_start <= quest.due_date <= month_end:
+        return quest.due_date
+
+    return None
 
 
 def _normalize_checkin_status(status: str) -> str:

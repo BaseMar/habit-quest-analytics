@@ -1,14 +1,16 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, QuestCheckin
+from src.database.models import Base, Category, Quest, QuestCheckin
 from src.services.checklist_service import (
+    build_month_days,
     complete_checkin,
     ensure_checkin,
     fail_checkin,
+    get_month_checklist,
     mark_stale_planned_checkins_failed,
     reset_checkin,
     skip_checkin,
@@ -40,6 +42,31 @@ def _create_quest(session, title: str = "Morning workout", xp_difficulty: str = 
         planned_date=date(2026, 7, 1),
         session=session,
     )
+
+
+def _create_raw_quest(
+    session,
+    title: str,
+    due_date: date | None = None,
+    planned_start_at: datetime | None = None,
+    planned_end_at: datetime | None = None,
+):
+    category = session.query(Category).one()
+    quest = Quest(
+        title=title,
+        category_id=category.id,
+        difficulty="Hard",
+        status="Planned",
+        xp_reward=75,
+        due_date=due_date,
+        planned_start_at=planned_start_at,
+        planned_end_at=planned_end_at,
+        estimated_minutes=60,
+    )
+    session.add(quest)
+    session.commit()
+    session.refresh(quest)
+    return quest
 
 
 def test_ensure_checkin_creates_planned_checkin(session):
@@ -186,3 +213,132 @@ def test_checkin_service_uses_quest_relationship_and_xp_reward(session):
     assert checkin.quest == quest
     assert checkin in quest.checkins
     assert checkin.xp_awarded == 150
+
+
+def test_get_month_checklist_returns_selected_year_month_and_days(session):
+    checklist = get_month_checklist(2026, 2, session=session)
+
+    assert checklist["year"] == 2026
+    assert checklist["month"] == 2
+    assert checklist["days"] == build_month_days(2026, 2)
+    assert checklist["days"][0] == date(2026, 2, 1)
+    assert checklist["days"][-1] == date(2026, 2, 28)
+
+
+def test_get_month_checklist_includes_scheduled_quest_and_creates_planned_checkin(session):
+    quest = _create_raw_quest(
+        session,
+        "Scheduled workout",
+        planned_start_at=datetime(2026, 7, 5, 9, 0),
+        planned_end_at=datetime(2026, 7, 5, 10, 0),
+    )
+
+    checklist = get_month_checklist(2026, 7, session=session)
+
+    assert [row["quest_id"] for row in checklist["rows"]] == [quest.id]
+    row = checklist["rows"][0]
+    assert row["title"] == "Scheduled workout"
+    assert row["category"] == "Health"
+    assert row["difficulty"] == "Hard"
+    assert row["xp_reward"] == 75
+    assert row["estimated_minutes"] == 60
+
+    checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+    assert checkin.status == "Planned"
+    assert checkin.xp_awarded == 0
+    assert checkin.checkin_date == date(2026, 7, 5)
+    assert row["cells"][date(2026, 7, 5)]["checkin_id"] == checkin.id
+    assert row["cells"][date(2026, 7, 5)]["status"] == "Planned"
+
+
+def test_get_month_checklist_uses_neutral_cells_for_days_without_checkins(session):
+    _create_raw_quest(session, "Monthly due quest", due_date=date(2026, 7, 5))
+
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+    empty_cell = row["cells"][date(2026, 7, 1)]
+
+    assert empty_cell["checkin_id"] is None
+    assert empty_cell["status"] is None
+    assert empty_cell["xp_awarded"] == 0
+    assert empty_cell["completed_at"] is None
+    assert empty_cell["skipped_at"] is None
+    assert empty_cell["failed_at"] is None
+
+
+def test_get_month_checklist_preserves_completed_checkin_status_and_xp(session):
+    quest = _create_raw_quest(session, "Completed quest", due_date=date(2026, 7, 6))
+    completed_checkin = complete_checkin(quest.id, date(2026, 7, 6), session=session)
+    completed_at = completed_checkin.completed_at
+
+    checklist = get_month_checklist(2026, 7, session=session)
+    cell = checklist["rows"][0]["cells"][date(2026, 7, 6)]
+
+    assert cell["status"] == "Completed"
+    assert cell["xp_awarded"] == quest.xp_reward
+    assert cell["completed_at"] == completed_at
+
+
+def test_get_month_checklist_preserves_skipped_and_failed_checkins(session):
+    skipped_quest = _create_raw_quest(session, "Skipped quest", due_date=date(2026, 7, 7))
+    failed_quest = _create_raw_quest(session, "Failed quest", due_date=date(2026, 7, 8))
+    skipped_checkin = skip_checkin(skipped_quest.id, date(2026, 7, 7), session=session)
+    failed_checkin = fail_checkin(failed_quest.id, date(2026, 7, 8), session=session)
+
+    checklist = get_month_checklist(2026, 7, session=session)
+    rows_by_quest = {row["quest_id"]: row for row in checklist["rows"]}
+
+    skipped_cell = rows_by_quest[skipped_quest.id]["cells"][date(2026, 7, 7)]
+    failed_cell = rows_by_quest[failed_quest.id]["cells"][date(2026, 7, 8)]
+    assert skipped_cell["status"] == "Skipped"
+    assert skipped_cell["skipped_at"] == skipped_checkin.skipped_at
+    assert skipped_cell["xp_awarded"] == 0
+    assert failed_cell["status"] == "Failed"
+    assert failed_cell["failed_at"] == failed_checkin.failed_at
+    assert failed_cell["xp_awarded"] == 0
+
+
+def test_get_month_checklist_excludes_outside_quests_unless_checkin_is_in_month(session):
+    outside_quest = _create_raw_quest(session, "Outside quest", due_date=date(2026, 8, 1))
+    checkin_quest = _create_raw_quest(session, "Outside quest with July checkin", due_date=date(2026, 8, 2))
+    ensure_checkin(checkin_quest.id, date(2026, 7, 10), session=session)
+
+    checklist = get_month_checklist(2026, 7, session=session)
+    row_ids = [row["quest_id"] for row in checklist["rows"]]
+
+    assert outside_quest.id not in row_ids
+    assert checkin_quest.id in row_ids
+
+
+def test_get_month_checklist_does_not_duplicate_quest_matching_due_date_and_start(session):
+    quest = _create_raw_quest(
+        session,
+        "Single row quest",
+        due_date=date(2026, 7, 5),
+        planned_start_at=datetime(2026, 7, 5, 9, 0),
+        planned_end_at=datetime(2026, 7, 5, 10, 0),
+    )
+
+    checklist = get_month_checklist(2026, 7, session=session)
+
+    assert [row["quest_id"] for row in checklist["rows"]].count(quest.id) == 1
+    assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 1
+
+
+def test_get_month_checklist_does_not_overwrite_existing_checkins(session):
+    quest = _create_raw_quest(session, "Existing checkin quest", due_date=date(2026, 7, 9))
+    checkin = complete_checkin(quest.id, date(2026, 7, 9), session=session)
+    original_completed_at = checkin.completed_at
+    original_xp_awarded = checkin.xp_awarded
+
+    get_month_checklist(2026, 7, session=session)
+    session.refresh(checkin)
+
+    assert checkin.status == "Completed"
+    assert checkin.completed_at == original_completed_at
+    assert checkin.xp_awarded == original_xp_awarded
+
+
+def test_get_month_checklist_rejects_invalid_month(session):
+    with pytest.raises(ValueError, match="month must be between 1 and 12"):
+        get_month_checklist(2026, 13, session=session)
