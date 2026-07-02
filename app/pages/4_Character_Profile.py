@@ -217,7 +217,7 @@ def render_radar_chart(profile: dict) -> None:
     st.markdown("**RPG Stat Balance**")
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
     st.markdown(
-        '<div class="hq-radar-caption">Based on completed quest XP by category.</div>',
+        '<div class="hq-radar-caption">Based on completed quest-day XP by category.</div>',
         unsafe_allow_html=True,
     )
 
@@ -306,6 +306,9 @@ def render_basic_stats(profile: dict) -> None:
 def _format_basic_stats(stats: list[dict]) -> list[dict]:
     label_overrides = {
         "Boss Quests Completed": "Boss Quests",
+        "Completed Quest Days": "Quest Days",
+        "Boss Quest Days": "Boss Days",
+        "Average XP / Quest Day": "Avg XP / Day",
         "Average XP / Completed Quest": "Avg XP / Quest",
         "Strongest RPG Stat": "Strongest Stat",
         "Most Productive Weekday": "Best Weekday",
@@ -381,13 +384,13 @@ with right_col:
         else:
             render_empty_state(
                 "No RPG stat data yet",
-                "Complete quests in Quest Planner to populate the stat radar.",
+                "Complete quest days in Quest Planner to populate the stat radar.",
             )
 
 if not profile["has_completed_quests"]:
     render_empty_state(
-        "No completed quests yet",
-        "Complete quests in Quest Planner to earn XP, level up, and grow your RPG stats.",
+        "No completed quest days yet",
+        "Complete quest days in Quest Planner to earn XP, level up, and grow your RPG stats.",
     )
 
 render_section_title("Basic Stats", "Compact activity stats that complement the hero progression panel.")
@@ -397,9 +400,9 @@ with st.expander("How Stats Are Calculated"):
     st.markdown(
         """
         <div class="hq-explainer">
-            Completed quests grant XP based on difficulty. That XP contributes to one RPG stat through the quest category
+            Completed quest days grant XP based on difficulty. That XP contributes to one RPG stat through the quest category
             mapping: Learning to Knowledge, Health to Strength, Work to Discipline, Social to Creativity, and Home to
-            Recovery. Your level is based on total completed quest XP, with each 500 XP moving the character into the next
+            Recovery. Your level is based on total completed quest-day XP, with each 500 XP moving the character into the next
             level.
         </div>
         """,

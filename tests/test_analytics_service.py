@@ -571,3 +571,90 @@ def test_get_character_profile_data_summarizes_completed_quest_progress(session)
         "Stat": "Knowledge",
         "XP": 550,
     }
+
+
+def test_get_character_profile_data_sums_checkin_xp_and_level_progress(session):
+    category = _add_category(session, "Learning")
+    quest = _add_quest(session, "Study", xp_reward=300, category=category)
+    _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=550)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    assert profile["total_xp"] == 550
+    assert profile["current_level"] == 2
+    assert profile["xp_to_next_level"] == 450
+    assert profile["level_progress"] == 0.1
+    assert profile["completed_quests"] == 1
+    assert profile["completed_quest_days"] == 1
+    assert profile["activity_stats"][0] == {"label": "Completed Quest Days", "value": 1}
+
+
+def test_get_character_profile_data_groups_checkin_xp_by_parent_quest_category(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    lift = _add_quest(session, "Lift", category=health)
+    report = _add_quest(session, "Report", category=work)
+    _add_checkin(session, lift, date(2026, 6, 25), "Completed", xp_awarded=30)
+    _add_checkin(session, report, date(2026, 6, 26), "Completed", xp_awarded=75)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    stat_rows = profile["rpg_stats"][["Stat", "XP"]].to_dict("records")
+    assert {"Stat": "Strength", "XP": 30} in stat_rows
+    assert {"Stat": "Discipline", "XP": 75} in stat_rows
+
+
+def test_get_character_profile_data_counts_repeated_completed_checkins_for_same_quest(session):
+    category = _add_category(session, "Health")
+    quest = _add_quest(session, "Workout", category=category)
+    _add_checkin(session, quest, date(2026, 6, 25), "Completed", xp_awarded=30)
+    _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=30)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    assert profile["total_xp"] == 60
+    assert profile["completed_quest_days"] == 2
+    strength = profile["rpg_stats"].set_index("Stat").loc["Strength"]
+    assert int(strength["XP"]) == 60
+
+
+def test_get_character_profile_data_ignores_non_completed_checkins_for_activity_and_xp(session):
+    category = _add_category(session, "Health")
+    skipped = _add_quest(session, "Skipped", category=category)
+    failed = _add_quest(session, "Failed", category=category)
+    planned = _add_quest(session, "Planned", category=category)
+    _add_checkin(session, skipped, date(2026, 6, 24), "Skipped", xp_awarded=0)
+    _add_checkin(session, failed, date(2026, 6, 25), "Failed", xp_awarded=0)
+    _add_checkin(session, planned, date(2026, 6, 26), "Planned", xp_awarded=0)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    assert profile["total_xp"] == 0
+    assert profile["completed_quest_days"] == 0
+    assert profile["has_completed_quests"] is False
+    assert int(profile["rpg_stats"]["XP"].sum()) == 0
+
+
+def test_get_character_profile_data_reset_checkin_with_zero_xp_no_longer_contributes(session):
+    category = _add_category(session, "Health")
+    quest = _add_quest(session, "Workout", category=category)
+    _add_checkin(session, quest, date(2026, 6, 26), "Planned", xp_awarded=0)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    assert profile["total_xp"] == 0
+    assert profile["completed_quest_days"] == 0
+    assert int(profile["rpg_stats"]["XP"].sum()) == 0
+
+
+def test_get_character_profile_data_does_not_double_count_legacy_completed_quest_with_checkin(session):
+    category = _add_category(session, "Learning")
+    quest = _add_quest(session, "Legacy completed", status="Completed", xp_reward=300, category=category)
+    _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=30)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    assert profile["total_xp"] == 30
+    assert profile["completed_quest_days"] == 1
+    knowledge = profile["rpg_stats"].set_index("Stat").loc["Knowledge"]
+    assert int(knowledge["XP"]) == 30

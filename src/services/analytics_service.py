@@ -197,19 +197,60 @@ def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
 
 
 def get_character_profile_data(today: date | None = None, session=None) -> dict:
-    """Return character progression data based on completed quests."""
+    """Return character progression data based on completed check-ins."""
     today = today or date.today()
     owns_session = session is None
     session = session or get_session()
     try:
         quests = session.query(Quest).options(joinedload(Quest.category)).all()
+        checkins = (
+            session.query(QuestCheckin)
+            .options(joinedload(QuestCheckin.quest).joinedload(Quest.category))
+            .all()
+        )
+        player_profile = session.query(PlayerProfile).order_by(PlayerProfile.id).first()
+        character_name = player_profile.character_name if player_profile else "Adventurer"
+        avatar_path = player_profile.avatar_path if player_profile else None
+
+        if checkins:
+            completed_checkins = [
+                checkin for checkin in checkins if _normalize_status(checkin.status) == "Completed"
+            ]
+            total_xp = sum(checkin.xp_awarded or 0 for checkin in checkins)
+            current_level = calculate_level(total_xp)
+            xp_to_next_level = calculate_xp_to_next_level(total_xp)
+            completion_rate = calculate_completion_rate(len(completed_checkins), len(checkins))
+            weekly_xp = calculate_weekly_checkin_xp(completed_checkins, today)
+            rpg_stats = build_xp_by_rpg_stat_from_checkins(completed_checkins)
+            activity_stats = build_character_checkin_activity_stats(
+                completed_checkins=completed_checkins,
+                all_checkins=checkins,
+                rpg_stats=rpg_stats,
+                completion_rate=completion_rate,
+                weekly_xp=weekly_xp,
+            )
+
+            return {
+                "character_name": character_name,
+                "character_title": calculate_character_title(current_level),
+                "avatar_path": avatar_path,
+                "current_level": current_level,
+                "total_xp": total_xp,
+                "xp_to_next_level": xp_to_next_level,
+                "level_progress": calculate_level_progress(total_xp),
+                "has_completed_quests": bool(completed_checkins),
+                "completed_quests": len(completed_checkins),
+                "completed_quest_days": len(completed_checkins),
+                "completion_rate": completion_rate,
+                "weekly_xp": weekly_xp,
+                "rpg_stats": rpg_stats,
+                "activity_stats": activity_stats,
+            }
+
         completed_quests = [quest for quest in quests if _is_completed(quest)]
         total_xp = sum(quest.xp_reward or 0 for quest in completed_quests)
         current_level = calculate_level(total_xp)
         xp_to_next_level = calculate_xp_to_next_level(total_xp)
-        player_profile = session.query(PlayerProfile).order_by(PlayerProfile.id).first()
-        character_name = player_profile.character_name if player_profile else "Adventurer"
-        avatar_path = player_profile.avatar_path if player_profile else None
         completion_rate = calculate_completion_rate(len(completed_quests), len(quests))
         weekly_xp = calculate_weekly_xp(completed_quests, today)
         rpg_stats = build_xp_by_rpg_stat(completed_quests)
@@ -224,6 +265,7 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
             "level_progress": calculate_level_progress(total_xp),
             "has_completed_quests": bool(completed_quests),
             "completed_quests": len(completed_quests),
+            "completed_quest_days": len(completed_quests),
             "completion_rate": completion_rate,
             "weekly_xp": weekly_xp,
             "rpg_stats": rpg_stats,
@@ -274,6 +316,22 @@ def build_xp_by_rpg_stat(quests: list[Quest]) -> pd.DataFrame:
     )
 
 
+def build_xp_by_rpg_stat_from_checkins(checkins: list[QuestCheckin]) -> pd.DataFrame:
+    """Return completed check-in XP grouped by parent quest category RPG stat."""
+    totals = {stat: 0 for stat in RPG_STATS}
+    for checkin in checkins:
+        if _normalize_status(checkin.status) != "Completed":
+            continue
+        quest = checkin.quest
+        category_name = _category_name(quest) if quest is not None else "Uncategorized"
+        stat = _stat_for_category(category_name)
+        totals[stat] += checkin.xp_awarded or 0
+
+    return pd.DataFrame(
+        [{"Stat": stat, "XP": totals[stat], "Progress": min(totals[stat] / 500, 1.0)} for stat in RPG_STATS]
+    )
+
+
 def calculate_weekly_xp(quests: list[Quest], today: date) -> int:
     """Return completed quest XP earned in the week containing today."""
     week_start = today - timedelta(days=today.weekday())
@@ -287,6 +345,19 @@ def calculate_weekly_xp(quests: list[Quest], today: date) -> int:
         if _is_completed(quest)
         and quest.completed_at is not None
         and week_start_at <= quest.completed_at < week_end_at
+    )
+
+
+def calculate_weekly_checkin_xp(checkins: list[QuestCheckin], today: date) -> int:
+    """Return completed check-in XP earned in the week containing today."""
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+
+    return sum(
+        checkin.xp_awarded or 0
+        for checkin in checkins
+        if _normalize_status(checkin.status) == "Completed"
+        and week_start <= checkin.checkin_date < week_end
     )
 
 
@@ -310,6 +381,30 @@ def build_character_activity_stats(
         {"label": "Most Active Category", "value": _most_active_category(completed_quests)},
         {"label": "Strongest RPG Stat", "value": _strongest_rpg_stat(rpg_stats)},
         {"label": "Most Productive Weekday", "value": _most_productive_weekday(completed_quests)},
+    ]
+
+
+def build_character_checkin_activity_stats(
+    completed_checkins: list[QuestCheckin],
+    all_checkins: list[QuestCheckin],
+    rpg_stats: pd.DataFrame,
+    completion_rate: float,
+    weekly_xp: int,
+) -> list[dict]:
+    """Return compact character stats based on completed daily check-ins."""
+    completed_count = len(completed_checkins)
+    total_xp = sum(checkin.xp_awarded or 0 for checkin in completed_checkins)
+    average_xp = round(total_xp / completed_count, 1) if completed_count else 0
+
+    return [
+        {"label": "Completed Quest Days", "value": completed_count},
+        {"label": "Completion Rate", "value": f"{completion_rate}%"},
+        {"label": "Weekly XP", "value": weekly_xp},
+        {"label": "Boss Quest Days", "value": _count_boss_checkins(completed_checkins)},
+        {"label": "Average XP / Quest Day", "value": average_xp},
+        {"label": "Most Active Category", "value": _most_active_checkin_category(completed_checkins)},
+        {"label": "Strongest RPG Stat", "value": _strongest_rpg_stat(rpg_stats)},
+        {"label": "Most Productive Weekday", "value": _most_productive_checkin_weekday(completed_checkins)},
     ]
 
 
@@ -538,10 +633,33 @@ def _count_boss_quests(quests: list[Quest]) -> int:
     return sum(1 for quest in quests if (quest.difficulty or "").strip().lower() == "boss")
 
 
+def _count_boss_checkins(checkins: list[QuestCheckin]) -> int:
+    return sum(
+        1
+        for checkin in checkins
+        if checkin.quest is not None and (checkin.quest.difficulty or "").strip().lower() == "boss"
+    )
+
+
 def _most_active_category(quests: list[Quest]) -> str:
     category_counts: dict[str, int] = {}
     for quest in quests:
         category = _category_name(quest)
+        category_counts[category] = category_counts.get(category, 0) + 1
+
+    if not category_counts:
+        return "Not enough data"
+
+    return sorted(category_counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _most_active_checkin_category(checkins: list[QuestCheckin]) -> str:
+    category_counts: dict[str, int] = {}
+    for checkin in checkins:
+        if checkin.quest is None:
+            category = "Uncategorized"
+        else:
+            category = _category_name(checkin.quest)
         category_counts[category] = category_counts.get(category, 0) + 1
 
     if not category_counts:
@@ -565,6 +683,19 @@ def _most_productive_weekday(quests: list[Quest]) -> str:
         if activity_date is None:
             continue
 
+        key = (activity_date.weekday(), activity_date.strftime("%A"))
+        weekday_counts[key] = weekday_counts.get(key, 0) + 1
+
+    if not weekday_counts:
+        return "Not enough data"
+
+    return sorted(weekday_counts.items(), key=lambda item: (-item[1], item[0][0]))[0][0][1]
+
+
+def _most_productive_checkin_weekday(checkins: list[QuestCheckin]) -> str:
+    weekday_counts: dict[tuple[int, str], int] = {}
+    for checkin in checkins:
+        activity_date = checkin.checkin_date
         key = (activity_date.weekday(), activity_date.strftime("%A"))
         weekday_counts[key] = weekday_counts.get(key, 0) + 1
 
