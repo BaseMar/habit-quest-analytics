@@ -26,13 +26,10 @@ from src.services.checklist_service import (
     skip_checkin,
 )
 from src.services.quest_service import (
-    VALID_QUEST_STATUSES,
     create_scheduled_quest,
-    get_all_quests,
     get_categories,
     get_quests_for_calendar,
     get_quests_for_day,
-    update_quest_status,
     validate_schedule_times,
 )
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
@@ -468,14 +465,6 @@ def _category_name(quest) -> str:
     return quest.category.name if quest.category else "Uncategorized"
 
 
-def _format_date(value) -> str:
-    return value.strftime("%Y-%m-%d") if value else ""
-
-
-def _format_datetime(value) -> str:
-    return value.strftime("%Y-%m-%d %H:%M") if value else ""
-
-
 def _format_selected_date(value: date) -> str:
     return value.strftime("%A, %Y-%m-%d")
 
@@ -601,43 +590,3 @@ with planner_col:
 render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
 with st.container(border=True):
     render_monthly_checklist()
-
-quests = get_all_quests()
-
-if not quests:
-    render_empty_state("No quests yet", "Plan your first quest above to start building your adventure log.")
-else:
-    quest_rows = [
-        {
-            "ID": quest.id,
-            "Title": quest.title,
-            "Category": _category_name(quest),
-            "Difficulty": quest.difficulty,
-            "Status": quest.status,
-            "Planned Date": _format_date(quest.due_date),
-            "Start": _format_datetime(quest.planned_start_at),
-            "End": _format_datetime(quest.planned_end_at),
-            "Estimated Minutes": quest.estimated_minutes or "",
-            "XP Reward": quest.xp_reward,
-            "Completed At": _format_datetime(quest.completed_at),
-        }
-        for quest in quests
-    ]
-    render_section_title("Maintenance", "Secondary controls for reviewing and maintaining quest records.")
-    with st.container(border=True):
-        with st.expander("Quest Ledger", expanded=False):
-            st.caption("Review persisted quest history without taking focus from the planner.")
-            st.dataframe(pd.DataFrame(quest_rows), width="stretch", hide_index=True)
-
-        with st.expander("Legacy Status Controls", expanded=False):
-            st.caption("Temporary fallback while Monthly Checklist is being introduced.")
-            quest_labels = {f"#{quest.id} - {quest.title}": quest.id for quest in quests}
-            with st.form("update_quest_status_form"):
-                selected_quest = st.selectbox("Quest", list(quest_labels.keys()))
-                selected_status = st.selectbox("Status", list(VALID_QUEST_STATUSES))
-                status_submitted = st.form_submit_button("Update Status")
-
-                if status_submitted:
-                    update_quest_status(quest_labels[selected_quest], selected_status)
-                    st.success("Quest status updated.")
-                    st.rerun()
