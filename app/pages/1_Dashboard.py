@@ -17,23 +17,23 @@ def render_mission_brief(command_center: dict) -> None:
     attention_count = command_center["overdue_quests"] + command_center["failed_quests"]
 
     if today_count == 0:
-        message = "No quests planned for today. Plan your day in Quest Planner to start today's mission."
+        message = "No quest check-ins planned for today. Schedule quests in Quest Planner to start today's mission."
     else:
-        quest_word = "quest" if today_count == 1 else "quests"
+        quest_word = "check-in" if today_count == 1 else "check-ins"
         attention_word = "item needs" if attention_count == 1 else "items need"
         message = f"Today's mission: {today_count} {quest_word} planned. {attention_count} {attention_word} attention."
 
     with st.container(border=True):
         st.write(f"**{message}**")
         if command_center["overdue_quests"] > 0:
-            st.caption(f"{command_center['overdue_quests']} overdue quests need review in Quest Planner.")
+            st.caption(f"{command_center['overdue_quests']} overdue check-ins need review in Quest Planner.")
 
 
 def render_todays_focus(today_quests: list[dict]) -> None:
     if not today_quests:
         render_empty_state(
-            "No quests planned for today",
-            "Plan your day in Quest Planner.",
+            "No quest check-ins planned for today",
+            "Schedule quests in Quest Planner to build today's focus.",
         )
         return
 
@@ -53,7 +53,7 @@ def render_status_kpis(command_center: dict) -> None:
     status_items = (
         ("Overdue", command_center["overdue_quests"], "warning"),
         ("Failed", command_center["failed_quests"], "danger"),
-        ("Planned", command_center["planned_quests"], "info"),
+        ("Planned Today", command_center["planned_quests"], "info"),
         ("Completed Today", command_center["completed_today"], "success"),
     )
     cards = "\n".join(
@@ -158,7 +158,7 @@ else:
     render_status_kpis(command_center)
     render_mission_brief(command_center)
 
-    render_section_title("Today's Focus", "Today’s planned quests. Manage details and status updates in Quest Planner.")
+    render_section_title("Today's Focus", "Today's planned quest check-ins. Manage status updates in Quest Planner.")
     render_todays_focus(command_center["today_quests"])
 
-st.caption("Data source: local SQLite quest records.")
+st.caption("Data source: local SQLite quest check-in records.")

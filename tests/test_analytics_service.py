@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Quest
+from src.database.models import Base, Category, Quest, QuestCheckin
 from src.services.analytics_service import (
     build_character_activity_stats,
     build_today_focus_rows,
@@ -32,6 +32,55 @@ def session():
         yield session
     finally:
         session.close()
+
+
+def _add_category(session, name: str = "Health") -> Category:
+    category = Category(name=name)
+    session.add(category)
+    session.commit()
+    return category
+
+
+def _add_quest(
+    session,
+    title: str,
+    status: str = "Planned",
+    xp_reward: int = 10,
+    due_date: date | None = None,
+    planned_start_at: datetime | None = None,
+    planned_end_at: datetime | None = None,
+    category: Category | None = None,
+) -> Quest:
+    quest = Quest(
+        title=title,
+        status=status,
+        xp_reward=xp_reward,
+        due_date=due_date,
+        planned_start_at=planned_start_at,
+        planned_end_at=planned_end_at,
+        category=category,
+    )
+    session.add(quest)
+    session.commit()
+    return quest
+
+
+def _add_checkin(
+    session,
+    quest: Quest,
+    checkin_date: date,
+    status: str = "Planned",
+    xp_awarded: int = 0,
+) -> QuestCheckin:
+    checkin = QuestCheckin(
+        quest_id=quest.id,
+        checkin_date=checkin_date,
+        status=status,
+        xp_awarded=xp_awarded,
+    )
+    session.add(checkin)
+    session.commit()
+    return checkin
 
 
 def test_get_dashboard_kpis_counts_completed_quests_and_xp(session):
@@ -195,128 +244,155 @@ def test_build_status_counts_returns_supported_status_counts(session):
     }
 
 
-def test_get_command_center_data_returns_operational_quest_metrics(session):
-    session.add_all(
-        [
-            Quest(
-                title="Workout",
-                status="Completed",
-                xp_reward=75,
-                due_date=date(2026, 6, 22),
-                completed_at=datetime(2026, 6, 23, 9, 0),
-            ),
-            Quest(
-                title="Report",
-                status="Completed",
-                xp_reward=150,
-                due_date=date(2026, 6, 24),
-                completed_at=datetime(2026, 6, 26, 14, 0),
-            ),
-            Quest(title="Plan meals", status="Planned", xp_reward=10, due_date=date(2026, 6, 25)),
-            Quest(title="Missed task", status="Failed", xp_reward=30, due_date=date(2026, 6, 26)),
-            Quest(title="Skipped task", status="Skipped", xp_reward=10, due_date=date(2026, 6, 15)),
-        ]
-    )
-    session.commit()
+def test_get_command_center_data_counts_checkin_status_kpis(session):
+    today = date(2026, 6, 26)
+    completed_quest = _add_quest(session, "Completed today", status="Planned", xp_reward=75)
+    planned_quest = _add_quest(session, "Planned today", xp_reward=10)
+    overdue_quest = _add_quest(session, "Old planned", xp_reward=30)
+    failed_quest = _add_quest(session, "Failed old", xp_reward=10)
+    skipped_quest = _add_quest(session, "Skipped today", xp_reward=150)
 
-    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+    _add_checkin(session, completed_quest, today, "Completed", xp_awarded=75)
+    _add_checkin(session, planned_quest, today, "Planned")
+    _add_checkin(session, overdue_quest, date(2026, 6, 25), "Planned")
+    _add_checkin(session, failed_quest, date(2026, 6, 24), "Failed")
+    _add_checkin(session, skipped_quest, today, "Skipped")
 
-    assert result["has_quests"] is True
-    assert result["total_quests"] == 5
-    assert result["completed_quests"] == 2
-    assert result["planned_quests"] == 1
-    assert result["due_today"] == 1
-    assert result["overdue_quests"] == 1
+    result = get_command_center_data(today=today, session=session)
+
     assert result["completed_today"] == 1
+    assert result["planned_quests"] == 1
+    assert result["overdue_quests"] == 1
     assert result["failed_quests"] == 1
     assert result["skipped_quests"] == 1
-    assert result["completion_rate"] == 40.0
-    assert result["weekly_xp"] == 225
-    assert result["completed_this_week"] == 2
-    assert result["failed_this_week"] == 1
-    assert result["total_quests_this_week"] == 4
-    assert result["weekly_completion_rate"] == 50.0
     assert result["status_counts"] == {
         "Planned": 1,
-        "Completed": 2,
+        "Completed": 1,
         "Failed": 1,
         "Skipped": 1,
     }
+
+
+def test_command_center_skipped_checkins_do_not_count_as_operational_kpis(session):
+    quest = _add_quest(session, "Skipped task")
+    _add_checkin(session, quest, date(2026, 6, 25), "Skipped")
+
+    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+
+    assert result["completed_today"] == 0
+    assert result["planned_quests"] == 0
+    assert result["overdue_quests"] == 0
+    assert result["failed_quests"] == 0
+
+
+def test_command_center_today_focus_uses_checkin_status_and_parent_quest_metadata(session):
+    category = _add_category(session, "Work")
+    quest = _add_quest(
+        session,
+        "Ship report",
+        status="Planned",
+        xp_reward=150,
+        due_date=date(2026, 6, 26),
+        planned_start_at=datetime(2026, 6, 26, 9, 0),
+        planned_end_at=datetime(2026, 6, 26, 11, 0),
+        category=category,
+    )
+    quest.difficulty = "Boss"
+    _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=150)
+
+    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+
     assert result["today_quests"] == [
         {
-            "Time": "All day",
-            "Title": "Missed task",
-            "Category": "Uncategorized",
-            "Difficulty": "Easy",
-            "Status": "Failed",
-            "XP": "30 XP",
+            "Time": "09:00 - 11:00",
+            "Title": "Ship report",
+            "Category": "Work",
+            "Difficulty": "Boss",
+            "Status": "Completed",
+            "XP": "150 XP",
         }
     ]
 
 
-def test_build_today_focus_rows_sorts_scheduled_quests_before_legacy_due_date_only():
-    quests = [
-        Quest(
-            title="Legacy all day",
-            status="Planned",
-            xp_reward=10,
-            due_date=date(2026, 6, 26),
-            created_at=datetime(2026, 6, 20, 8, 0),
-        ),
-        Quest(
-            title="Later scheduled",
-            status="Planned",
-            difficulty="Medium",
-            xp_reward=30,
-            due_date=date(2026, 6, 26),
-            planned_start_at=datetime(2026, 6, 26, 13, 0),
-            planned_end_at=datetime(2026, 6, 26, 14, 0),
-        ),
-        Quest(
-            title="Earlier scheduled",
-            status="Completed",
-            difficulty="Hard",
-            xp_reward=75,
-            due_date=date(2026, 6, 26),
-            planned_start_at=datetime(2026, 6, 26, 9, 0),
-            planned_end_at=datetime(2026, 6, 26, 11, 0),
-        ),
-        Quest(
-            title="Other day",
-            status="Planned",
-            xp_reward=10,
-            due_date=date(2026, 6, 27),
-        ),
+def test_build_today_focus_rows_sorts_by_planned_start_at_then_title(session):
+    later = _add_quest(
+        session,
+        "Later scheduled",
+        planned_start_at=datetime(2026, 6, 26, 13, 0),
+        planned_end_at=datetime(2026, 6, 26, 14, 0),
+    )
+    earlier = _add_quest(
+        session,
+        "Earlier scheduled",
+        xp_reward=75,
+        planned_start_at=datetime(2026, 6, 26, 9, 0),
+        planned_end_at=datetime(2026, 6, 26, 11, 0),
+    )
+    all_day = _add_quest(session, "All day task")
+    alpha = _add_quest(session, "Alpha all day")
+    checkins = [
+        _add_checkin(session, later, date(2026, 6, 26), "Planned"),
+        _add_checkin(session, all_day, date(2026, 6, 26), "Planned"),
+        _add_checkin(session, earlier, date(2026, 6, 26), "Completed", xp_awarded=75),
+        _add_checkin(session, alpha, date(2026, 6, 26), "Planned"),
     ]
 
-    result = build_today_focus_rows(quests, date(2026, 6, 26))
+    result = build_today_focus_rows(checkins)
 
-    assert result == [
-        {
-            "Time": "09:00 - 11:00",
-            "Title": "Earlier scheduled",
-            "Category": "Uncategorized",
-            "Difficulty": "Hard",
-            "Status": "Completed",
-            "XP": "75 XP",
-        },
-        {
-            "Time": "13:00 - 14:00",
-            "Title": "Later scheduled",
-            "Category": "Uncategorized",
-            "Difficulty": "Medium",
-            "Status": "Planned",
-            "XP": "30 XP",
-        },
-        {
-            "Time": "All day",
-            "Title": "Legacy all day",
-            "Category": "Uncategorized",
-            "Difficulty": "Easy",
-            "Status": "Planned",
-            "XP": "10 XP",
-        },
+    assert [row["Title"] for row in result] == [
+        "Earlier scheduled",
+        "Later scheduled",
+        "All day task",
+        "Alpha all day",
     ]
+
+
+def test_command_center_legacy_quest_status_does_not_override_existing_checkin_status(session):
+    quest = _add_quest(
+        session,
+        "Legacy status mismatch",
+        status="Completed",
+        due_date=date(2026, 6, 26),
+    )
+    _add_checkin(session, quest, date(2026, 6, 26), "Planned")
+
+    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+
+    assert result["planned_quests"] == 1
+    assert result["completed_today"] == 0
+    assert result["today_quests"][0]["Status"] == "Planned"
+
+
+def test_command_center_ensures_missing_checkin_for_legacy_scheduled_quest(session):
+    quest = _add_quest(
+        session,
+        "Legacy scheduled",
+        status="Failed",
+        due_date=date(2026, 6, 26),
+        planned_start_at=datetime(2026, 6, 26, 10, 0),
+        planned_end_at=datetime(2026, 6, 26, 11, 0),
+    )
+
+    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+    checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+
+    assert checkin.status == "Planned"
+    assert checkin.checkin_date == date(2026, 6, 26)
+    assert result["planned_quests"] == 1
+    assert result["today_quests"][0]["Status"] == "Planned"
+
+
+def test_command_center_does_not_auto_fail_stale_planned_checkins(session):
+    quest = _add_quest(session, "Old planned")
+    checkin = _add_checkin(session, quest, date(2026, 6, 20), "Planned")
+
+    result = get_command_center_data(today=date(2026, 6, 26), session=session)
+    session.refresh(checkin)
+
+    assert result["overdue_quests"] == 1
+    assert result["failed_quests"] == 0
+    assert checkin.status == "Planned"
+    assert checkin.failed_at is None
 
 
 def test_build_completion_rate_by_weekday(session):
