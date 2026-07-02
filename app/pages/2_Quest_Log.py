@@ -1,5 +1,6 @@
 from calendar import month_name
 from datetime import date, datetime, time
+import hashlib
 import sys
 from pathlib import Path
 
@@ -224,7 +225,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             events=calendar_events,
             options=calendar_options,
             custom_css=custom_css,
-            key="quest_calendar",
+            key=f"quest_calendar_{_calendar_events_signature(calendar_events)}",
         )
     except Exception as error:
         st.warning(f"Calendar component could not render. Use the selected date field below. Details: {error}")
@@ -248,7 +249,7 @@ def render_schedule_list(quests: list) -> None:
                 st.write(f"**{_format_time_range(quest)}**")
             with detail_col:
                 st.write(f"**{quest.title}**")
-                st.caption(f"{_category_name(quest)} | {quest.difficulty} | {quest.status}")
+                st.caption(f"{_category_name(quest)} | {quest.difficulty} | {_display_status(quest)}")
             with xp_col:
                 st.write(f"**{quest.xp_reward or 0} XP**")
 
@@ -257,7 +258,7 @@ def render_day_summary(quests: list) -> None:
     quest_count = len(quests)
     planned_minutes = sum(_quest_duration_minutes(quest) for quest in quests)
     planned_xp = sum(quest.xp_reward or 0 for quest in quests)
-    completed_count = sum(1 for quest in quests if (quest.status or "").strip().lower() == "completed")
+    completed_count = sum(1 for quest in quests if _display_status(quest).strip().lower() == "completed")
     quest_col, time_col, xp_col, complete_col = st.columns(4)
     quest_col.metric("Quests", f"{quest_count} {_pluralize('quest', quest_count)}")
     time_col.metric("Planned Time", _format_minutes(planned_minutes))
@@ -327,8 +328,6 @@ def render_monthly_checklist() -> None:
 
     if st.session_state.get("checklist_selected_quest") not in row_lookup:
         st.session_state["checklist_selected_quest"] = next(iter(row_lookup))
-    if st.session_state.get("checklist_selected_date") not in checklist["days"]:
-        st.session_state["checklist_selected_date"] = checklist["days"][0]
 
     with editor_col:
         quest_col, date_col = st.columns([0.62, 0.38])
@@ -339,6 +338,10 @@ def render_monthly_checklist() -> None:
                 format_func=lambda quest_id: quest_labels[quest_id],
                 key="checklist_selected_quest",
             )
+
+        selected_row = row_lookup[selected_quest_id]
+        _sync_checklist_selected_date(selected_row, checklist["days"])
+
         with date_col:
             selected_checklist_date = st.selectbox(
                 "Date",
@@ -347,7 +350,6 @@ def render_monthly_checklist() -> None:
                 key="checklist_selected_date",
             )
 
-    selected_row = row_lookup[selected_quest_id]
     selected_cell = selected_row["cells"][selected_checklist_date]
     current_status = CHECKLIST_STATUS_LABELS.get(selected_cell["status"], "Unknown")
 
@@ -367,6 +369,7 @@ def render_monthly_checklist() -> None:
         with column:
             if st.button(label, use_container_width=True, key=key):
                 action(selected_quest_id, selected_checklist_date)
+                st.session_state["pending_selected_date"] = selected_checklist_date
                 st.session_state["checklist_status_message"] = (
                     f"{label} saved for {selected_checklist_date:%Y-%m-%d}."
                 )
@@ -411,6 +414,38 @@ def _build_checklist_quest_labels(rows: list[dict]) -> dict[int, str]:
         label_counts[label] = label_counts.get(label, 0) + 1
         labels[quest_id] = label if label_counts[label] == 1 else f"{label} ({label_counts[label]})"
     return labels
+
+
+def _sync_checklist_selected_date(row: dict, days: list[date]) -> None:
+    selected_quest_id = row["quest_id"]
+    previous_quest_id = st.session_state.get("checklist_last_quest_id")
+    current_date = st.session_state.get("checklist_selected_date")
+
+    if current_date not in days or previous_quest_id != selected_quest_id:
+        st.session_state["checklist_selected_date"] = _preferred_checklist_date(row, days)
+
+    st.session_state["checklist_last_quest_id"] = selected_quest_id
+
+
+def _preferred_checklist_date(row: dict, days: list[date]) -> date:
+    current_page_date = st.session_state.get("selected_date")
+    if current_page_date in days and row["cells"][current_page_date]["status"] is not None:
+        return current_page_date
+
+    for day in days:
+        if row["cells"][day]["status"] is not None:
+            return day
+
+    return days[0]
+
+
+def _calendar_events_signature(calendar_events: list[dict]) -> str:
+    event_parts = [
+        f"{event.get('id')}:{event.get('start')}:{event.get('end')}:{event.get('status')}:{event.get('color')}"
+        for event in calendar_events
+    ]
+    raw_signature = "|".join(sorted(event_parts))
+    return hashlib.md5(raw_signature.encode("utf-8")).hexdigest()[:12]
 
 
 def _extract_calendar_date(calendar_state) -> date | None:
@@ -465,6 +500,10 @@ def _category_name(quest) -> str:
     return quest.category.name if quest.category else "Uncategorized"
 
 
+def _display_status(quest) -> str:
+    return getattr(quest, "display_status", None) or quest.status or "Planned"
+
+
 def _format_selected_date(value: date) -> str:
     return value.strftime("%A, %Y-%m-%d")
 
@@ -508,6 +547,10 @@ if not category_options:
 
 if "selected_date" not in st.session_state:
     st.session_state["selected_date"] = date.today()
+
+pending_selected_date = st.session_state.pop("pending_selected_date", None)
+if pending_selected_date is not None:
+    st.session_state["selected_date"] = pending_selected_date
 
 calendar_events = get_quests_for_calendar()
 

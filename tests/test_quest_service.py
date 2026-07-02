@@ -5,7 +5,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Category, QuestCheckin
-from src.services.checklist_service import ensure_checkin
+from src.services.checklist_service import (
+    complete_checkin,
+    ensure_checkin,
+    fail_checkin,
+    reset_checkin,
+    skip_checkin,
+)
 from src.services.quest_service import (
     create_quest,
     create_scheduled_quest,
@@ -175,6 +181,84 @@ def test_get_quests_for_day_sorts_by_start_time_then_created_at(session):
     assert [quest.title for quest in quests] == [earlier.title, later.title, legacy.title]
 
 
+def test_get_quests_for_day_uses_checkin_status_for_selected_date(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    complete_checkin(quest.id, date(2026, 6, 26), session=session)
+
+    quests = get_quests_for_day(date(2026, 6, 26), session=session)
+
+    assert quests[0].status == "Planned"
+    assert quests[0].display_status == "Completed"
+
+
+@pytest.mark.parametrize(
+    ("action", "expected_status"),
+    [
+        (skip_checkin, "Skipped"),
+        (fail_checkin, "Failed"),
+    ],
+)
+def test_get_quests_for_day_displays_skipped_and_failed_checkin_statuses(session, action, expected_status):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    action(quest.id, date(2026, 6, 26), session=session)
+
+    quests = get_quests_for_day(date(2026, 6, 26), session=session)
+
+    assert quests[0].display_status == expected_status
+
+
+def test_get_quests_for_day_displays_planned_after_checkin_reset(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    complete_checkin(quest.id, date(2026, 6, 26), session=session)
+    reset_checkin(quest.id, date(2026, 6, 26), session=session)
+
+    quests = get_quests_for_day(date(2026, 6, 26), session=session)
+
+    assert quests[0].display_status == "Planned"
+
+
+def test_get_quests_for_day_includes_quest_with_checkin_on_selected_date(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    complete_checkin(quest.id, date(2026, 6, 27), session=session)
+
+    quests = get_quests_for_day(date(2026, 6, 27), session=session)
+
+    assert [day_quest.title for day_quest in quests] == ["Workout"]
+    assert quests[0].display_status == "Completed"
+
+
 def test_get_quests_for_calendar_returns_event_dicts(session):
     category = session.query(Category).one()
     create_scheduled_quest(
@@ -210,6 +294,65 @@ def test_get_quests_for_calendar_returns_event_dicts(session):
             },
         }
     ]
+
+
+def test_get_quests_for_calendar_uses_checkin_status_and_color(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "SQL study",
+        category_id=category.id,
+        difficulty="Hard",
+        planned_date=date(2026, 6, 26),
+        start_time=time(11, 30),
+        end_time=time(13, 0),
+        session=session,
+    )
+    complete_checkin(quest.id, date(2026, 6, 26), session=session)
+
+    events = get_quests_for_calendar(session=session)
+
+    assert quest.status == "Planned"
+    assert events[0]["status"] == "Completed"
+    assert events[0]["extendedProps"]["status"] == "Completed"
+    assert events[0]["color"] == "#22c55e"
+    assert events[0]["backgroundColor"] == "#22c55e"
+    assert events[0]["borderColor"] == "#22c55e"
+
+
+def test_get_quests_for_calendar_falls_back_to_quest_status_without_checkin(session):
+    category = session.query(Category).one()
+    quest = create_quest(
+        "Legacy planned task",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        session=session,
+    )
+    update_quest_status(quest.id, "Failed", session=session)
+
+    events = get_quests_for_calendar(session=session)
+
+    assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 0
+    assert events[0]["status"] == "Failed"
+    assert events[0]["color"] == "#ef4444"
+
+
+def test_reading_calendar_and_day_schedule_does_not_duplicate_checkins(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "SQL study",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(11, 30),
+        end_time=time(13, 0),
+        session=session,
+    )
+
+    get_quests_for_calendar(session=session)
+    get_quests_for_calendar(session=session)
+    get_quests_for_day(date(2026, 6, 26), session=session)
+    get_quests_for_day(date(2026, 6, 26), session=session)
+
+    assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 1
 
 
 def test_quest_to_calendar_event_supports_legacy_planned_date(session):

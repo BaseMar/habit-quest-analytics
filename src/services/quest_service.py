@@ -1,10 +1,10 @@
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from src.database.db import get_session
-from src.database.models import Category, Quest, utc_now
+from src.database.models import Category, Quest, QuestCheckin, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.checklist_service import ensure_checkin
 from src.services.xp_service import calculate_xp
@@ -154,15 +154,23 @@ def get_quests_for_day(planned_date: date, session=None) -> list[Quest]:
     try:
         quests = (
             session.query(Quest)
-            .options(joinedload(Quest.category))
+            .options(joinedload(Quest.category), selectinload(Quest.checkins))
             .filter(
                 or_(
                     Quest.due_date == planned_date,
                     and_(Quest.planned_start_at >= day_start, Quest.planned_start_at < day_end),
+                    Quest.checkins.any(QuestCheckin.checkin_date == planned_date),
                 )
             )
             .all()
         )
+        statuses_by_quest_id = _get_checkin_statuses_for_date(
+            session,
+            [quest.id for quest in quests],
+            planned_date,
+        )
+        for quest in quests:
+            quest.display_status = statuses_by_quest_id.get(quest.id, _normalize_status(quest.status))
         return sorted(
             quests,
             key=lambda quest: (
@@ -182,7 +190,7 @@ def get_quests_for_calendar(session=None) -> list[dict]:
     try:
         quests = (
             session.query(Quest)
-            .options(joinedload(Quest.category))
+            .options(joinedload(Quest.category), selectinload(Quest.checkins))
             .filter(
                 or_(
                     Quest.planned_start_at.is_not(None),
@@ -197,7 +205,17 @@ def get_quests_for_calendar(session=None) -> list[dict]:
             )
             .all()
         )
-        return [quest_to_calendar_event(quest) for quest in quests]
+        statuses_by_quest_and_date = _get_checkin_statuses_for_quest_dates(
+            session,
+            [(quest.id, _quest_event_date(quest)) for quest in quests],
+        )
+        return [
+            quest_to_calendar_event(
+                quest,
+                status_override=statuses_by_quest_and_date.get((quest.id, _quest_event_date(quest))),
+            )
+            for quest in quests
+        ]
     finally:
         if owns_session:
             session.close()
@@ -250,10 +268,17 @@ def validate_schedule_times(planned_date: date, start_time: time, end_time: time
     return planned_start_at, planned_end_at
 
 
-def quest_to_calendar_event(quest: Quest) -> dict:
+def quest_to_calendar_event(quest: Quest, status_override: str | None = None) -> dict:
     """Convert a quest record to a calendar event dictionary."""
-    status = _normalize_status(quest.status)
     start = quest.planned_start_at or quest.due_date
+    event_date = _quest_event_date(quest)
+    status = (
+        _normalize_status(status_override)
+        if status_override is not None
+        else get_quest_status_for_date(quest, event_date)
+        if event_date is not None
+        else _normalize_status(quest.status)
+    )
     end = quest.planned_end_at
     color = STATUS_COLORS.get(status, STATUS_COLORS["Planned"])
     category = quest.category.name if quest.category else "Uncategorized"
@@ -279,6 +304,55 @@ def quest_to_calendar_event(quest: Quest) -> dict:
     if quest.planned_start_at is None and quest.due_date is not None:
         event["allDay"] = True
     return event
+
+
+def get_quest_status_for_date(quest: Quest, target_date: date) -> str:
+    """Return the check-in status for a quest on a date, falling back to quest status."""
+    for checkin in getattr(quest, "checkins", []) or []:
+        if checkin.checkin_date == target_date:
+            return _normalize_status(checkin.status)
+    return _normalize_status(quest.status)
+
+
+def _get_checkin_statuses_for_date(session, quest_ids: list[int], target_date: date) -> dict[int, str]:
+    if not quest_ids:
+        return {}
+
+    checkins = (
+        session.query(QuestCheckin)
+        .filter(
+            QuestCheckin.quest_id.in_(quest_ids),
+            QuestCheckin.checkin_date == target_date,
+        )
+        .all()
+    )
+    return {checkin.quest_id: _normalize_status(checkin.status) for checkin in checkins}
+
+
+def _get_checkin_statuses_for_quest_dates(
+    session,
+    quest_date_pairs: list[tuple[int, date | None]],
+) -> dict[tuple[int, date], str]:
+    normalized_pairs = [(quest_id, target_date) for quest_id, target_date in quest_date_pairs if target_date is not None]
+    if not normalized_pairs:
+        return {}
+
+    quest_ids = {quest_id for quest_id, _ in normalized_pairs}
+    target_dates = {target_date for _, target_date in normalized_pairs}
+    checkins = (
+        session.query(QuestCheckin)
+        .filter(
+            QuestCheckin.quest_id.in_(quest_ids),
+            QuestCheckin.checkin_date.in_(target_dates),
+        )
+        .all()
+    )
+    requested_pairs = set(normalized_pairs)
+    return {
+        (checkin.quest_id, checkin.checkin_date): _normalize_status(checkin.status)
+        for checkin in checkins
+        if (checkin.quest_id, checkin.checkin_date) in requested_pairs
+    }
 
 
 def _normalize_status(status: str) -> str:
@@ -309,6 +383,12 @@ def _normalize_estimated_minutes(estimated_minutes: int | None) -> int | None:
         return None
 
     return value
+
+
+def _quest_event_date(quest: Quest) -> date | None:
+    if quest.planned_start_at is not None:
+        return quest.planned_start_at.date()
+    return quest.due_date
 
 
 def _format_calendar_datetime(value: date | datetime | None) -> str | None:
