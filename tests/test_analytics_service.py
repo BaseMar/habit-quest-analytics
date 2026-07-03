@@ -49,6 +49,7 @@ def _add_quest(
     due_date: date | None = None,
     planned_start_at: datetime | None = None,
     planned_end_at: datetime | None = None,
+    estimated_minutes: int | None = None,
     category: Category | None = None,
 ) -> Quest:
     quest = Quest(
@@ -58,6 +59,7 @@ def _add_quest(
         due_date=due_date,
         planned_start_at=planned_start_at,
         planned_end_at=planned_end_at,
+        estimated_minutes=estimated_minutes,
         category=category,
     )
     session.add(quest)
@@ -177,6 +179,131 @@ def test_get_habit_analytics_data_returns_empty_safe_weekly_pulse(session):
         "failed_this_week": 0,
         "weekly_completion_rate": 0.0,
     }
+
+
+def test_get_habit_analytics_data_uses_checkins_for_weekly_pulse(session):
+    today = date(2026, 6, 26)
+    completed = _add_quest(session, "Completed", xp_reward=75)
+    failed = _add_quest(session, "Failed", xp_reward=30)
+    skipped = _add_quest(session, "Skipped", xp_reward=10)
+    future_planned = _add_quest(session, "Future planned", xp_reward=10)
+    last_week = _add_quest(session, "Last week", xp_reward=150)
+    _add_checkin(session, completed, date(2026, 6, 26), "Completed", xp_awarded=75)
+    _add_checkin(session, failed, date(2026, 6, 25), "Failed")
+    _add_checkin(session, skipped, date(2026, 6, 24), "Skipped")
+    _add_checkin(session, future_planned, date(2026, 6, 28), "Planned")
+    _add_checkin(session, last_week, date(2026, 6, 19), "Completed", xp_awarded=150)
+
+    result = get_habit_analytics_data(today=today, session=session)
+
+    assert result["weekly_pulse"] == {
+        "weekly_xp": 75,
+        "completed_this_week": 1,
+        "failed_this_week": 1,
+        "weekly_completion_rate": 50.0,
+    }
+
+
+def test_get_habit_analytics_data_groups_checkin_xp_by_checkin_date(session):
+    first = _add_quest(session, "First", xp_reward=30)
+    second = _add_quest(session, "Second", xp_reward=75)
+    failed = _add_quest(session, "Failed", xp_reward=10)
+    _add_checkin(session, first, date(2026, 6, 25), "Completed", xp_awarded=30)
+    _add_checkin(session, second, date(2026, 6, 25), "Completed", xp_awarded=75)
+    _add_checkin(session, failed, date(2026, 6, 26), "Failed", xp_awarded=0)
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["xp_by_day"].to_dict("records") == [
+        {"Date": date(2026, 6, 25), "XP": 105},
+        {"Date": date(2026, 6, 26), "XP": 0},
+    ]
+
+
+def test_get_habit_analytics_data_counts_checkin_statuses(session):
+    statuses = ["Planned", "Completed", "Completed", "Failed", "Skipped"]
+    for index, status in enumerate(statuses):
+        quest = _add_quest(session, f"Quest {index}")
+        _add_checkin(session, quest, date(2026, 6, 20 + index), status, xp_awarded=10 if status == "Completed" else 0)
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["quests_by_status"].to_dict("records") == [
+        {"Status": "Planned", "Count": 1},
+        {"Status": "Completed", "Count": 2},
+        {"Status": "Failed", "Count": 1},
+        {"Status": "Skipped", "Count": 1},
+    ]
+
+
+def test_get_habit_analytics_data_counts_checkins_by_parent_category(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    lift = _add_quest(session, "Lift", category=health)
+    report = _add_quest(session, "Report", category=work)
+    _add_checkin(session, lift, date(2026, 6, 25), "Completed", xp_awarded=30)
+    _add_checkin(session, lift, date(2026, 6, 26), "Skipped")
+    _add_checkin(session, report, date(2026, 6, 26), "Completed", xp_awarded=75)
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["quests_by_category"].to_dict("records") == [
+        {"Category": "Health", "Count": 2},
+        {"Category": "Work", "Count": 1},
+    ]
+    assert result["completed_checkins_by_category"].to_dict("records") == [
+        {"Category": "Health", "Count": 1},
+        {"Category": "Work", "Count": 1},
+    ]
+
+
+def test_get_habit_analytics_data_uses_checkins_for_weekday_completion_rate(session):
+    completed = _add_quest(session, "Completed")
+    failed = _add_quest(session, "Failed")
+    skipped = _add_quest(session, "Skipped")
+    planned = _add_quest(session, "Planned")
+    _add_checkin(session, completed, date(2026, 6, 22), "Completed", xp_awarded=10)
+    _add_checkin(session, failed, date(2026, 6, 22), "Failed")
+    _add_checkin(session, skipped, date(2026, 6, 22), "Skipped")
+    _add_checkin(session, planned, date(2026, 6, 22), "Planned")
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["completion_rate_by_weekday"].to_dict("records") == [
+        {
+            "Weekday": "Monday",
+            "Completed Quest Days": 1,
+            "Resolved Quest Days": 2,
+            "Completion Rate": 50.0,
+        }
+    ]
+
+
+def test_get_habit_analytics_data_uses_checkins_for_planned_minutes_by_category(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    lift = _add_quest(session, "Lift", estimated_minutes=45, category=health)
+    report = _add_quest(session, "Report", estimated_minutes=60, category=work)
+    _add_checkin(session, lift, date(2026, 6, 25), "Completed", xp_awarded=30)
+    _add_checkin(session, lift, date(2026, 6, 26), "Failed")
+    _add_checkin(session, report, date(2026, 6, 26), "Planned")
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["estimated_minutes_by_category"].to_dict("records") == [
+        {"Category": "Health", "Planned Minutes": 90},
+        {"Category": "Work", "Planned Minutes": 60},
+    ]
+
+
+def test_get_habit_analytics_data_does_not_double_count_legacy_quests_when_checkins_exist(session):
+    quest = _add_quest(session, "Legacy completed", status="Completed", xp_reward=150)
+    _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=30)
+
+    result = get_habit_analytics_data(today=date(2026, 6, 26), session=session)
+
+    assert result["weekly_pulse"]["weekly_xp"] == 30
+    assert result["xp_by_day"].to_dict("records") == [{"Date": date(2026, 6, 26), "XP": 30}]
 
 
 def test_build_xp_by_day_uses_completed_or_planned_date(session):

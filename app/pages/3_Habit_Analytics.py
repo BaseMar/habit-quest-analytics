@@ -28,7 +28,7 @@ def render_weekly_pulse(weekly_pulse: dict) -> None:
 
 def render_xp_by_day(xp_by_day) -> None:
     if xp_by_day.empty:
-        render_empty_state("No completed quests yet", "Complete quests to see XP trends by day.")
+        render_empty_state("No completed quest days yet", "Complete quest days to see XP trends by day.")
         return
 
     chart_data = _format_date_labels(xp_by_day)
@@ -40,7 +40,7 @@ def render_xp_by_day(xp_by_day) -> None:
         markers=True,
         color_discrete_sequence=["#8B5CF6"],
     )
-    fig.update_layout(xaxis_title="Quest Date", yaxis_title="XP Earned", showlegend=False, height=360)
+    fig.update_layout(xaxis_title="Check-in Date", yaxis_title="XP Earned", showlegend=False, height=360)
     fig.update_xaxes(type="category")
     fig.update_traces(line={"width": 3}, marker={"size": 8})
     st.plotly_chart(style_chart(fig, height=360), width="stretch")
@@ -48,48 +48,53 @@ def render_xp_by_day(xp_by_day) -> None:
 
 def render_status_chart(quests_by_status) -> None:
     if quests_by_status.empty:
-        render_empty_state("No status data", "Add quests to see the status breakdown.")
+        render_empty_state("No status data", "Update quest days to see the status breakdown.")
         return
 
     fig = px.bar(
         quests_by_status,
         x="Status",
         y="Count",
-        title="Quests by Status",
+        title="Check-ins by Status",
         category_orders={"Status": quests_by_status["Status"].tolist()},
         color_discrete_sequence=["#38BDF8"],
     )
-    fig.update_layout(xaxis_title="Quest Status", yaxis_title="Quest Count", showlegend=False, height=320)
+    fig.update_layout(xaxis_title="Check-in Status", yaxis_title="Check-in Count", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
 
 
 def render_category_chart(quests_by_category) -> None:
     if quests_by_category.empty:
-        render_empty_state("No category data", "Add categorized quests to see category balance.")
+        render_empty_state("No category data", "Add categorized quest days to see category balance.")
         return
 
     fig = px.bar(
         quests_by_category,
         x="Category",
         y="Count",
-        title="Quests by Category",
+        title="Check-ins by Category",
         color_discrete_sequence=["#22C55E"],
     )
-    fig.update_layout(xaxis_title="Category", yaxis_title="Quest Count", showlegend=False, height=320)
+    fig.update_layout(xaxis_title="Category", yaxis_title="Check-in Count", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
 
 
 def render_weekday_chart(completion_rate_by_weekday) -> None:
     if completion_rate_by_weekday.empty:
-        render_empty_state("No planned dates found", "Schedule quests to see completion rate by weekday.")
+        render_empty_state("No resolved quest days found", "Complete or fail quest days to see weekday consistency.")
         return
+    hover_columns = [
+        column
+        for column in ("Completed Quest Days", "Resolved Quest Days", "Completed Quests", "Total Quests")
+        if column in completion_rate_by_weekday.columns
+    ]
 
     fig = px.bar(
         completion_rate_by_weekday,
         x="Weekday",
         y="Completion Rate",
         title="Completion Rate by Weekday",
-        hover_data=["Completed Quests", "Total Quests"],
+        hover_data=hover_columns,
         color_discrete_sequence=["#F59E0B"],
         category_orders={
             "Weekday": [
@@ -103,23 +108,24 @@ def render_weekday_chart(completion_rate_by_weekday) -> None:
             ]
         },
     )
-    fig.update_layout(xaxis_title="Planned Weekday", yaxis_title="Completion Rate (%)", showlegend=False, height=320)
+    fig.update_layout(xaxis_title="Check-in Weekday", yaxis_title="Completion Rate (%)", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
 
 
 def render_estimated_minutes_chart(estimated_minutes_by_category) -> None:
-    if estimated_minutes_by_category.empty or estimated_minutes_by_category["Estimated Minutes"].sum() == 0:
+    minutes_column = "Planned Minutes" if "Planned Minutes" in estimated_minutes_by_category.columns else "Estimated Minutes"
+    if estimated_minutes_by_category.empty or estimated_minutes_by_category[minutes_column].sum() == 0:
         render_empty_state("No estimated time recorded", "Schedule quests with duration to compare planned effort.")
         return
 
     fig = px.bar(
         estimated_minutes_by_category,
         x="Category",
-        y="Estimated Minutes",
-        title="Estimated Minutes by Category",
+        y=minutes_column,
+        title="Planned Minutes by Category",
         color_discrete_sequence=["#8B5CF6"],
     )
-    fig.update_layout(xaxis_title="Category", yaxis_title="Estimated Minutes", showlegend=False, height=320)
+    fig.update_layout(xaxis_title="Category", yaxis_title="Planned Minutes", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
 
 
@@ -128,7 +134,7 @@ def render_insights(analytics: dict) -> None:
     if not insights:
         return
 
-    render_section_title("Insights", "Small readouts derived from the current quest history.")
+    render_section_title("Insights", "Small readouts derived from current checklist history.")
     insight_cols = st.columns(len(insights))
     for column, (label, value) in zip(insight_cols, insights):
         with column:
@@ -148,13 +154,18 @@ def _build_insights(analytics: dict) -> list[tuple[str, str]]:
 
     completion_rate_by_weekday = analytics["completion_rate_by_weekday"]
     if not completion_rate_by_weekday.empty:
+        completed_column = (
+            "Completed Quest Days"
+            if "Completed Quest Days" in completion_rate_by_weekday.columns
+            else "Completed Quests"
+        )
         strongest_weekday = completion_rate_by_weekday.sort_values(
-            ["Completion Rate", "Completed Quests", "Weekday"],
+            [completed_column, "Completion Rate", "Weekday"],
             ascending=[False, False, True],
         ).iloc[0]
         insights.append(("Strongest Weekday", str(strongest_weekday["Weekday"])))
 
-    quests_by_category = analytics["quests_by_category"]
+    quests_by_category = analytics.get("completed_checkins_by_category", analytics["quests_by_category"])
     if not quests_by_category.empty:
         top_category = quests_by_category.sort_values(["Count", "Category"], ascending=[False, True]).iloc[0]
         insights.append(("Most Active Category", str(top_category["Category"])))
@@ -163,7 +174,7 @@ def _build_insights(analytics: dict) -> list[tuple[str, str]]:
     if not quests_by_status.empty:
         failed_rows = quests_by_status[quests_by_status["Status"] == "Failed"]
         failed_count = int(failed_rows["Count"].iloc[0]) if not failed_rows.empty else 0
-        insights.append(("Failed Quests", str(failed_count)))
+        insights.append(("Failed Quest Days", str(failed_count)))
 
     return insights[:3]
 
@@ -180,18 +191,18 @@ analytics = get_habit_analytics_data()
 
 if not analytics["has_quests"]:
     render_empty_state(
-        "No analytics data yet",
-        "Complete or schedule quests in Quest Planner to generate insights.",
+        "No checklist data yet",
+        "Plan quests in Quest Planner and update them in Monthly Checklist to generate analytics.",
     )
 else:
     render_section_title("Weekly Pulse", "Compact performance readout for the current week.")
     render_weekly_pulse(analytics["weekly_pulse"])
 
-    render_section_title("Trend Overview", "Time-based progress from completed quest XP.")
+    render_section_title("Trend Overview", "Time-based progress from completed quest-day XP.")
     with st.container(border=True):
         render_xp_by_day(analytics["xp_by_day"])
 
-    render_section_title("Performance Breakdown", "How quests are distributed by state and category.")
+    render_section_title("Performance Breakdown", "How quest days are distributed by state and category.")
     status_col, category_col = st.columns(2, gap="large")
     with status_col:
         with st.container(border=True):
@@ -200,7 +211,7 @@ else:
         with st.container(border=True):
             render_category_chart(analytics["quests_by_category"])
 
-    render_section_title("Consistency & Time", "Planning consistency and estimated effort by category.")
+    render_section_title("Consistency & Time", "Checklist consistency and planned workload by category.")
     weekday_col, minutes_col = st.columns(2, gap="large")
     with weekday_col:
         with st.container(border=True):
