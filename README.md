@@ -1,6 +1,8 @@
 # Habit Quest Analytics
 
-An RPG-inspired habit planner and analytics dashboard that turns scheduled tasks into daily quests, awards XP for completed quest days, and shows progress through operational metrics, trend analysis, and character growth.
+An RPG-inspired habit planner and analytics dashboard that turns scheduled tasks
+into daily quests, awards XP for completed quest days, and shows progress through
+operational metrics, trend analysis, and character growth.
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-ff4b4b)
@@ -35,9 +37,13 @@ An RPG-inspired habit planner and analytics dashboard that turns scheduled tasks
 
 ## Project Goal
 
-Habit apps often track whether tasks were done, but they do not always connect planning, completion, XP, progression, and analytics in one workflow.
+Habit apps often track whether tasks were done, but they do not always connect
+planning, completion, XP, progression, and analytics in one workflow.
 
-Habit Quest Analytics explores that loop as a portfolio MVP. It lets a user schedule daily quests, mark each quest day as planned, completed, skipped, or failed, earn XP from completed check-ins, grow RPG-style stats, and review behavior through dashboards and charts.
+Habit Quest Analytics explores that loop as a portfolio MVP. It lets a user
+schedule daily quests, mark each quest day as planned, completed, skipped, or
+failed, earn XP from completed check-ins, grow RPG-style stats, and review
+behavior through dashboards and charts.
 
 ## My Role
 
@@ -57,7 +63,11 @@ I designed and implemented the current MVP, including:
 
 Live app: https://habit-quest-analytics-sai5h3bl7wjykw4fbruabd.streamlit.app
 
-This is a public portfolio demo deployed on Streamlit Community Cloud. The project is local-first and currently uses SQLite for local/demo persistence. It is not a production multi-user SaaS app. Local uploaded files and local SQLite data are not production-grade persistent storage on Streamlit Cloud and may reset after redeploys, reboots, or instance changes.
+This is a public portfolio demo deployed on Streamlit Community Cloud. The
+project is local-first and currently uses SQLite for local/demo persistence. It
+is not a production multi-user SaaS app. Local uploaded files and local SQLite
+data are not production-grade persistent storage on Streamlit Cloud and may reset
+after redeploys, reboots, or instance changes.
 
 ## Project Status
 
@@ -70,12 +80,17 @@ Implemented:
 - Calendar-based Quest Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - `QuestCheckin` model for per-day completion status.
-- Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset behavior, XP idempotency, and a stale planned failure helper.
-- Scheduled quest creation that creates a planned check-in for the scheduled date.
+- Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset
+  behavior, XP idempotency, and a stale planned failure helper.
+- Scheduled quest creation that creates a planned check-in for the scheduled
+  date.
 - Command Center operational metrics powered by check-ins.
-- Character Profile XP, level, completed quest days, and RPG stats powered by check-in XP.
-- Habit Analytics weekly pulse, trend, breakdown, consistency, planned workload, and insight data powered by check-ins.
-- Legacy `Quest.status` compatibility/fallback while the migration remains stable.
+- Character Profile XP, level, completed quest days, and RPG stats powered by
+  check-in XP.
+- Habit Analytics weekly pulse, trend, breakdown, consistency, planned workload,
+  and insight data powered by check-ins.
+- Legacy `Quest.status` compatibility/fallback while the migration remains
+  stable.
 
 Still evolving:
 
@@ -85,11 +100,13 @@ Still evolving:
 - External calendar sync.
 - AI and voice planning assistants.
 - Optional automatic stale planned failure workflow.
-- Eventual cleanup of legacy `Quest.status` once the check-in migration is fully stable.
+- Eventual cleanup of legacy `Quest.status` once the check-in migration is fully
+  stable.
 
 ## Preview
 
-No screenshot files are currently committed. Use the live demo above to review the current UI.
+No screenshot files are currently committed. Use the live demo above to review
+the current UI.
 
 ## Tech Stack
 
@@ -112,8 +129,10 @@ Habit Quest Analytics turns productivity tracking into a compact RPG loop:
 - Complete quest days to earn XP.
 - Grow RPG stats through quest categories.
 - Review today's operational status in Command Center.
-- Analyze consistency, trends, status mix, category activity, and planned workload in Habit Analytics.
-- View level, XP progress, avatar, radar chart, and RPG stats in Character Profile.
+- Analyze consistency, trends, status mix, category activity, and planned
+  workload in Habit Analytics.
+- View level, XP progress, avatar, radar chart, and RPG stats in Character
+  Profile.
 
 ## Example Insights
 
@@ -143,12 +162,14 @@ The app is designed to answer questions such as:
 - Status legend for empty, planned, completed, skipped, and failed days.
 - Compact status editor for selected quest/date actions.
 - Complete, Skip, Fail, and Reset actions.
-- `QuestCheckin.xp_awarded` prevents duplicate XP from repeated completion actions.
+- `QuestCheckin.xp_awarded` prevents duplicate XP from repeated completion
+  actions.
 
 ### Command Center
 
 - Read-only operational overview for today's quest check-ins.
-- Planned Today, Completed Today, Failed, and Overdue metrics from `QuestCheckin`.
+- Planned Today, Completed Today, Failed, and Overdue metrics from
+  `QuestCheckin`.
 - Today's Focus list using parent quest details and daily check-in status.
 
 ### Habit Analytics
@@ -180,27 +201,39 @@ The app is designed to answer questions such as:
 
 ### Testing
 
-- Pytest coverage for XP rules, metrics, model relationships, check-in constraints, checklist services, quest creation integration, analytics services, and profile calculations.
+- Pytest coverage for XP rules, metrics, model relationships, check-in
+  constraints, checklist services, quest creation integration, analytics
+  services, and profile calculations.
 - Compile check used before code handoff.
 
 ## App Sections
 
-- `Home Base` - onboarding, app explanation, quick start, app map, and local-first MVP note.
-- `Command Center` - read-only operational overview powered by daily quest check-ins.
-- `Quest Planner` - calendar planner, selected day schedule, new quest form, and Monthly Checklist.
-- `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency charts, planned minutes, and insights.
-- `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and radar chart.
+- `Home Base` - onboarding, app explanation, quick start, app map, and
+  local-first MVP note.
+- `Command Center` - read-only operational overview powered by daily quest
+  check-ins.
+- `Quest Planner` - calendar planner, selected day schedule, new quest form, and
+  Monthly Checklist.
+- `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
+  charts, planned minutes, and insights.
+- `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
+  radar chart.
 
 ## Key Technical Decisions
 
-- `QuestCheckin` is the source of truth for daily completion status when check-ins exist.
-- `Quest.status` remains in the model for compatibility/fallback during migration.
-- XP is stored in `QuestCheckin.xp_awarded` so historical XP values are preserved and repeated completion does not duplicate XP.
+- `QuestCheckin` is the source of truth for daily completion status when
+  check-ins exist.
+- `Quest.status` remains in the model for compatibility/fallback during
+  migration.
+- XP is stored in `QuestCheckin.xp_awarded` so historical XP values are
+  preserved and repeated completion does not duplicate XP.
 - Scheduled quests create a planned check-in for the scheduled date.
 - Business logic lives in service layers instead of Streamlit page code.
 - Metrics are covered by pytest before the UI consumes them.
-- Auto-fail service logic exists with `grace_days = 3`, but it is not automatically enabled from app startup or page load.
-- The app remains local-first until production persistence is explicitly designed.
+- Auto-fail service logic exists with `grace_days = 3`, but it is not
+  automatically enabled from app startup or page load.
+- The app remains local-first until production persistence is explicitly
+  designed.
 
 ## Data Flow
 
@@ -213,7 +246,9 @@ Scheduled Quest
   -> Habit Analytics trends and consistency
 ```
 
-Streamlit pages are presentation surfaces. Services prepare workflow and analytics data. SQLAlchemy models own persistence. Tests cover the behavior that should remain stable as the UI evolves.
+Streamlit pages are presentation surfaces. Services prepare workflow and
+analytics data. SQLAlchemy models own persistence. Tests cover the behavior that
+should remain stable as the UI evolves.
 
 ## Architecture
 
@@ -237,18 +272,24 @@ habit-quest-analytics/
 
 Core entities:
 
-- `Category` - groups quests into areas such as Health, Work, Learning, Home, and Social.
-- `Quest` - scheduled task or habit plan with difficulty, XP reward, due date, optional time window, and legacy status.
+- `Category` - groups quests into areas such as Health, Work, Learning, Home,
+  and Social.
+- `Quest` - scheduled task or habit plan with difficulty, XP reward, due date,
+  optional time window, and legacy status.
 - `QuestCheckin` - daily status record for one quest on one date.
-- `PlayerProfile` - local character profile name, avatar path, and legacy total XP field.
+- `PlayerProfile` - local character profile name, avatar path, and legacy total
+  XP field.
 - `Achievement` - planned milestone definition.
-- `UnlockedAchievement` - join table connecting profiles to unlocked achievements.
+- `UnlockedAchievement` - join table connecting profiles to unlocked
+  achievements.
 
 Important relationship:
 
 - One `Quest` can have many `QuestCheckin` records.
-- A `QuestCheckin` tracks the status for a specific `quest_id` and `checkin_date`.
-- `QuestCheckin.xp_awarded` is used for XP, progression, RPG stats, and analytics when check-ins exist.
+- A `QuestCheckin` tracks the status for a specific `quest_id` and
+  `checkin_date`.
+- `QuestCheckin.xp_awarded` is used for XP, progression, RPG stats, and
+  analytics when check-ins exist.
 
 ```mermaid
 erDiagram
@@ -347,7 +388,8 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
-The app initializes SQLite tables and default categories on startup. Default categories can also be seeded manually:
+The app initializes SQLite tables and default categories on startup. Default
+categories can also be seeded manually:
 
 ```bash
 python -m src.database.seed
@@ -360,7 +402,8 @@ python -m pytest
 python -m compileall -q app src tests
 ```
 
-On Windows, if local pycache permissions cause compile issues, run with a temporary pycache prefix:
+On Windows, if local pycache permissions cause compile issues, run with a
+temporary pycache prefix:
 
 ```powershell
 $env:PYTHONPYCACHEPREFIX="$env:TEMP\habit_quest_pycache"
@@ -371,22 +414,27 @@ python -m compileall -q app src tests
 
 - Daily completion tracking belongs to `QuestCheckin`.
 - UI pages should read prepared service data instead of owning business rules.
-- Service functions own status transitions, XP idempotency, and query preparation.
+- Service functions own status transitions, XP idempotency, and query
+  preparation.
 - XP changes must be idempotent.
-- Analytics should avoid double-counting legacy quest status and check-in records.
-- Future work should stay small, testable, and local-first until production persistence is planned.
+- Analytics should avoid double-counting legacy quest status and check-in
+  records.
+- Future work should stay small, testable, and local-first until production
+  persistence is planned.
 
 ## Limitations & Future Work
 
 Current limitations:
 
 - Recurring habits are not implemented yet.
-- SQLite/local file storage is suitable for MVP and demo use, not production multi-user persistence.
+- SQLite/local file storage is suitable for MVP and demo use, not production
+  multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
 - Google Calendar sync is not implemented.
 - AI planning assistant and voice quest capture are not implemented.
 - Auto-fail exists as service logic but is not automatically enabled.
-- `Quest.status` still exists for compatibility/fallback and should be cleaned up only after the check-in migration is stable.
+- `Quest.status` still exists for compatibility/fallback and should be cleaned
+  up only after the check-in migration is stable.
 
 Suggested future order:
 
