@@ -1,57 +1,75 @@
 # Monthly Habit Checklist v1 Design
 
-This document describes a future design for replacing the temporary Quest Planner status dropdown with a checklist-based daily completion system.
+This document records the approved design and current implementation status for the checklist-based daily completion workflow in Quest Planner.
 
-Status: planned design. The `QuestCheckin` data model foundation exists, but checklist services, UI, and analytics integration are not implemented.
+## Status
+
+Monthly Checklist v1 is implemented.
+
+Implemented:
+
+- `QuestCheckin` data model.
+- Unique `quest_id + checkin_date` constraint.
+- Checklist status service.
+- Scheduled quest -> planned check-in integration.
+- Monthly checklist data builder.
+- Quest Planner Monthly Checklist UI.
+- Quest Planner calendar and selected day schedule using check-in status.
+- Command Center metrics using check-ins.
+- Character Profile XP/progression using check-in XP.
+- Habit Analytics using check-ins.
+
+Not implemented:
+
+- recurring habit generation,
+- automatic app/page-level stale planned failure,
+- production database,
+- authentication,
+- Google Calendar sync,
+- AI planning assistant,
+- voice input.
 
 ## Goal
 
-Monthly Habit Checklist v1 should make daily completion feel like a planner workflow instead of a manual status maintenance task.
+Monthly Checklist v1 replaces the old temporary Quest Planner status workflow with a daily completion system.
 
 Target flow:
 
 - Plan quests in Quest Planner.
+- Scheduled quests create planned check-ins for their scheduled date.
 - Review a selected month.
-- Mark whether a planned quest or habit was completed, skipped, or failed on a specific day.
+- Mark a planned quest day as completed, skipped, failed, or planned.
 - Award XP once for completed daily check-ins.
 - Feed check-in data into Command Center, Habit Analytics, and Character Profile.
 
 ## Product Behavior
 
-The checklist should track completion per quest per day. Completion status should not be stored only in `Quest.status`, because one quest can eventually have many daily results.
+The checklist tracks completion per quest per day. Completion status should not be stored only in `Quest.status`, because one quest can eventually have many daily results.
 
 Core behavior:
 
-- User selects a month.
-- Rows represent planned quests or habits.
+- User selects a month and year.
+- Rows represent planned quests.
 - Columns represent days of the selected month.
 - Each cell represents one quest on one date.
-- User can mark a cell as `Completed`, `Skipped`, or `Failed`.
-- Unresolved cells remain `Planned`.
+- User selects a quest/date and marks it `Completed`, `Skipped`, `Failed`, or resets it to `Planned`.
+- Unresolved planned cells remain `Planned`.
+- Empty days remain neutral/blank.
 - Completed check-ins award XP once.
 - Skipped and failed check-ins award no XP.
-- A planned check-in can automatically become failed after a short grace period.
-
-Recommended auto-fail default:
-
-```python
-grace_days = 3
-```
-
-The auto-fail rule should use 3 days as the default grace period. For example, a planned check-in older than `today - 3 days` can become `Failed` if it is still unresolved.
 
 ## Status Semantics
 
 - `Planned` - The quest is expected for that date but has not been resolved yet.
 - `Completed` - The user completed the quest on that date. XP is awarded once.
-- `Skipped` - The user intentionally skipped the quest. No XP is awarded, and it should be treated separately from failure.
+- `Skipped` - The user intentionally skipped the quest. No XP is awarded, and it should remain separate from failure.
 - `Failed` - The quest was planned but not completed or skipped. No XP is awarded, and it should count as a missed planned action.
 
-## Data Model Foundation
+## Data Model
 
-The checklist uses a table named `quest_checkins`.
+The checklist uses `quest_checkins`.
 
-Proposed `QuestCheckin` fields:
+Fields:
 
 - `id`
 - `quest_id`
@@ -64,11 +82,11 @@ Proposed `QuestCheckin` fields:
 - `created_at`
 - `updated_at`
 
-Constraints:
+Constraint:
 
 - Unique constraint on `quest_id + checkin_date`.
 
-Recommended relationships:
+Relationships:
 
 - `QuestCheckin.quest_id` references `quests.id`.
 - `Quest.checkins` links a quest to its daily check-ins.
@@ -77,7 +95,7 @@ Why this table is needed:
 
 - `Quest.status` can only represent one global state.
 - A checklist needs one status per quest per day.
-- Future recurring habits will need one check-in per generated habit date.
+- Future recurring habits need one check-in per generated habit date.
 - Analytics and XP calculations need stable daily completion records.
 
 ## XP Rules
@@ -85,179 +103,174 @@ Why this table is needed:
 - `Completed` awards XP once.
 - `Skipped` gives no XP.
 - `Failed` gives no XP.
-- XP should be stored in `xp_awarded` to preserve historical values.
+- Resetting to `Planned` clears timestamps and sets `xp_awarded = 0`.
+- XP is stored in `QuestCheckin.xp_awarded` to preserve historical values.
 - Completing the same check-in twice must not duplicate XP.
 
-Recommended behavior:
+Current behavior:
 
-- When a check-in first changes to `Completed`, set `xp_awarded` to the quest XP reward.
-- If a completed check-in is completed again, leave `xp_awarded` unchanged.
-- If future UI allows changing `Completed` back to another status, the product must explicitly decide whether XP is revoked. V1 can avoid this complexity by limiting reversal actions or requiring confirmation.
+- First completion sets `xp_awarded` to the parent quest's `xp_reward` if the value is currently `0`.
+- Repeating a completion action keeps the stored XP value.
+- Skip, Fail, and Reset set XP back to `0`.
+
+## Auto-Fail Helper
+
+The service function exists:
+
+```python
+mark_stale_planned_checkins_failed(today, grace_days=3)
+```
+
+Recommended default:
+
+```python
+grace_days = 3
+```
+
+Behavior:
+
+- Find `Planned` check-ins with `checkin_date <= today - grace_days`.
+- Mark them `Failed`.
+- Set `failed_at`.
+- Return the number of updated check-ins.
+- Do not alter completed, skipped, or already failed check-ins.
+
+Important:
+
+- This helper is not called automatically from app startup or page load yet.
+- A future activation workflow should be designed before enabling it automatically.
 
 ## UI Direction
 
-Monthly Checklist should live in Quest Planner and replace the temporary status controls.
+Monthly Checklist lives in Quest Planner.
 
-Recommended layout:
+Current v1 structure:
 
-- Section title: `Monthly Checklist`
+- Section title: `Monthly Checklist`.
+- Subtitle: `Track daily quest completion for the selected month.`
 - Month selector.
-- Compact status legend.
+- Year selector.
+- Status legend.
 - Matrix preview:
-  - rows are quests or habits,
+  - rows are quests,
   - columns are days of the month,
-  - cells use simple status symbols and colors.
+  - cells show simple status symbols.
 - Selected quest/date action controls:
-  - choose quest,
-  - choose date,
-  - mark `Completed`, `Skipped`, `Failed`, or reset to `Planned`.
+  - select quest,
+  - select date,
+  - view current status,
+  - Complete, Skip, Fail, Reset.
 
-V1 should avoid a fragile 31-column interactive widget grid. A matrix preview plus selected quest/date controls is simpler, easier to test, and more reliable in Streamlit.
+V1 intentionally avoids a fragile fully editable 31-column widget grid. The matrix preview plus selected quest/date controls is simpler, more reliable in Streamlit, and easier to test.
 
 ## Quest Planner Impact
 
-Quest Planner remains the planning surface.
+Quest Planner is the planning and checklist surface.
 
-Expected changes:
+Current behavior:
 
-- Keep calendar planning and the New Quest form.
-- Remove `Temporary Status Controls`.
-- Add `Monthly Checklist`.
-- Creating a scheduled quest should create or lazily ensure a planned check-in for the planned date.
-- Selected Day Board can show check-in status when available.
-- Day Schedule can eventually include quick actions for today's check-ins.
-
-Compatibility:
-
-- Existing quests with `due_date` can create check-ins lazily when the checklist loads.
-- One-time scheduled quests should normally have one check-in for their planned date.
-- Recurring habits are not required for v1, but this design leaves room for them later.
+- Calendar planning and the New Quest form remain.
+- Creating a scheduled quest creates a planned check-in for the scheduled date.
+- Monthly Checklist is the only user-facing completion/status workflow on Quest Planner.
+- The old Maintenance, Quest Ledger, and Legacy Status Controls UI were removed.
+- Calendar events display check-in status for the event date when available.
+- Selected Day Schedule displays check-in status for the selected date when available.
+- `Quest.status` is not synchronized from check-in status.
 
 ## Command Center Impact
 
-Command Center should eventually use check-ins for operational metrics.
+Command Center uses check-ins for operational metrics.
 
-Expected changes:
+Current behavior:
 
-- Today's focus should use today's check-ins.
-- `Completed Today` should count completed check-ins.
-- `Failed` should count failed check-ins.
-- `Overdue` should mean unresolved planned check-ins before today.
-- Auto-failed check-ins after `grace_days = 3` should appear as failed, not overdue.
-- Skipped should remain separate from failed.
-
-During transition, Command Center can use legacy quest status as a fallback when no check-ins exist.
+- Today's Focus uses today's check-ins.
+- `Completed Today` counts completed check-ins for today.
+- `Planned Today` counts planned check-ins for today.
+- `Failed` counts failed check-ins through today.
+- `Overdue` means unresolved planned check-ins before today.
+- Skipped remains separate from failed.
+- Command Center is read-only and does not expose status action buttons.
 
 ## Habit Analytics Impact
 
-Habit Analytics should eventually use check-ins as the source of truth for completion behavior.
+Habit Analytics uses check-ins when any check-ins exist.
 
-Expected changes:
+Current behavior:
 
-- XP trend should use completed check-ins and `xp_awarded`.
-- Status breakdown should count check-in statuses.
-- Weekday completion rate should use check-in dates.
-- Category analytics should join check-ins to quests and categories.
-- Skipped should be handled separately from failed so intentional skips do not distort failure analysis.
+- Weekly XP sums `QuestCheckin.xp_awarded`.
+- Completed This Week counts completed check-ins.
+- Failed This Week counts failed check-ins.
+- Weekly completion rate uses completed / (completed + failed).
+- XP trend groups awarded XP by `checkin_date`.
+- Status breakdown counts check-in statuses.
+- Category breakdown joins check-ins to quests and categories.
+- Weekday completion rate uses check-in dates.
+- Planned minutes by category uses parent quest `estimated_minutes`.
 
-During transition, analytics can keep legacy quest-based fallback behavior until check-in data is available.
+Legacy quest-based fallback remains only for databases with no check-ins.
 
 ## Character Profile Impact
 
-Character Profile XP and RPG stats should eventually come from completed check-ins.
+Character Profile uses check-ins when any check-ins exist.
 
-Expected changes:
+Current behavior:
 
-- Total XP should sum `xp_awarded` from completed check-ins.
-- Level should use check-in XP totals.
-- RPG stat XP should group completed check-in XP by the parent quest category.
-- Repeated completions of the same future habit on different days should each be able to award XP once.
+- Total XP sums `QuestCheckin.xp_awarded`.
+- Level and XP to next level use check-in XP.
+- Completed Quest Days counts completed check-ins.
+- RPG stat XP groups completed check-in XP by parent quest category.
+- Resetting a completed check-in to planned removes its XP contribution because `xp_awarded` becomes `0`.
 
-Labeling may need refinement later. For example, `Completed Quests` may become `Completed Check-ins` or `Completed Quest Days` once repeated habit completion exists.
+Legacy quest-based fallback remains only for databases with no check-ins.
 
 ## Implementation Phases
 
-Recommended commit breakdown:
+Current phase status:
 
-1. Data model
-   - Add `QuestCheckin` model.
-   - Add SQLite table creation or migration support.
-   - Add relationship from quests to check-ins.
+1. Data model - implemented.
+2. Checklist service - implemented.
+3. Quest creation integration - implemented.
+4. Quest Planner UI - implemented.
+5. Command Center metrics - implemented.
+6. Habit Analytics metrics - implemented.
+7. Character Profile XP/stat calculations - implemented.
+8. Docs cleanup - current documentation refresh.
 
-2. Checklist service
-   - Add check-in creation and lookup helpers.
-   - Add status transition functions.
-   - Add XP award idempotency.
-   - Add `grace_days = 3` auto-fail service logic.
+Future phases:
 
-3. Quest creation integration
-   - Create or lazily ensure planned check-ins for scheduled quests.
-   - Preserve current scheduled quest behavior.
-
-4. Quest Planner UI
-   - Replace temporary status controls with Monthly Checklist.
-   - Render matrix preview.
-   - Add selected quest/date action controls.
-
-5. Command Center metrics
-   - Use check-ins for today, completed, failed, skipped, and overdue operational counts.
-   - Keep legacy fallback if needed during migration.
-
-6. Habit Analytics metrics
-   - Use check-ins for XP trend, status breakdown, weekday completion, and category analysis.
-
-7. Character Profile XP/stat calculations
-   - Use completed check-ins and `xp_awarded` for XP, level, and RPG stat growth.
-
-8. Docs cleanup
-   - Update README and planning docs after implementation.
-   - Document final status and XP rules.
+1. Recurring habit design and generation.
+2. Optional auto-fail activation workflow.
+3. Production persistence and migration strategy.
+4. Authentication and user-specific data.
+5. External calendar sync.
+6. AI and voice planning extensions.
+7. Legacy `Quest.status` cleanup.
 
 ## Test Plan
 
-Data model:
+Covered by current tests:
 
-- Creates `quest_checkins`.
-- Enforces unique `quest_id + checkin_date`.
-- Loads quest and category relationships.
+- `quest_checkins` model creation.
+- Unique `quest_id + checkin_date` constraint.
+- Quest/check-in relationships.
+- Planned check-in creation.
+- Idempotent `ensure_checkin`.
+- Complete, Skip, Fail, and Reset behavior.
+- XP idempotency.
+- Stale planned failure helper.
+- Scheduled quest creation creates planned check-ins.
+- Monthly checklist data builder.
+- Command Center metrics from check-ins.
+- Quest Planner calendar/day status helpers.
+- Character Profile XP/stat calculations from check-ins.
+- Habit Analytics metrics from check-ins.
 
-Checklist service:
+Manual verification focus:
 
-- Creates planned check-in.
-- Completing a check-in sets `Completed`, `completed_at`, and `xp_awarded`.
-- Completing twice does not duplicate XP.
-- Skipping sets `Skipped` and no XP.
-- Failing sets `Failed` and no XP.
-- Auto-fail changes only old unresolved `Planned` check-ins.
-- Completed and skipped check-ins are not auto-failed.
-
-Quest Planner:
-
-- Scheduled quest appears in the monthly checklist.
-- Existing scheduled quest can produce a planned check-in.
-- Status actions update the correct quest/date cell.
-- Temporary status controls are removed.
-
-Command Center:
-
-- Today's focus reflects check-in status.
-- Completed Today uses completed check-ins.
-- Failed and skipped are counted separately.
-- Overdue uses unresolved past check-ins.
-
-Habit Analytics:
-
-- XP trend uses completed check-ins.
-- Status breakdown uses check-in statuses.
-- Weekday completion rate uses check-in dates.
-- Empty states still work.
-
-Character Profile:
-
-- Total XP sums completed check-in `xp_awarded`.
-- Level uses check-in XP.
-- RPG stats group check-in XP by quest category.
-- Repeated completions on different dates can each award XP once.
+- Create scheduled quest.
+- Confirm planned check-in appears in Monthly Checklist.
+- Mark Complete, Skip, Fail, and Reset.
+- Confirm matrix, calendar, selected day schedule, Command Center, Habit Analytics, and Character Profile reflect the expected check-in data.
 
 ## Non-Goals For V1
 
@@ -267,4 +280,4 @@ Character Profile:
 - No Google Calendar sync.
 - No AI planning assistant.
 - No voice input.
-- No fragile 31-column widget grid as the first implementation.
+- No fragile 31-column editable widget grid.

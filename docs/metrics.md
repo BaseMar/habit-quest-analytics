@@ -1,6 +1,6 @@
 # Metrics
 
-This document defines the core metrics for Habit Quest Analytics. Some formulas are implemented in the scaffold; others describe the planned MVP analytics layer.
+This document defines the current core metrics for Habit Quest Analytics. After the QuestCheckin migration, daily completion metrics should use `QuestCheckin` records when they exist.
 
 ## XP Rewards
 
@@ -13,27 +13,19 @@ Quest XP is based on difficulty.
 | Hard | 75 |
 | Boss | 150 |
 
-What it tells the user:
-
-- how much progress a completed quest contributes,
-- whether harder quests are meaningfully rewarded,
-- how daily actions translate into character progression.
-
 Status: implemented in `src/services/xp_service.py`.
 
 ## Total XP
 
 ```text
-total_xp = sum(xp_reward for completed quests)
+total_xp = sum(QuestCheckin.xp_awarded)
 ```
 
-What it tells the user:
+When check-ins exist, Character Profile uses awarded check-in XP. This prevents duplicate XP from repeated completion actions and preserves historical XP values.
 
-- cumulative progress across all completed work,
-- long-term activity level,
-- the base value used for character level.
+Fallback:
 
-Status: model field exists on `PlayerProfile`; workflow update logic is planned.
+- If no check-ins exist, legacy completed quest XP can be used so older demo data does not disappear.
 
 ## Level
 
@@ -41,12 +33,7 @@ Status: model field exists on `PlayerProfile`; workflow update logic is planned.
 level = total_xp // 500 + 1
 ```
 
-What it tells the user:
-
-- the character's current progression tier,
-- a simple long-term reward for repeated completion.
-
-Status: implemented in `src/services/xp_service.py`.
+Status: implemented.
 
 ## XP To Next Level
 
@@ -56,63 +43,62 @@ xp_to_next_level = 500 - (total_xp % 500)
 
 If `total_xp` is exactly on a level boundary, the next level requires another `500` XP.
 
-What it tells the user:
-
-- how close the character is to leveling up,
-- how much work remains before the next progression milestone.
-
 Status: implemented.
 
-## Completion Rate
+## Completed Quest Days
 
 ```text
-completion_rate = completed_quests / total_quests * 100
+completed_quest_days = count(check-ins where status = Completed)
 ```
 
-If there are no quests, completion rate is `0.0`.
+This replaces the older "completed quests" interpretation in profile-style views when check-ins exist. A repeated habit can eventually produce many completed quest days from one parent quest.
 
-What it tells the user:
+## Command Center Metrics
 
-- whether planned work is actually getting finished,
-- whether the quest load is realistic,
-- how completion changes over time.
+Command Center is read-only and uses check-ins for operational status.
 
-Status: implemented as a pure metric function.
+```text
+planned_today = count(check-ins where status = Planned and checkin_date = today)
+completed_today = count(check-ins where status = Completed and checkin_date = today)
+overdue = count(check-ins where status = Planned and checkin_date < today)
+failed = count(check-ins where status = Failed and checkin_date <= today)
+```
+
+Skipped check-ins are tracked separately and should not count as completed, failed, or overdue.
 
 ## Weekly XP
 
 ```text
-weekly_xp = sum(xp_reward for quests completed during the week)
+weekly_xp = sum(xp_awarded for check-ins in the current week)
 ```
 
-What it tells the user:
+Normally only completed check-ins have nonzero XP.
 
-- how much progress was earned each week,
-- whether productivity is increasing, falling, or staying stable,
-- which weeks had unusually high or low activity.
-
-Status: implemented for quests completed in the current week.
-
-## XP By Day
+## Weekly Completion Rate
 
 ```text
-xp_by_day = sum(xp_reward for completed quests grouped by activity date)
+weekly_completion_rate = completed / (completed + failed) * 100
 ```
 
-The activity date uses `completed_at` when available and falls back to the planned date.
+Rules:
 
-What it tells the user:
+- Use current-week check-ins.
+- Exclude skipped check-ins.
+- Exclude planned future check-ins.
+- Return `0.0` if the denominator is zero.
 
-- which days produced the most XP,
-- whether completed effort is clustered or consistent,
-- how quest completion translates into daily progress.
-
-Status: implemented.
-
-## Quests By Status
+## XP Trend By Day
 
 ```text
-quests_by_status = count(quests grouped by status)
+xp_by_day = sum(xp_awarded grouped by checkin_date)
+```
+
+The Habit Analytics trend chart uses check-in dates and a line chart with markers.
+
+## Check-ins By Status
+
+```text
+checkins_by_status = count(check-ins grouped by status)
 ```
 
 Supported status values:
@@ -122,95 +108,40 @@ Supported status values:
 - Failed
 - Skipped
 
-What it tells the user:
-
-- how much work is still planned,
-- how much work was completed,
-- whether skipped or failed quests are accumulating.
-
-Status: implemented.
-
-## Quests By Category
+## Check-ins By Category
 
 ```text
-quests_by_category = count(quests grouped by category)
+checkins_by_category = count(check-ins grouped by parent quest category)
 ```
 
-What it tells the user:
+This joins `QuestCheckin -> Quest -> Category`.
 
-- which life or work areas receive the most attention,
-- whether categories are balanced,
-- which categories may be neglected.
-
-Status: implemented.
-
-## Current Streak
+## Completion Rate By Weekday
 
 ```text
-current_streak = consecutive days with at least one completed habit quest
+weekday_completion_rate = completed / (completed + failed) * 100
 ```
 
-What it tells the user:
+Rules:
 
-- whether habit activity is consistent,
-- how long the current routine has been maintained,
-- whether missed days are breaking momentum.
+- Use `QuestCheckin.checkin_date`.
+- Count completed and failed check-ins as resolved outcomes.
+- Exclude skipped check-ins.
+- Exclude planned items.
+- Return `0.0` for weekdays without resolved check-ins.
 
-Status: planned.
-
-## Consistency Score
+## Planned Minutes By Category
 
 ```text
-consistency_score = completed_days / tracked_days * 100
+planned_minutes_by_category = sum(parent quest estimated_minutes grouped by category)
 ```
 
-If there are no tracked days, consistency score is `0.0`.
-
-What it tells the user:
-
-- how often the user follows through across a tracked period,
-- whether a habit is stable enough to be considered reliable.
-
-Status: implemented as a pure metric function.
-
-## Planned Vs Actual Time
-
-```text
-time_accuracy = actual_minutes / estimated_minutes * 100
-```
-
-Alternative view:
-
-```text
-time_delta = actual_minutes - estimated_minutes
-```
-
-What it tells the user:
-
-- whether tasks are being underestimated or overestimated,
-- which categories consume more time than expected,
-- whether planning accuracy improves over time.
-
-Status: planned. The current data model includes `estimated_minutes`; an actual-time field is still needed before this metric can be implemented.
-
-## Estimated Minutes By Category
-
-```text
-estimated_minutes_by_category = sum(estimated_minutes grouped by category)
-```
-
-What it tells the user:
-
-- where planned time is being allocated,
-- which categories carry the largest planned workload,
-- whether time planning is balanced across categories.
-
-Status: implemented.
+This represents planned workload attached to check-ins. It is not actual time spent.
 
 ## RPG Stat XP
 
 ```text
-rpg_stat_xp = sum(xp_reward for completed quests grouped by mapped category stat)
+rpg_stat_xp = sum(xp_awarded for completed check-ins grouped by parent quest category RPG stat)
 ```
 
 Default category mapping:
@@ -221,10 +152,28 @@ Default category mapping:
 - Social -> Creativity
 - Home -> Recovery
 
-What it tells the user:
+## Consistency Score
 
-- which RPG-style character traits are growing,
-- how completed work is distributed across life areas,
-- whether the character profile reflects balanced activity.
+```text
+consistency_score = completed_days / tracked_days * 100
+```
 
-Status: implemented.
+Status: implemented as a pure metric helper. UI-level consistency currently uses check-in analytics views rather than a standalone streak system.
+
+## Planned Metrics
+
+### Current Streak
+
+```text
+current_streak = consecutive days with at least one completed habit quest day
+```
+
+Status: planned.
+
+### Planned Vs Actual Time
+
+```text
+time_accuracy = actual_minutes / estimated_minutes * 100
+```
+
+Status: planned. The current data model includes `estimated_minutes`; an actual-time field is still needed before this metric can be implemented.

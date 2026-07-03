@@ -1,37 +1,39 @@
 # MVP Specification
 
-The MVP should prove the core loop: create quests, complete quests, earn XP, level up, and review basic productivity patterns.
+The MVP proves the core loop: plan quests, track daily completion, earn XP, level up, and review productivity patterns.
 
 ## MVP Scope
 
-The first usable version should include:
+The current usable version includes:
 
-- quest creation and editing,
-- quest completion with XP rewards,
+- calendar-based scheduled quest creation,
+- daily quest completion through Monthly Checklist check-ins,
 - categories for organizing work,
 - difficulty levels: Easy, Medium, Hard, Boss,
-- player profile with total XP and level,
-- basic dashboard KPIs,
-- simple habit consistency metrics,
+- XP rewards stored per completed check-in,
+- player profile with XP, level, avatar, and RPG stats,
+- Command Center operational KPIs,
+- Habit Analytics trends and consistency metrics,
 - local SQLite persistence,
-- tests for business rules.
+- pytest coverage for business rules.
 
 ## User Stories
 
-- As a user, I want to create a quest so that I can track a habit or task.
-- As a user, I want to set quest difficulty so that harder work gives more XP.
-- As a user, I want to mark a quest complete so that my XP and progress update.
-- As a user, I want to view active and completed quests so that I can review my workload.
-- As a user, I want to see my level so that long-term progress is visible.
-- As a user, I want to review completion rates so that I can understand consistency.
-- As a user, I want categories so that I can see which areas of life are balanced or neglected.
+- As a user, I want to schedule a quest so I can plan a task or habit for a specific day.
+- As a user, I want to set quest difficulty so harder work gives more XP.
+- As a user, I want to mark a planned quest day as completed, skipped, failed, or planned.
+- As a user, I want completed quest days to award XP only once.
+- As a user, I want to review today's planned and resolved quest check-ins.
+- As a user, I want to see my level and RPG stats grow from completed activity.
+- As a user, I want analytics that show trends, categories, consistency, and planned workload.
 
 ## App Sections
 
-- `Dashboard` - summary cards for active quests, completed quests, total XP, level, and consistency.
-- `Quest Log` - quest creation, filtering, completion, and history.
-- `Habit Analytics` - completion rate, weekly XP, category distribution, and streak-oriented charts.
-- `Character Profile` - character name, avatar, total XP, level, XP to next level, RPG stats, and planned achievements.
+- `Home Base` - onboarding, quick start, app map, and local-first MVP note.
+- `Command Center` - read-only operational overview using daily check-ins.
+- `Quest Planner` - calendar planner, selected day schedule, new quest form, and Monthly Checklist.
+- `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency, planned minutes, and insights.
+- `Character Profile` - avatar, XP, level, completed quest days, RPG stats, radar chart, and achievements placeholder.
 
 ## Implementation Phases
 
@@ -40,144 +42,103 @@ The first usable version should include:
 Status: implemented.
 
 - Create project structure.
-- Add placeholder Streamlit pages.
+- Add Streamlit pages.
 - Add SQLAlchemy models.
 - Add SQLite initialization.
 - Add default category seeding.
 - Add XP and level formulas.
 - Add initial tests.
 
-### Phase 2: Quest Management
+### Phase 2: Quest Planning
 
-Status: partially implemented.
+Status: implemented for scheduled one-time quests.
 
-- Add quest creation form.
-- Persist quests to SQLite.
-- List active and completed quests.
-- Mark quests complete.
-- Calculate and store XP rewards.
-
-Implemented so far:
-
-- create quests from the Quest Log page,
-- store title, description, category, difficulty, planned date, estimated minutes, status, and XP reward,
-- list persisted quests,
-- update status to Planned, Completed, Failed, or Skipped,
-- set `completed_at` when a quest is completed for the first time.
+- Create scheduled quests from Quest Planner.
+- Store title, notes, category, difficulty, planned date, planned start/end times, estimated minutes, and XP reward.
+- Validate that end time is after start time.
+- Display quests on the calendar and selected day schedule.
 
 Still planned:
 
-- edit existing quests,
-- delete or archive quests,
-- habit flag controls,
-- player profile XP updates.
+- quest editing,
+- delete/archive workflow,
+- recurring habits.
 
-### Phase 3: Dashboard Metrics
+### Phase 3: Monthly Checklist
 
-Status: partially implemented.
+Status: implemented v1.
 
-- Load quest records into Pandas.
-- Add KPI cards for completion, XP, and level progress.
-- Add completion rate and weekly XP summaries.
-- Add basic category breakdowns.
+- Add `QuestCheckin` model with unique `quest_id + checkin_date`.
+- Create planned check-ins for scheduled quests.
+- Build monthly checklist data with rows as quests and columns as days.
+- Render a compact matrix preview in Quest Planner.
+- Allow Complete, Skip, Fail, and Reset actions for a selected quest/date.
+- Keep XP idempotent with `QuestCheckin.xp_awarded`.
 
-Implemented so far:
+Not implemented:
 
-- total quests,
-- completed quests,
-- completion rate,
-- total XP from completed quests,
-- weekly XP from quests completed in the current week,
-- current level,
-- XP to next level.
+- recurring habit generation,
+- fully editable 31-column widget grid,
+- automatic app-level stale planned failure.
 
-Still planned:
+### Phase 4: Command Center Metrics
 
-- dashboard filtering.
-- richer trend charts.
+Status: implemented with check-ins.
 
-### Phase 3b: Habit Analytics Charts
+- Planned Today counts planned check-ins for today.
+- Completed Today counts completed check-ins for today.
+- Overdue counts planned check-ins before today.
+- Failed counts failed check-ins through today.
+- Today's Focus reads parent quest metadata and `QuestCheckin.status`.
+- Command Center remains read-only.
 
-Status: partially implemented.
+### Phase 5: Habit Analytics
 
-Implemented so far:
+Status: implemented with check-ins when available.
 
-- XP by day,
-- quests by status,
-- quests by category,
-- completion rate by planned weekday,
-- estimated minutes by category.
+- Weekly XP from `QuestCheckin.xp_awarded`.
+- Completed and failed quest days for the current week.
+- Weekly completion rate using completed / (completed + failed).
+- XP trend by check-in date.
+- Check-ins by status.
+- Check-ins by category.
+- Completion rate by weekday.
+- Planned minutes by category.
+- Insight summaries from check-in data.
 
-Still planned:
+Legacy quest-based fallback remains only for databases with no check-ins.
 
-- date range filters,
-- habit-specific views,
-- streak charts,
-- trend comparisons over longer periods.
+### Phase 6: Character Profile
 
-### Phase 4: Character And Achievements
+Status: implemented with check-ins when available.
 
-Status: partially implemented.
+- Total XP from `QuestCheckin.xp_awarded`.
+- Level and XP-to-next-level from check-in XP.
+- Completed Quest Days from completed check-ins.
+- RPG stat XP from completed check-ins joined to quest categories.
+- Radar chart from RPG stat XP.
+- Local avatar upload path stored on the player profile.
 
-- Show character profile details.
-- Calculate XP to next level.
-- Upload and display a local avatar.
-- Define achievement rules.
-- Store and display unlocked achievements.
-
-Implemented so far:
-
-- character name,
-- character title by level,
-- current level,
-- total XP from completed quests,
-- XP to next level,
-- progress bar toward the next level,
-- RPG stat XP from completed quests by category,
-- radar chart for RPG stat balance,
-- compact profile stat rows,
-- achievements placeholder,
-- local avatar upload path on the player profile.
-
-Still planned:
-
-- persisted player profile editing,
-- achievement rules,
-- unlocked achievement display.
+Legacy quest-based fallback remains only for databases with no check-ins.
 
 ## Future Features Outside MVP
 
-- Authentication and multi-user support.
-- Cloud database deployment.
-- External calendar or task integrations.
-- Machine learning recommendations.
-- Completion probability prediction.
-- Advanced recurring quest scheduling.
-- Data import and export workflows.
-
-## Advanced Future Extensions
-
-These are roadmap ideas for later phases. They are not currently implemented and should remain separate from MVP scope.
-
-- Google Calendar integration - sync scheduled quests with Google Calendar and allow planned habits or tasks to appear alongside real calendar events.
-- User authentication - add login support so each user has separate quests, calendar, character profile, and analytics. This would likely require PostgreSQL or another production database plus user-specific data model changes.
-- AI planning assistant - add an LLM-powered assistant that can understand natural language planning requests. Example: a user writes "Schedule gym tomorrow from 9 to 11" and the assistant creates a scheduled quest.
-- Voice quest capture - add microphone or voice input so users can speak tasks or habit plans. The assistant could convert spoken requests into scheduled quests. This depends on the future AI assistant and should come after the core planner is stable.
-
-Suggested implementation order:
-
-1. Monthly habit checklist
-2. Recurring habits
-3. PostgreSQL / production persistence
-4. Authentication
-5. Google Calendar sync
-6. AI planning assistant
-7. Voice input
+- Recurring habits and templates.
+- PostgreSQL / production persistence.
+- Authentication and user-specific data isolation.
+- Google Calendar sync.
+- AI planning assistant.
+- Voice quest capture.
+- Achievement unlock rules.
+- Date filters and richer analytics comparisons.
+- Data export/import.
 
 ## MVP Success Criteria
 
-- A user can create and complete quests locally.
-- XP and level update predictably.
-- Quest records persist in SQLite.
-- The dashboard summarizes real quest data.
-- Core formulas remain covered by tests.
+- A user can schedule quests locally.
+- Scheduled quests create planned check-ins.
+- A user can resolve daily check-ins as completed, skipped, failed, or planned.
+- Completed check-ins award XP once.
+- Command Center, Habit Analytics, and Character Profile use check-ins when available.
+- Quest records and check-ins persist in SQLite.
+- Core formulas and service behavior remain covered by tests.

@@ -4,6 +4,13 @@ This file stores proposed future features for Habit Quest Analytics, sorted from
 
 Rule: do not implement any item from this list without explicit user confirmation. Before implementation, discuss scope, priority, data model impact, UI impact, and tests.
 
+Current baseline:
+
+- Monthly Checklist v1 is implemented.
+- `QuestCheckin` is the main source of truth for daily status when check-ins exist.
+- Command Center, Habit Analytics, and Character Profile use check-ins for their current metrics/progression paths.
+- `Quest.status` remains only as legacy compatibility/fallback.
+
 ## Priority 1. Professional UX / Visual Design Upgrade
 
 What it adds:
@@ -26,19 +33,27 @@ Implementation note:
 - This should stay practical and app-like, not become a marketing landing page.
 - Improve existing screens before adding new ones.
 
-## Priority 2. Quest Status Flow
+## Priority 2. Quest Status Flow Cleanup
 
-What it adds:
+Current status:
 
-- Clear product rules for quest statuses:
+- Core product rules are implemented through `QuestCheckin`.
+- Monthly Checklist supports Planned, Completed, Skipped, Failed, and Reset.
+- XP idempotency is implemented through `QuestCheckin.xp_awarded`.
+
+What remains:
+
+- Keep refining user-facing copy and edge cases for daily check-in statuses:
   - Planned: scheduled but not yet historically evaluated.
   - Completed: finished and grants XP.
   - Failed: not completed despite being planned and grants no XP.
   - Skipped: consciously skipped, grants no XP, and may be excluded from selected metrics.
+- Decide if and when to enable automatic stale planned failure.
+- Eventually clean up legacy `Quest.status` after the migration is stable.
 
 Why it matters:
 
-- Status rules affect XP, dashboard KPIs, analytics charts, weekly reviews, and user trust.
+- Status rules affect XP, Command Center KPIs, analytics charts, weekly reviews, and user trust.
 - Planned quests should not distort historical performance before their date has passed.
 
 Positive value:
@@ -49,8 +64,8 @@ Positive value:
 
 Implementation note:
 
-- This is partly product design and partly code.
-- Start by documenting rules, then align KPI and analytics calculations.
+- Do not synchronize `Quest.status` from `QuestCheckin.status`.
+- Keep new work centered on daily check-ins.
 
 ## Priority 3. Quest Editing
 
@@ -61,7 +76,7 @@ What it adds:
 Why it matters:
 
 - Users often create tasks quickly and refine them later.
-- It makes the Quest Log feel practical instead of one-shot.
+- It makes Quest Planner feel practical instead of one-shot.
 - It reduces the need for delete/recreate workflows.
 
 Positive value:
@@ -89,12 +104,7 @@ Positive value:
 
 What it adds:
 
-- A daily operational section showing:
-  - today's quests,
-  - quick status updates for Completed, Failed, and Skipped,
-  - XP available today,
-  - daily progress,
-  - daily completion rate.
+- A daily operational section showing today's quest check-ins, XP context, daily progress, and completion rate.
 
 Why it matters:
 
@@ -109,8 +119,8 @@ Positive value:
 
 Implementation note:
 
-- This can live at the top of Dashboard or become a separate page later.
-- Keep the first version simple and based on existing quest dates/statuses.
+- Command Center already provides a read-only daily overview.
+- Keep status changes in Quest Planner / Monthly Checklist unless a later design explicitly adds quick actions.
 
 ## Priority 6. Date Filters for Dashboard and Analytics
 
@@ -169,8 +179,8 @@ Dependency note:
 What it adds:
 
 - A weekly review page or section showing:
-  - planned quests,
-  - completed quests,
+  - planned quest days,
+  - completed quest days,
   - completion rate,
   - XP earned,
   - strongest category,
@@ -229,7 +239,7 @@ Positive value:
 
 What it adds:
 
-- A simple view showing whether XP and completed quests are balanced across categories.
+- A simple view showing whether XP and completed quest days are balanced across categories.
 
 Why it matters:
 
@@ -429,13 +439,14 @@ Implementation note:
 
 ### Suggested Implementation Order
 
-1. Monthly habit checklist
-2. Recurring habits
-3. PostgreSQL / production persistence
-4. Authentication
-5. Google Calendar sync
-6. AI planning assistant
-7. Voice input
+1. Recurring habits
+2. PostgreSQL / production persistence
+3. Authentication
+4. Google Calendar sync
+5. AI planning assistant
+6. Voice input
+7. Optional auto-fail activation workflow
+8. Legacy `Quest.status` cleanup
 
 ## Deferred Ideas
 
