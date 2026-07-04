@@ -26,6 +26,7 @@ Stores labels used to group quests.
 Relationships:
 
 - One category can have many quests.
+- One category can have many recurring habit templates.
 
 ### quests
 
@@ -38,7 +39,7 @@ Stores scheduled task or habit plans represented as RPG quests.
 | `description` | Optional quest notes. |
 | `difficulty` | Difficulty label used for XP reward calculation. |
 | `status` | Legacy quest-level status. Retained for compatibility/fallback, not the primary daily status source when check-ins exist. |
-| `is_habit` | Reserved habit flag. Recurring habits are not implemented yet. |
+| `is_habit` | Reserved habit flag. Recurring habit templates use `recurring_habits`; generated habit days can still be represented as normal quests. |
 | `xp_reward` | XP value assigned to this quest plan. |
 | `due_date` | Planned date for the quest. |
 | `planned_start_at` | Optional scheduled start datetime for calendar planning. |
@@ -52,6 +53,7 @@ Relationships:
 
 - Many quests can belong to one category.
 - One quest can have many daily check-ins.
+- One generated recurring habit instance can point to one quest.
 
 ### quest_checkins
 
@@ -76,6 +78,52 @@ Constraints and relationships:
 - The pair `quest_id` and `checkin_date` is unique.
 - Completed check-ins award XP once by storing the awarded value in `xp_awarded`.
 - Skipped, failed, and planned check-ins should have `xp_awarded = 0`.
+
+### recurring_habits
+
+Stores recurring habit templates. These templates are not completed directly; future generation logic will use them to create normal planned quest days and planned check-ins.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key. |
+| `title` | Habit name shown to the user. |
+| `description` | Optional notes. |
+| `category_id` | Optional foreign key to `categories.id`, matching current quest category behavior. |
+| `difficulty` | Difficulty label copied to generated quests. |
+| `xp_reward` | XP value copied to generated quests. |
+| `estimated_minutes` | Planned duration copied to generated quests. |
+| `recurrence_type` | Recurrence type. v1 is designed around `selected_weekdays`. |
+| `weekdays` | Serialized JSON weekday list for SQLite v1. `0` is Monday and `6` is Sunday. |
+| `start_date` | First date the habit can generate. |
+| `end_date` | Optional final date the habit can generate. |
+| `is_active` | Whether the template should be eligible for future generation. |
+| `created_at` | Timestamp set when the template is created. |
+| `updated_at` | Timestamp updated when the template changes. |
+
+Relationships:
+
+- Many recurring habit templates can belong to one category.
+- One recurring habit can have many generated instances.
+
+### recurring_habit_instances
+
+Links one recurring habit template and scheduled date to one generated quest.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key. |
+| `recurring_habit_id` | Required foreign key to `recurring_habits.id`. |
+| `scheduled_date` | Date generated from the recurring habit template. |
+| `quest_id` | Required foreign key to the generated `quests.id`. |
+| `created_at` | Timestamp set when the instance is created. |
+
+Constraints and relationships:
+
+- The pair `recurring_habit_id` and `scheduled_date` is unique.
+- `quest_id` is unique, so one generated quest belongs to at most one recurring habit instance.
+- Many generated instances belong to one recurring habit.
+- One generated instance points to one quest.
+- Generated quests can then use existing `QuestCheckin` records for daily status and XP.
 
 ### player_profiles
 
@@ -131,7 +179,10 @@ Relationships:
 ```mermaid
 erDiagram
     categories ||--o{ quests : groups
+    categories ||--o{ recurring_habits : groups
     quests ||--o{ quest_checkins : tracks
+    recurring_habits ||--o{ recurring_habit_instances : generates
+    quests ||--o| recurring_habit_instances : generated_as
     player_profiles ||--o{ unlocked_achievements : earns
     achievements ||--o{ unlocked_achievements : unlocked_as
 
@@ -171,6 +222,31 @@ erDiagram
         datetime updated_at
     }
 
+    recurring_habits {
+        int id PK
+        string title
+        text description
+        string difficulty
+        int xp_reward
+        int estimated_minutes
+        string recurrence_type
+        text weekdays
+        date start_date
+        date end_date
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+        int category_id FK
+    }
+
+    recurring_habit_instances {
+        int id PK
+        int recurring_habit_id FK
+        date scheduled_date
+        int quest_id FK
+        datetime created_at
+    }
+
     player_profiles {
         int id PK
         string character_name
@@ -203,6 +279,7 @@ Startup can:
 
 - create missing tables through SQLAlchemy metadata,
 - create `quest_checkins` for existing local databases if the table is missing,
+- create `recurring_habits` and `recurring_habit_instances` for existing local databases if the tables are missing,
 - add missing `estimated_minutes`, `planned_start_at`, and `planned_end_at` columns to `quests`,
 - add missing `avatar_path` to `player_profiles`.
 
@@ -210,7 +287,7 @@ These helpers do not drop existing data.
 
 ## Notes For Future Development
 
-- Recurring habits can build on `quest_checkins`, but recurrence generation is not implemented yet.
+- Recurring habit model tables exist, but recurrence services, month generation, and UI are not implemented yet.
 - Planned vs actual time analysis will require an actual-time field; `estimated_minutes` already stores planned workload.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - A production deployment with users should use a production database and a real migration strategy.

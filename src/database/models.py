@@ -30,6 +30,7 @@ class Category(Base):
     description = Column(Text, nullable=True)
 
     quests = relationship("Quest", back_populates="category")
+    recurring_habits = relationship("RecurringHabit", back_populates="category")
 
 
 class Quest(Base):
@@ -52,6 +53,50 @@ class Quest(Base):
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     category = relationship("Category", back_populates="quests")
     checkins = relationship("QuestCheckin", back_populates="quest")
+    recurring_habit_instance = relationship(
+        "RecurringHabitInstance",
+        back_populates="quest",
+        uselist=False,
+    )
+
+
+class RecurringHabit(Base):
+    __tablename__ = "recurring_habits"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    difficulty = Column(String(20), nullable=False)
+    xp_reward = Column(Integer, nullable=False)
+    estimated_minutes = Column(Integer, nullable=False)
+    recurrence_type = Column(String(50), nullable=False)
+    weekdays = Column(Text, nullable=True)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    category = relationship("Category", back_populates="recurring_habits")
+    instances = relationship("RecurringHabitInstance", back_populates="recurring_habit")
+
+
+class RecurringHabitInstance(Base):
+    __tablename__ = "recurring_habit_instances"
+    __table_args__ = (
+        UniqueConstraint("recurring_habit_id", "scheduled_date", name="uq_recurring_habit_date"),
+        UniqueConstraint("quest_id", name="uq_recurring_habit_instance_quest"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    recurring_habit_id = Column(Integer, ForeignKey("recurring_habits.id"), nullable=False)
+    scheduled_date = Column(Date, nullable=False)
+    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+
+    recurring_habit = relationship("RecurringHabit", back_populates="instances")
+    quest = relationship("Quest", back_populates="recurring_habit_instance")
 
 
 class QuestCheckin(Base):

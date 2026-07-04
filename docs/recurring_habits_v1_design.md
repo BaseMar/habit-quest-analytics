@@ -8,10 +8,11 @@ main source of truth for daily status, XP, and progression.
 
 ## Status
 
-Recurring Habits v1 is planned and not implemented yet.
+Recurring Habits v1 is planned. The model foundation is implemented; services, month
+generation, UI, and product behavior are not implemented yet.
 
-This document is a product and technical design only. It does not change models, services,
-dependencies, or app behavior.
+This document is a product and technical design. It should not be read as evidence that
+generation, services, dependencies, or app behavior are implemented.
 
 ## Product Rule
 
