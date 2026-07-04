@@ -1,8 +1,9 @@
 import json
+from calendar import monthrange
 from datetime import date
 
 from src.database.db import get_session
-from src.database.models import RecurringHabit, utc_now
+from src.database.models import Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance, utc_now
 from src.services.xp_service import calculate_xp
 
 
@@ -120,6 +121,133 @@ def set_recurring_habit_active(
             session.close()
 
 
+def build_recurring_habit_dates_for_month(
+    habit: RecurringHabit,
+    year: int,
+    month: int,
+) -> list[date]:
+    """Return eligible recurring habit dates in a selected month without writing data."""
+    days = _build_month_days(year, month)
+    if not habit.is_active:
+        return []
+
+    recurrence_type = _normalize_recurrence_type(habit.recurrence_type)
+    if recurrence_type != "selected_weekdays":
+        return []
+
+    weekdays = set(deserialize_weekdays(habit.weekdays))
+    return [
+        day
+        for day in days
+        if day.weekday() in weekdays
+        and day >= habit.start_date
+        and (habit.end_date is None or day <= habit.end_date)
+    ]
+
+
+def generate_recurring_habit_for_month(
+    habit_id: int,
+    year: int,
+    month: int,
+    session=None,
+) -> dict:
+    """Generate planned quest days and check-ins for one recurring habit in a month."""
+    _build_month_days(year, month)
+
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {habit_id} was not found.")
+
+        eligible_dates = build_recurring_habit_dates_for_month(habit, year, month)
+        generated_count = 0
+        skipped_existing_count = 0
+
+        for scheduled_date in eligible_dates:
+            existing_instance = _get_recurring_habit_instance(session, habit.id, scheduled_date)
+            if existing_instance is not None:
+                skipped_existing_count += 1
+                continue
+
+            quest = Quest(
+                title=habit.title,
+                description=habit.description,
+                category_id=habit.category_id,
+                difficulty=habit.difficulty,
+                status="Planned",
+                xp_reward=habit.xp_reward,
+                due_date=scheduled_date,
+                planned_start_at=None,
+                planned_end_at=None,
+                estimated_minutes=habit.estimated_minutes,
+            )
+            session.add(quest)
+            session.flush()
+
+            checkin = QuestCheckin(
+                quest_id=quest.id,
+                checkin_date=scheduled_date,
+                status="Planned",
+                xp_awarded=0,
+            )
+            instance = RecurringHabitInstance(
+                recurring_habit_id=habit.id,
+                scheduled_date=scheduled_date,
+                quest_id=quest.id,
+            )
+            session.add(checkin)
+            session.add(instance)
+            session.commit()
+            generated_count += 1
+
+        return {
+            "habit_id": habit.id,
+            "year": year,
+            "month": month,
+            "generated_count": generated_count,
+            "skipped_existing_count": skipped_existing_count,
+            "eligible_count": len(eligible_dates),
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
+def generate_all_recurring_habits_for_month(
+    year: int,
+    month: int,
+    active_only: bool = True,
+    session=None,
+) -> dict:
+    """Generate planned quest days and check-ins for recurring habits in a month."""
+    _build_month_days(year, month)
+
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habits = list_recurring_habits(active_only=active_only, session=session)
+        habit_summaries = [
+            generate_recurring_habit_for_month(habit.id, year, month, session=session)
+            for habit in habits
+        ]
+        return {
+            "year": year,
+            "month": month,
+            "habit_summaries": habit_summaries,
+            "total_generated": sum(summary["generated_count"] for summary in habit_summaries),
+            "total_skipped_existing": sum(summary["skipped_existing_count"] for summary in habit_summaries),
+            "total_eligible": sum(summary["eligible_count"] for summary in habit_summaries),
+        }
+    finally:
+        if owns_session:
+            session.close()
+
+
 def serialize_weekdays(weekdays: list[int]) -> str:
     """Return a stable JSON representation of a weekday list."""
     return json.dumps(validate_weekdays(weekdays))
@@ -191,3 +319,28 @@ def _validate_dates(start_date: date, end_date: date | None) -> None:
         raise ValueError("Start date is required.")
     if end_date is not None and end_date < start_date:
         raise ValueError("End date must be on or after start date.")
+
+
+def _build_month_days(year: int, month: int) -> list[date]:
+    if month < 1 or month > 12:
+        raise ValueError("month must be between 1 and 12.")
+    if year < 1:
+        raise ValueError("year must be 1 or greater.")
+
+    day_count = monthrange(year, month)[1]
+    return [date(year, month, day) for day in range(1, day_count + 1)]
+
+
+def _get_recurring_habit_instance(
+    session,
+    habit_id: int,
+    scheduled_date: date,
+) -> RecurringHabitInstance | None:
+    return (
+        session.query(RecurringHabitInstance)
+        .filter(
+            RecurringHabitInstance.recurring_habit_id == habit_id,
+            RecurringHabitInstance.scheduled_date == scheduled_date,
+        )
+        .one_or_none()
+    )
