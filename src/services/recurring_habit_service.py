@@ -1,6 +1,6 @@
 import json
 from calendar import monthrange
-from datetime import date
+from datetime import date, datetime, time
 
 from src.database.db import get_session
 from src.database.models import Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance, utc_now
@@ -21,6 +21,8 @@ def create_recurring_habit(
     end_date: date | None = None,
     description: str | None = None,
     is_active: bool = True,
+    planned_start_time: time | None = None,
+    planned_end_time: time | None = None,
     session=None,
 ) -> RecurringHabit:
     """Create and persist a recurring habit template."""
@@ -29,6 +31,7 @@ def create_recurring_habit(
     normalized_estimated_minutes = _normalize_estimated_minutes(estimated_minutes)
     normalized_recurrence_type = _normalize_recurrence_type(recurrence_type)
     _validate_dates(start_date, end_date)
+    _validate_planned_times(planned_start_time, planned_end_time)
     serialized_weekdays = (
         serialize_weekdays(weekdays)
         if normalized_recurrence_type == "selected_weekdays"
@@ -49,6 +52,8 @@ def create_recurring_habit(
             weekdays=serialized_weekdays,
             start_date=start_date,
             end_date=end_date,
+            planned_start_time=planned_start_time,
+            planned_end_time=planned_end_time,
             is_active=bool(is_active),
         )
         session.add(habit)
@@ -179,8 +184,8 @@ def generate_recurring_habit_for_month(
                 status="Planned",
                 xp_reward=habit.xp_reward,
                 due_date=scheduled_date,
-                planned_start_at=None,
-                planned_end_at=None,
+                planned_start_at=_combine_date_time(scheduled_date, habit.planned_start_time),
+                planned_end_at=_combine_date_time(scheduled_date, habit.planned_end_time),
                 estimated_minutes=habit.estimated_minutes,
             )
             session.add(quest)
@@ -319,6 +324,21 @@ def _validate_dates(start_date: date, end_date: date | None) -> None:
         raise ValueError("Start date is required.")
     if end_date is not None and end_date < start_date:
         raise ValueError("End date must be on or after start date.")
+
+
+def _validate_planned_times(planned_start_time: time | None, planned_end_time: time | None) -> None:
+    if planned_start_time is None and planned_end_time is None:
+        return
+    if planned_start_time is None or planned_end_time is None:
+        raise ValueError("Start time and end time must both be provided for timed recurring habits.")
+    if planned_end_time <= planned_start_time:
+        raise ValueError("End time must be after start time.")
+
+
+def _combine_date_time(scheduled_date: date, scheduled_time: time | None) -> datetime | None:
+    if scheduled_time is None:
+        return None
+    return datetime.combine(scheduled_date, scheduled_time)
 
 
 def _build_month_days(year: int, month: int) -> list[date]:

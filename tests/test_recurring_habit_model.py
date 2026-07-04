@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 
 import pytest
 from sqlalchemy import create_engine, inspect
@@ -29,6 +29,8 @@ def _create_recurring_habit(
     weekdays: str = "[0, 2, 4]",
     description: str | None = "Strength training",
     end_date: date | None = None,
+    planned_start_time: time | None = None,
+    planned_end_time: time | None = None,
 ) -> RecurringHabit:
     category = session.query(Category).one()
     habit = RecurringHabit(
@@ -42,6 +44,8 @@ def _create_recurring_habit(
         weekdays=weekdays,
         start_date=date(2026, 7, 1),
         end_date=end_date,
+        planned_start_time=planned_start_time,
+        planned_end_time=planned_end_time,
     )
     session.add(habit)
     session.commit()
@@ -119,6 +123,9 @@ def test_sqlite_schema_helper_adds_recurring_habit_tables_to_existing_database(t
 
     assert "recurring_habits" in table_names
     assert "recurring_habit_instances" in table_names
+    recurring_habit_columns = {column["name"] for column in inspector.get_columns("recurring_habits")}
+    assert "planned_start_time" in recurring_habit_columns
+    assert "planned_end_time" in recurring_habit_columns
 
 
 def test_recurring_habit_can_be_created_with_selected_weekdays(session):
@@ -230,3 +237,14 @@ def test_recurring_habit_nullable_description_works(session):
     habit = _create_recurring_habit(session, description=None)
 
     assert habit.description is None
+
+
+def test_recurring_habit_planned_times_can_be_stored(session):
+    habit = _create_recurring_habit(
+        session,
+        planned_start_time=time(9, 0),
+        planned_end_time=time(10, 30),
+    )
+
+    assert habit.planned_start_time == time(9, 0)
+    assert habit.planned_end_time == time(10, 30)

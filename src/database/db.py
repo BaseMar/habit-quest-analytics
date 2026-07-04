@@ -42,10 +42,14 @@ def _ensure_sqlite_schema() -> None:
 
     if "quest_checkins" not in table_names:
         QuestCheckin.__table__.create(bind=engine, checkfirst=True)
+    recurring_habits_created = False
     if "recurring_habits" not in table_names:
         RecurringHabit.__table__.create(bind=engine, checkfirst=True)
+        table_names.append("recurring_habits")
+        recurring_habits_created = True
     if "recurring_habit_instances" not in table_names:
         RecurringHabitInstance.__table__.create(bind=engine, checkfirst=True)
+        table_names.append("recurring_habit_instances")
 
     quest_columns = {column["name"] for column in inspector.get_columns("quests")}
     if "estimated_minutes" not in quest_columns:
@@ -57,6 +61,20 @@ def _ensure_sqlite_schema() -> None:
     if "planned_end_at" not in quest_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE quests ADD COLUMN planned_end_at DATETIME"))
+
+    recurring_habit_columns = (
+        set(RecurringHabit.__table__.columns.keys())
+        if recurring_habits_created
+        else {column["name"] for column in inspector.get_columns("recurring_habits")}
+        if "recurring_habits" in table_names
+        else set()
+    )
+    if "planned_start_time" not in recurring_habit_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE recurring_habits ADD COLUMN planned_start_time TIME"))
+    if "planned_end_time" not in recurring_habit_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE recurring_habits ADD COLUMN planned_end_time TIME"))
 
     if "player_profiles" not in inspector.get_table_names():
         return

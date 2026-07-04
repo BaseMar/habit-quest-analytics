@@ -5,7 +5,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
-from src.database.models import Quest, QuestCheckin, utc_now
+from src.database.models import RecurringHabit, RecurringHabitInstance, Quest, QuestCheckin, utc_now
 
 
 VALID_CHECKIN_STATUSES = ("Planned", "Completed", "Skipped", "Failed")
@@ -33,7 +33,12 @@ def get_month_checklist(year: int, month: int, session=None) -> dict:
     try:
         quests = (
             session.query(Quest)
-            .options(joinedload(Quest.category))
+            .options(
+                joinedload(Quest.category),
+                joinedload(Quest.recurring_habit_instance)
+                .joinedload(RecurringHabitInstance.recurring_habit)
+                .joinedload(RecurringHabit.category),
+            )
             .filter(
                 or_(
                     and_(Quest.due_date >= month_start, Quest.due_date <= month_end),
@@ -80,7 +85,9 @@ def get_month_checklist(year: int, month: int, session=None) -> dict:
             "rows": [
                 _build_month_row(quest, days, checkins_by_quest_and_date.get(quest.id, {}))
                 for quest in quests
-            ],
+                if quest.recurring_habit_instance is None
+            ]
+            + _build_recurring_month_rows(quests, days, checkins_by_quest_and_date, month_start, month_end),
         }
     finally:
         if owns_session:
@@ -252,7 +259,10 @@ def _build_month_row(
     checkins_by_date: dict[date, QuestCheckin],
 ) -> dict:
     return {
+        "row_id": f"quest:{quest.id}",
+        "row_type": "quest",
         "quest_id": quest.id,
+        "recurring_habit_id": None,
         "title": quest.title,
         "category": quest.category.name if quest.category else None,
         "difficulty": quest.difficulty,
@@ -270,6 +280,7 @@ def _build_month_cell(day: date, checkin: QuestCheckin | None) -> dict:
         return {
             "date": day,
             "checkin_date": day,
+            "quest_id": None,
             "checkin_id": None,
             "status": None,
             "xp_awarded": 0,
@@ -281,6 +292,7 @@ def _build_month_cell(day: date, checkin: QuestCheckin | None) -> dict:
     return {
         "date": day,
         "checkin_date": checkin.checkin_date,
+        "quest_id": checkin.quest_id,
         "checkin_id": checkin.id,
         "status": checkin.status,
         "xp_awarded": checkin.xp_awarded,
@@ -288,6 +300,74 @@ def _build_month_cell(day: date, checkin: QuestCheckin | None) -> dict:
         "skipped_at": checkin.skipped_at,
         "failed_at": checkin.failed_at,
     }
+
+
+def _build_recurring_month_rows(
+    quests: list[Quest],
+    days: list[date],
+    checkins_by_quest_and_date: dict[int, dict[date, QuestCheckin]],
+    month_start: date,
+    month_end: date,
+) -> list[dict]:
+    instances_by_habit_id: dict[int, list[RecurringHabitInstance]] = {}
+    for quest in quests:
+        instance = quest.recurring_habit_instance
+        if instance is None or instance.recurring_habit is None:
+            continue
+        if month_start <= instance.scheduled_date <= month_end:
+            instances_by_habit_id.setdefault(instance.recurring_habit_id, []).append(instance)
+
+    rows = []
+    for habit_id in sorted(
+        instances_by_habit_id,
+        key=lambda current_id: (
+            instances_by_habit_id[current_id][0].recurring_habit.title.lower(),
+            current_id,
+        ),
+    ):
+        instances = sorted(instances_by_habit_id[habit_id], key=lambda instance: instance.scheduled_date)
+        rows.append(_build_recurring_month_row(instances, days, checkins_by_quest_and_date))
+    return rows
+
+
+def _build_recurring_month_row(
+    instances: list[RecurringHabitInstance],
+    days: list[date],
+    checkins_by_quest_and_date: dict[int, dict[date, QuestCheckin]],
+) -> dict:
+    habit = instances[0].recurring_habit
+    instances_by_date = {instance.scheduled_date: instance for instance in instances}
+    return {
+        "row_id": f"recurring_habit:{habit.id}",
+        "row_type": "recurring_habit",
+        "quest_id": None,
+        "recurring_habit_id": habit.id,
+        "title": habit.title,
+        "category": habit.category.name if habit.category else None,
+        "difficulty": habit.difficulty,
+        "xp_reward": habit.xp_reward,
+        "estimated_minutes": habit.estimated_minutes,
+        "cells": {
+            day: _build_recurring_month_cell(
+                day,
+                instances_by_date.get(day),
+                checkins_by_quest_and_date,
+            )
+            for day in days
+        },
+    }
+
+
+def _build_recurring_month_cell(
+    day: date,
+    instance: RecurringHabitInstance | None,
+    checkins_by_quest_and_date: dict[int, dict[date, QuestCheckin]],
+) -> dict:
+    if instance is None:
+        return _build_month_cell(day, None)
+
+    checkin = checkins_by_quest_and_date.get(instance.quest_id, {}).get(day)
+    return _build_month_cell(day, checkin)
 
 
 def _get_scheduled_date_in_month(

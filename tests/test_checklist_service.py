@@ -17,6 +17,7 @@ from src.services.checklist_service import (
     update_checkin_status,
 )
 from src.services.quest_service import create_quest
+from src.services.recurring_habit_service import create_recurring_habit, generate_recurring_habit_for_month
 
 
 @pytest.fixture()
@@ -67,6 +68,20 @@ def _create_raw_quest(
     session.commit()
     session.refresh(quest)
     return quest
+
+
+def _create_recurring_habit(session, weekdays: list[int] | None = None):
+    category = session.query(Category).one()
+    return create_recurring_habit(
+        title="Gym Workout",
+        category_id=category.id,
+        difficulty="Hard",
+        estimated_minutes=60,
+        recurrence_type="selected_weekdays",
+        weekdays=weekdays or [0, 2, 4],
+        start_date=date(2026, 7, 1),
+        session=session,
+    )
 
 
 def test_ensure_checkin_creates_planned_checkin(session):
@@ -337,6 +352,60 @@ def test_get_month_checklist_does_not_overwrite_existing_checkins(session):
     assert checkin.status == "Completed"
     assert checkin.completed_at == original_completed_at
     assert checkin.xp_awarded == original_xp_awarded
+
+
+def test_get_month_checklist_groups_recurring_habit_instances_into_one_row(session):
+    habit = _create_recurring_habit(session, weekdays=[0, 2, 4])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+
+    checklist = get_month_checklist(2026, 7, session=session)
+
+    assert len(checklist["rows"]) == 1
+    row = checklist["rows"][0]
+    assert row["row_type"] == "recurring_habit"
+    assert row["recurring_habit_id"] == habit.id
+    assert row["quest_id"] is None
+    assert row["title"] == "Gym Workout"
+
+
+def test_get_month_checklist_recurring_habit_cells_appear_on_scheduled_dates(session):
+    habit = _create_recurring_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+
+    assert row["cells"][date(2026, 7, 1)]["status"] == "Planned"
+    assert row["cells"][date(2026, 7, 8)]["status"] == "Planned"
+    assert row["cells"][date(2026, 7, 1)]["quest_id"] is not None
+
+
+def test_get_month_checklist_recurring_habit_non_scheduled_dates_are_neutral(session):
+    habit = _create_recurring_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+    neutral_cell = row["cells"][date(2026, 7, 2)]
+
+    assert neutral_cell["status"] is None
+    assert neutral_cell["quest_id"] is None
+    assert neutral_cell["checkin_id"] is None
+    assert session.query(QuestCheckin).filter_by(checkin_date=date(2026, 7, 2)).count() == 0
+
+
+def test_completing_recurring_habit_checklist_cell_updates_generated_checkin(session):
+    habit = _create_recurring_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    checklist = get_month_checklist(2026, 7, session=session)
+    cell = checklist["rows"][0]["cells"][date(2026, 7, 1)]
+
+    completed = complete_checkin(cell["quest_id"], date(2026, 7, 1), session=session)
+    refreshed = get_month_checklist(2026, 7, session=session)
+
+    assert completed.status == "Completed"
+    assert refreshed["rows"][0]["cells"][date(2026, 7, 1)]["status"] == "Completed"
+    assert refreshed["rows"][0]["cells"][date(2026, 7, 1)]["xp_awarded"] == habit.xp_reward
 
 
 def test_get_month_checklist_rejects_invalid_month(session):

@@ -33,6 +33,13 @@ from src.services.quest_service import (
     get_quests_for_day,
     validate_schedule_times,
 )
+from src.services.recurring_habit_service import (
+    create_recurring_habit,
+    deserialize_weekdays,
+    generate_all_recurring_habits_for_month,
+    list_recurring_habits,
+    set_recurring_habit_active,
+)
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
 
 
@@ -49,6 +56,19 @@ CHECKLIST_STATUS_MARKERS = {
     "Completed": "C",
     "Skipped": "S",
     "Failed": "F",
+}
+WEEKDAY_OPTIONS = {
+    "Monday": 0,
+    "Tuesday": 1,
+    "Wednesday": 2,
+    "Thursday": 3,
+    "Friday": 4,
+    "Saturday": 5,
+    "Sunday": 6,
+}
+RECURRENCE_PRESETS = {
+    "Every day": [0, 1, 2, 3, 4, 5, 6],
+    "Weekdays": [0, 1, 2, 3, 4],
 }
 
 
@@ -266,14 +286,219 @@ def render_day_summary(quests: list) -> None:
     complete_col.metric("Completed", completed_count)
 
 
-def render_monthly_checklist() -> None:
-    today = date.today()
-    selected_date = st.session_state.get("selected_date", today)
-
+def _ensure_checklist_period_state() -> None:
+    selected_date = st.session_state.get("selected_date", date.today())
     if "checklist_month" not in st.session_state:
         st.session_state["checklist_month"] = selected_date.month
     if "checklist_year" not in st.session_state:
         st.session_state["checklist_year"] = selected_date.year
+
+    selected_month_name = st.session_state.get("checklist_month_name")
+    if selected_month_name in list(month_name)[1:]:
+        st.session_state["checklist_month"] = list(month_name).index(selected_month_name)
+
+    selected_year = st.session_state.get("checklist_year_input")
+    if selected_year is not None:
+        st.session_state["checklist_year"] = int(selected_year)
+
+
+def render_recurring_habits(category_options: dict[str, int]) -> None:
+    _ensure_checklist_period_state()
+    selected_month = int(st.session_state["checklist_month"])
+    selected_year = int(st.session_state["checklist_year"])
+    category_names_by_id = {category_id: name for name, category_id in category_options.items()}
+
+    status_message = st.session_state.pop("recurring_habit_status_message", None)
+    if status_message:
+        st.success(status_message)
+
+    form_col, list_col = st.columns([0.42, 0.58], gap="large")
+
+    with form_col:
+        st.write("**Create Recurring Habit**")
+        st.caption("Define a template, then generate planned days for the selected month.")
+        with st.container(border=True):
+            habit_title = st.text_input(
+                "Title",
+                placeholder="Reading",
+                key="recurring_habit_title",
+            )
+            category_col, difficulty_col = st.columns([1.15, 0.85])
+            with category_col:
+                habit_category_name = st.selectbox(
+                    "Category",
+                    list(category_options.keys()),
+                    key="recurring_habit_category",
+                )
+            with difficulty_col:
+                habit_difficulty = st.selectbox(
+                    "Difficulty",
+                    list(QUEST_DIFFICULTIES),
+                    key="recurring_habit_difficulty",
+                )
+
+            minutes_col, active_col = st.columns([0.58, 0.42])
+            with minutes_col:
+                estimated_minutes = st.number_input(
+                    "Estimated minutes",
+                    min_value=1,
+                    max_value=1440,
+                    value=30,
+                    step=5,
+                    key="recurring_habit_estimated_minutes",
+                )
+            with active_col:
+                is_active = st.checkbox("Active", value=True, key="recurring_habit_is_active")
+
+            recurrence_preset = st.radio(
+                "Recurrence",
+                ["Every day", "Weekdays", "Custom selected weekdays"],
+                horizontal=False,
+                key="recurring_habit_preset",
+            )
+            if recurrence_preset == "Custom selected weekdays":
+                selected_weekday_names = st.multiselect(
+                    "Weekdays",
+                    list(WEEKDAY_OPTIONS.keys()),
+                    default=["Monday", "Wednesday", "Friday"],
+                    key="recurring_habit_weekdays",
+                )
+                weekdays = [WEEKDAY_OPTIONS[name] for name in selected_weekday_names]
+            else:
+                weekdays = RECURRENCE_PRESETS[recurrence_preset]
+
+            date_col, end_col = st.columns(2)
+            with date_col:
+                start_date = st.date_input(
+                    "Start date",
+                    value=st.session_state.get("selected_date", date.today()),
+                    key="recurring_habit_start_date",
+                )
+            with end_col:
+                has_end_date = st.checkbox("End date", value=False, key="recurring_habit_has_end_date")
+                end_date = (
+                    st.date_input(
+                        "Final date",
+                        value=start_date,
+                        key="recurring_habit_end_date",
+                    )
+                    if has_end_date
+                    else None
+                )
+
+            has_time_window = st.checkbox("Time window", value=False, key="recurring_habit_has_time_window")
+            if has_time_window:
+                start_time_col, end_time_col = st.columns(2)
+                with start_time_col:
+                    planned_start_time = st.time_input(
+                        "Start Time",
+                        value=time(9, 0),
+                        step=300,
+                        key="recurring_habit_start_time",
+                    )
+                with end_time_col:
+                    planned_end_time = st.time_input(
+                        "End Time",
+                        value=time(10, 0),
+                        step=300,
+                        key="recurring_habit_end_time",
+                    )
+            else:
+                planned_start_time = None
+                planned_end_time = None
+
+            description = st.text_area(
+                "Notes",
+                height=64,
+                placeholder="Optional notes",
+                key="recurring_habit_description",
+            )
+
+            if st.button("Create Recurring Habit", type="primary", use_container_width=True):
+                try:
+                    create_recurring_habit(
+                        title=habit_title,
+                        category_id=category_options[habit_category_name],
+                        difficulty=habit_difficulty,
+                        estimated_minutes=int(estimated_minutes),
+                        recurrence_type="selected_weekdays",
+                        weekdays=weekdays,
+                        start_date=start_date,
+                        end_date=end_date,
+                        description=description,
+                        is_active=is_active,
+                        planned_start_time=planned_start_time,
+                        planned_end_time=planned_end_time,
+                    )
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.session_state["recurring_habit_status_message"] = "Recurring habit created."
+                    st.rerun()
+
+    with list_col:
+        st.write("**Recurring Habit Templates**")
+        st.caption(
+            f"Generate planned days for {month_name[selected_month]} {selected_year}. "
+            "Change the month in Monthly Checklist."
+        )
+        st.caption("Deactivate stops future generation. Existing generated days remain for history.")
+
+        habits = list_recurring_habits()
+        if not habits:
+            render_empty_state(
+                "No recurring habits yet.",
+                "Create one to generate planned quest days for the selected month.",
+            )
+        else:
+            st.dataframe(
+                _build_recurring_habits_dataframe(habits, category_names_by_id),
+                width="stretch",
+                hide_index=True,
+                height=min(360, 92 + (len(habits) * 35)),
+            )
+
+            st.divider()
+            selected_habit = st.selectbox(
+                "Manage active status",
+                habits,
+                format_func=lambda habit: f"{habit.title} | {_format_habit_pattern(habit)} | {_active_label(habit)}",
+                key="recurring_habit_manage",
+            )
+            toggle_cols = st.columns(2)
+            with toggle_cols[0]:
+                if st.button("Activate", use_container_width=True, key="recurring_habit_activate"):
+                    set_recurring_habit_active(selected_habit.id, True)
+                    st.session_state["recurring_habit_status_message"] = "Recurring habit activated."
+                    st.rerun()
+            with toggle_cols[1]:
+                if st.button("Deactivate", use_container_width=True, key="recurring_habit_deactivate"):
+                    set_recurring_habit_active(selected_habit.id, False)
+                    st.session_state["recurring_habit_status_message"] = "Recurring habit deactivated."
+                    st.rerun()
+
+        st.divider()
+        generation_summary = st.session_state.pop("recurring_generation_summary", None)
+        if generation_summary:
+            st.success(
+                "Generated "
+                f"{generation_summary['total_generated']} planned days. "
+                f"{generation_summary['total_skipped_existing']} already existed. "
+                f"{generation_summary['total_eligible']} eligible days checked."
+            )
+
+        if st.button("Generate Planned Days for Selected Month", use_container_width=True):
+            try:
+                summary = generate_all_recurring_habits_for_month(selected_year, selected_month)
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                st.session_state["recurring_generation_summary"] = summary
+                st.rerun()
+
+
+def render_monthly_checklist() -> None:
+    _ensure_checklist_period_state()
 
     control_col, year_col = st.columns([0.58, 0.42])
     with control_col:
@@ -322,24 +547,24 @@ def render_monthly_checklist() -> None:
     st.write("**Update Daily Status**")
     st.caption("Choose a quest and day, then apply a checklist status.")
 
-    row_lookup = {row["quest_id"]: row for row in checklist["rows"]}
+    row_lookup = {_checklist_row_id(row): row for row in checklist["rows"]}
     quest_labels = _build_checklist_quest_labels(checklist["rows"])
     editor_col, status_col = st.columns([0.68, 0.32], gap="large")
 
-    if st.session_state.get("checklist_selected_quest") not in row_lookup:
-        st.session_state["checklist_selected_quest"] = next(iter(row_lookup))
+    if st.session_state.get("checklist_selected_row") not in row_lookup:
+        st.session_state["checklist_selected_row"] = next(iter(row_lookup))
 
     with editor_col:
         quest_col, date_col = st.columns([0.62, 0.38])
         with quest_col:
-            selected_quest_id = st.selectbox(
+            selected_row_id = st.selectbox(
                 "Quest",
                 list(row_lookup.keys()),
-                format_func=lambda quest_id: quest_labels[quest_id],
-                key="checklist_selected_quest",
+                format_func=lambda row_id: quest_labels[row_id],
+                key="checklist_selected_row",
             )
 
-        selected_row = row_lookup[selected_quest_id]
+        selected_row = row_lookup[selected_row_id]
         _sync_checklist_selected_date(selected_row, checklist["days"])
 
         with date_col:
@@ -357,6 +582,8 @@ def render_monthly_checklist() -> None:
         marker = CHECKLIST_STATUS_MARKERS.get(selected_cell["status"], "")
         status_prefix = f"{marker} - " if marker else ""
         st.info(f"Current: {status_prefix}{current_status}")
+        if _is_unscheduled_recurring_cell(selected_row, selected_cell):
+            st.caption("This recurring habit is not scheduled for the selected date.")
 
     action_cols = st.columns(4)
     actions = (
@@ -368,7 +595,11 @@ def render_monthly_checklist() -> None:
     for column, (label, action, key) in zip(action_cols, actions):
         with column:
             if st.button(label, use_container_width=True, key=key):
-                action(selected_quest_id, selected_checklist_date)
+                action_quest_id = _checklist_action_quest_id(selected_row, selected_cell)
+                if action_quest_id is None:
+                    st.warning("This recurring habit is not scheduled for the selected date.")
+                    continue
+                action(action_quest_id, selected_checklist_date)
                 st.session_state["pending_selected_date"] = selected_checklist_date
                 st.session_state["checklist_status_message"] = (
                     f"{label} saved for {selected_checklist_date:%Y-%m-%d}."
@@ -403,9 +634,25 @@ def _build_checklist_dataframe(checklist: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _build_checklist_quest_labels(rows: list[dict]) -> dict[int, str]:
+def _checklist_row_id(row: dict) -> str:
+    return row.get("row_id") or f"quest:{row['quest_id']}"
+
+
+def _checklist_action_quest_id(row: dict, cell: dict) -> int | None:
+    if cell.get("quest_id") is not None:
+        return cell["quest_id"]
+    if row.get("row_type") == "recurring_habit":
+        return None
+    return row.get("quest_id")
+
+
+def _is_unscheduled_recurring_cell(row: dict, cell: dict) -> bool:
+    return row.get("row_type") == "recurring_habit" and cell.get("quest_id") is None
+
+
+def _build_checklist_quest_labels(rows: list[dict]) -> dict[str, str]:
     base_labels = {
-        row["quest_id"]: f"{row['title']} | {row['category'] or 'Uncategorized'} | {row['difficulty']}"
+        _checklist_row_id(row): f"{row['title']} | {row['category'] or 'Uncategorized'} | {row['difficulty']}"
         for row in rows
     }
     label_counts: dict[str, int] = {}
@@ -417,14 +664,14 @@ def _build_checklist_quest_labels(rows: list[dict]) -> dict[int, str]:
 
 
 def _sync_checklist_selected_date(row: dict, days: list[date]) -> None:
-    selected_quest_id = row["quest_id"]
-    previous_quest_id = st.session_state.get("checklist_last_quest_id")
+    selected_row_id = _checklist_row_id(row)
+    previous_row_id = st.session_state.get("checklist_last_row_id")
     current_date = st.session_state.get("checklist_selected_date")
 
-    if current_date not in days or previous_quest_id != selected_quest_id:
+    if current_date not in days or previous_row_id != selected_row_id:
         st.session_state["checklist_selected_date"] = _preferred_checklist_date(row, days)
 
-    st.session_state["checklist_last_quest_id"] = selected_quest_id
+    st.session_state["checklist_last_row_id"] = selected_row_id
 
 
 def _preferred_checklist_date(row: dict, days: list[date]) -> date:
@@ -437,6 +684,49 @@ def _preferred_checklist_date(row: dict, days: list[date]) -> date:
             return day
 
     return days[0]
+
+
+def _build_recurring_habits_dataframe(habits: list, category_names_by_id: dict[int, str]) -> pd.DataFrame:
+    rows = [
+        {
+            "Habit": habit.title,
+            "Category": category_names_by_id.get(habit.category_id, "Uncategorized"),
+            "Difficulty": habit.difficulty,
+            "Pattern": _format_habit_pattern(habit),
+            "Minutes": habit.estimated_minutes,
+            "Time": _format_habit_time_window(habit),
+            "Start": habit.start_date.isoformat(),
+            "End": habit.end_date.isoformat() if habit.end_date else "",
+            "Active": _active_label(habit),
+        }
+        for habit in habits
+    ]
+    return pd.DataFrame(rows)
+
+
+def _format_habit_pattern(habit) -> str:
+    try:
+        weekdays = deserialize_weekdays(habit.weekdays)
+    except ValueError:
+        return "Custom"
+
+    if weekdays == [0, 1, 2, 3, 4, 5, 6]:
+        return "Every day"
+    if weekdays == [0, 1, 2, 3, 4]:
+        return "Weekdays"
+
+    weekday_names = [name[:3] for name, value in WEEKDAY_OPTIONS.items() if value in weekdays]
+    return ", ".join(weekday_names) if weekday_names else "Custom"
+
+
+def _active_label(habit) -> str:
+    return "Active" if habit.is_active else "Inactive"
+
+
+def _format_habit_time_window(habit) -> str:
+    if habit.planned_start_time is not None and habit.planned_end_time is not None:
+        return f"{habit.planned_start_time:%H:%M} - {habit.planned_end_time:%H:%M}"
+    return "All day"
 
 
 def _calendar_events_signature(calendar_events: list[dict]) -> str:
@@ -629,6 +919,10 @@ with planner_col:
                 else:
                     st.success("Quest scheduled.")
                     st.rerun()
+
+render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
+with st.container(border=True):
+    render_recurring_habits(category_options)
 
 render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
 with st.container(border=True):

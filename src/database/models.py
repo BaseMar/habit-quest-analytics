@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base, relationship
@@ -73,6 +74,8 @@ class RecurringHabit(Base):
     weekdays = Column(Text, nullable=True)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
+    planned_start_time = Column(Time, nullable=True)
+    planned_end_time = Column(Time, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=utc_now)
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)

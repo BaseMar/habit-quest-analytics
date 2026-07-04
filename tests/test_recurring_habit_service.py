@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time
 
 import pytest
 from sqlalchemy import create_engine
@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Category, Quest, QuestCheckin, RecurringHabitInstance
 from src.services.checklist_service import complete_checkin, get_month_checklist
+from src.services.quest_service import get_quests_for_calendar, get_quests_for_day
 from src.services.recurring_habit_service import (
     build_recurring_habit_dates_for_month,
     create_recurring_habit,
@@ -47,6 +48,8 @@ def _create_habit(
     end_date: date | None = None,
     difficulty: str = "Hard",
     estimated_minutes: int = 60,
+    planned_start_time: time | None = None,
+    planned_end_time: time | None = None,
 ):
     return create_recurring_habit(
         title=title,
@@ -59,6 +62,8 @@ def _create_habit(
         end_date=end_date,
         description="Strength training",
         is_active=is_active,
+        planned_start_time=planned_start_time,
+        planned_end_time=planned_end_time,
         session=session,
     )
 
@@ -240,6 +245,31 @@ def test_create_recurring_habit_does_not_create_recurring_habit_instance_rows(se
     assert session.query(RecurringHabitInstance).count() == 0
 
 
+def test_create_recurring_habit_stores_planned_times(session):
+    habit = _create_habit(
+        session,
+        planned_start_time=time(9, 0),
+        planned_end_time=time(10, 30),
+    )
+
+    assert habit.planned_start_time == time(9, 0)
+    assert habit.planned_end_time == time(10, 30)
+
+
+def test_create_recurring_habit_rejects_partial_planned_time(session):
+    with pytest.raises(ValueError, match="both be provided"):
+        _create_habit(session, planned_start_time=time(9, 0), planned_end_time=None)
+
+
+def test_create_recurring_habit_rejects_end_time_before_start_time(session):
+    with pytest.raises(ValueError, match="End time must be after start time"):
+        _create_habit(
+            session,
+            planned_start_time=time(10, 30),
+            planned_end_time=time(9, 0),
+        )
+
+
 def test_build_recurring_habit_dates_for_month_generates_selected_weekdays(session):
     habit = _create_habit(session, weekdays=[0, 2, 4])
 
@@ -351,6 +381,31 @@ def test_generated_quest_has_expected_fields(session):
     assert quest.planned_end_at is None
 
 
+def test_generated_quest_uses_template_planned_times(session):
+    habit = _create_habit(
+        session,
+        weekdays=[2],
+        planned_start_time=time(9, 0),
+        planned_end_time=time(10, 30),
+    )
+
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    quest = session.query(Quest).order_by(Quest.due_date).first()
+
+    assert quest.planned_start_at == datetime(2026, 7, 1, 9, 0)
+    assert quest.planned_end_at == datetime(2026, 7, 1, 10, 30)
+
+
+def test_all_day_recurring_habit_generation_keeps_null_planned_datetimes(session):
+    habit = _create_habit(session, weekdays=[2])
+
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    quest = session.query(Quest).order_by(Quest.due_date).first()
+
+    assert quest.planned_start_at is None
+    assert quest.planned_end_at is None
+
+
 def test_generate_recurring_habit_for_month_creates_planned_checkins(session):
     habit = _create_habit(session, weekdays=[2])
 
@@ -451,15 +506,51 @@ def test_generate_all_recurring_habits_for_month_skips_inactive_by_default(sessi
     assert session.query(Quest).count() == 5
 
 
+def test_deactivated_recurring_habit_does_not_generate_new_instances(session):
+    habit = _create_habit(session, weekdays=[2], is_active=False)
+
+    summary = generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+
+    assert summary["eligible_count"] == 0
+    assert summary["generated_count"] == 0
+    assert session.query(Quest).count() == 0
+
+
 def test_generated_checkins_appear_in_month_checklist(session):
     habit = _create_habit(session, weekdays=[2])
 
     generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
     checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
 
-    assert len(checklist["rows"]) == 5
-    assert {row["title"] for row in checklist["rows"]} == {"Gym Workout"}
-    assert all(row["cells"][row_date]["status"] == "Planned" for row in checklist["rows"] for row_date in row["cells"] if row["cells"][row_date]["checkin_id"] is not None)
+    assert len(checklist["rows"]) == 1
+    assert row["row_type"] == "recurring_habit"
+    assert row["title"] == "Gym Workout"
+    assert row["cells"][date(2026, 7, 1)]["status"] == "Planned"
+    assert row["cells"][date(2026, 7, 1)]["quest_id"] is not None
+    assert row["cells"][date(2026, 7, 2)]["status"] is None
+    assert row["cells"][date(2026, 7, 2)]["quest_id"] is None
+    assert row["cells"][date(2026, 7, 2)]["checkin_id"] is None
+
+
+def test_calendar_and_day_schedule_display_generated_recurring_status(session):
+    habit = _create_habit(
+        session,
+        weekdays=[2],
+        planned_start_time=time(9, 0),
+        planned_end_time=time(10, 30),
+    )
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    instance = session.query(RecurringHabitInstance).order_by(RecurringHabitInstance.scheduled_date).first()
+    complete_checkin(instance.quest_id, instance.scheduled_date, session=session)
+
+    calendar_events = get_quests_for_calendar(session=session)
+    day_quests = get_quests_for_day(date(2026, 7, 1), session=session)
+
+    assert calendar_events[0]["status"] == "Completed"
+    assert calendar_events[0]["start"] == "2026-07-01T09:00:00"
+    assert calendar_events[0]["end"] == "2026-07-01T10:30:00"
+    assert day_quests[0].display_status == "Completed"
 
 
 def test_completing_generated_checkin_awards_xp_once(session):

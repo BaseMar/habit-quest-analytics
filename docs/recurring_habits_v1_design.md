@@ -1,6 +1,6 @@
 # Recurring Habits v1 Design
 
-This document defines the planned Recurring Habits v1 feature before implementation.
+This document defines the Recurring Habits v1 feature and its intended boundaries.
 
 The app has completed its migration to `QuestCheckin`-based daily tracking. Quest Planner,
 Command Center, Character Profile, and Habit Analytics now use `QuestCheckin` records as the
@@ -8,11 +8,15 @@ main source of truth for daily status, XP, and progression.
 
 ## Status
 
-Recurring Habits v1 is planned. The model foundation is implemented; services, month
-generation, UI, and product behavior are not implemented yet.
+Recurring Habits v1 is implemented for selected-weekday templates and explicit
+selected-month generation from Quest Planner.
 
-This document is a product and technical design. It should not be read as evidence that
-generation, services, dependencies, or app behavior are implemented.
+Still not implemented:
+
+- true `N times per week` auto-scheduling,
+- recurring habit editing beyond active/inactive status,
+- automatic background generation,
+- generation from analytics, profile, Command Center, or app startup.
 
 ## Product Rule
 
@@ -50,6 +54,7 @@ Planned template fields:
 - difficulty
 - XP reward derived from difficulty
 - estimated minutes
+- optional planned start/end time
 - optional notes/description
 - recurrence pattern
 - start date
@@ -59,9 +64,12 @@ Planned template fields:
 The user should manage templates separately from generated quest days. Generated quest days are
 normal planned quests with planned check-ins.
 
+Monthly Checklist groups generated recurring quest days into one logical row per recurring
+habit template. Dates where the habit was not generated remain neutral/empty, not skipped.
+
 ## Supported Recurrence Patterns
 
-Recurring Habits v1 should implement selected weekdays first.
+Recurring Habits v1 implements selected weekdays first.
 
 Supported v1 presets:
 
@@ -108,6 +116,8 @@ Planned fields:
 | `weekdays` | Serialized weekday list for SQLite v1, preferably a JSON string. |
 | `start_date` | First date the habit can generate. |
 | `end_date` | Optional final date the habit can generate. |
+| `planned_start_time` | Optional start time copied into generated quest datetime windows. |
+| `planned_end_time` | Optional end time copied into generated quest datetime windows. |
 | `is_active` | Whether the template should generate new quest days. |
 | `created_at` | Timestamp set when the template is created. |
 | `updated_at` | Timestamp updated when the template changes. |
@@ -146,7 +156,8 @@ For each eligible recurring habit date, generation should create:
 - one `RecurringHabitInstance` row linking the template/date to the generated quest.
 
 The generated `Quest` should copy the template's title, description, category, difficulty,
-XP reward, and estimated minutes. The generated quest should be scheduled for the generated date.
+XP reward, estimated minutes, and optional time window. The generated quest should be scheduled
+for the generated date.
 
 Generated `QuestCheckin` records should start with:
 
@@ -207,8 +218,8 @@ selection in v1.
 Monthly Checklist should not calculate recurrence itself.
 
 It should display persisted generated `QuestCheckin` records exactly like other planned quest
-days. Empty days should remain blank. Generated recurring habit days should use the same status
-actions:
+days, grouped into one logical row per recurring habit template. Empty days should remain blank.
+Generated recurring habit days should use the same status actions:
 
 - Complete
 - Skip
@@ -216,6 +227,8 @@ actions:
 - Reset
 
 Monthly Checklist should preserve existing completed, skipped, failed, and planned check-ins.
+It should not create a new check-in when the selected recurring habit is not scheduled for the
+selected date.
 
 ## Command Center Impact
 

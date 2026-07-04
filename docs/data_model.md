@@ -96,6 +96,8 @@ Stores recurring habit templates. These templates are not completed directly; fu
 | `weekdays` | Serialized JSON weekday list for SQLite v1. `0` is Monday and `6` is Sunday. |
 | `start_date` | First date the habit can generate. |
 | `end_date` | Optional final date the habit can generate. |
+| `planned_start_time` | Optional template start time for generated recurring quest days. |
+| `planned_end_time` | Optional template end time for generated recurring quest days. |
 | `is_active` | Whether the template should be eligible for future generation. |
 | `created_at` | Timestamp set when the template is created. |
 | `updated_at` | Timestamp updated when the template changes. |
@@ -233,6 +235,8 @@ erDiagram
         text weekdays
         date start_date
         date end_date
+        time planned_start_time
+        time planned_end_time
         boolean is_active
         datetime created_at
         datetime updated_at

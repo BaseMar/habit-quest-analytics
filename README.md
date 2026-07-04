@@ -79,6 +79,7 @@ Implemented:
 - Custom Streamlit navigation/sidebar with explicit page labels.
 - Calendar-based Quest Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
+- Recurring Habit templates with explicit selected-month planned-day generation.
 - `QuestCheckin` model for per-day completion status.
 - Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset
   behavior, XP idempotency, and a stale planned failure helper.
@@ -94,7 +95,7 @@ Implemented:
 
 Still evolving:
 
-- Recurring habits.
+- Recurring habit editing and true N-times-per-week scheduling.
 - Production persistence.
 - Authentication and user-specific data.
 - External calendar sync.
@@ -154,11 +155,16 @@ The app is designed to answer questions such as:
 - XP reward calculation from difficulty.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
+- Recurring Habit templates for Every day, Weekdays, and custom selected
+  weekdays.
+- Explicit selected-month generation for recurring planned quest days.
+- Recurring habits can be all-day or use a planned start/end time window.
 
 ### Monthly Checklist
 
 - Month and year selection.
 - Matrix preview with quests as rows and days as columns.
+- Recurring habits appear as one logical row with generated dates populated.
 - Status legend for empty, planned, completed, skipped, and failed days.
 - Compact status editor for selected quest/date actions.
 - Complete, Skip, Fail, and Reset actions.
@@ -212,8 +218,8 @@ The app is designed to answer questions such as:
   local-first MVP note.
 - `Command Center` - read-only operational overview powered by daily quest
   check-ins.
-- `Quest Planner` - calendar planner, selected day schedule, new quest form, and
-  Monthly Checklist.
+- `Quest Planner` - calendar planner, selected day schedule, new quest form,
+  Recurring Habits, and Monthly Checklist.
 - `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
   charts, planned minutes, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
@@ -426,8 +432,8 @@ python -m compileall -q app src tests
 
 Current limitations:
 
-- Recurring habits are not implemented yet. The planned v1 design is documented
-  in [docs/recurring_habits_v1_design.md](docs/recurring_habits_v1_design.md).
+- Recurring Habits v1 supports selected weekdays and explicit month generation;
+  true N-times-per-week auto-scheduling is not implemented yet.
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
@@ -439,7 +445,7 @@ Current limitations:
 
 Suggested future order:
 
-1. Recurring habits
+1. Recurring habit editing and N-times-per-week scheduling
 2. PostgreSQL / production persistence
 3. Authentication
 4. Google Calendar sync
