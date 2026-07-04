@@ -426,7 +426,8 @@ python -m compileall -q app src tests
 
 Current limitations:
 
-- Recurring habits are not implemented yet.
+- Recurring habits are not implemented yet. The planned v1 design is documented
+  in [docs/recurring_habits_v1_design.md](docs/recurring_habits_v1_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
