@@ -152,7 +152,7 @@ The app is designed to answer questions such as:
 
 - Calendar-based scheduled quest creation.
 - Title, category, difficulty, start time, end time, and notes.
-- XP reward calculation from difficulty.
+- XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
 - Recurring Habit templates for Every day, Weekdays, and custom selected
@@ -394,6 +394,9 @@ pip install -r requirements.txt
 streamlit run app/main.py
 ```
 
+In VS Code, you can also open `run_streamlit.py` and click **Run Python File**.
+That launcher runs the same Streamlit command from the project root.
+
 The app initializes SQLite tables and default categories on startup. Default
 categories can also be seeded manually:
 
@@ -434,8 +437,9 @@ Current limitations:
 
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   true N-times-per-week auto-scheduling is not implemented yet.
-- XP System v2 is planned to move future XP calculation toward planned time
-  instead of difficulty. See [docs/xp_system_v2_design.md](docs/xp_system_v2_design.md).
+- XP System v2 phase 1 uses planned time for new scheduled quest and recurring
+  habit XP. Nonlinear leveling and stat-level UI are still planned. See
+  [docs/xp_system_v2_design.md](docs/xp_system_v2_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.

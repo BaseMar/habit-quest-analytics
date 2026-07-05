@@ -7,7 +7,7 @@ from src.database.db import get_session
 from src.database.models import Category, Quest, QuestCheckin, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.checklist_service import ensure_checkin
-from src.services.xp_service import calculate_xp
+from src.services.xp_service import calculate_time_based_xp, calculate_xp
 
 
 VALID_QUEST_STATUSES = QUEST_STATUSES
@@ -34,8 +34,12 @@ def create_quest(
     session=None,
 ) -> Quest:
     """Create and persist a quest."""
-    xp_reward = calculate_xp(difficulty)
     estimated_minutes = _normalize_estimated_minutes(estimated_minutes)
+    xp_reward = (
+        calculate_time_based_xp(estimated_minutes)
+        if estimated_minutes is not None
+        else calculate_xp(difficulty)
+    )
 
     owns_session = session is None
     session = session or get_session()
@@ -93,7 +97,7 @@ def create_scheduled_quest(
             category_id=category_id,
             difficulty=difficulty.strip().title(),
             status="Planned",
-            xp_reward=calculate_xp(difficulty),
+            xp_reward=calculate_time_based_xp(estimated_minutes),
             due_date=planned_date,
             planned_start_at=planned_start_at,
             planned_end_at=planned_end_at,

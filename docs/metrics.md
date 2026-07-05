@@ -4,16 +4,31 @@ This document defines the current core metrics for Habit Quest Analytics. After 
 
 ## XP Rewards
 
-Quest XP is based on difficulty.
+New scheduled quest and recurring habit XP is based on planned time.
 
-| Difficulty | XP |
-| --- | ---: |
-| Easy | 10 |
-| Medium | 30 |
-| Hard | 75 |
-| Boss | 150 |
+```text
+xp = max(5, round(planned_minutes / 60 * 20))
+```
+
+Examples:
+
+| Planned minutes | XP |
+| ---: | ---: |
+| 15 | 5 |
+| 30 | 10 |
+| 60 | 20 |
+| 90 | 30 |
+| 120 | 40 |
+| 180 | 60 |
 
 Status: implemented in `src/services/xp_service.py`.
+
+Notes:
+
+- Scheduled quests use planned duration.
+- Recurring habit templates use `estimated_minutes`.
+- Difficulty remains descriptive metadata and is not the primary XP driver for new scheduled quests or recurring templates.
+- Existing stored quest/check-in XP is not retroactively recalculated.
 
 ## Total XP
 

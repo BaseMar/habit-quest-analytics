@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 from src.database.db import get_session
 from src.database.models import Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance, utc_now
-from src.services.xp_service import calculate_xp
+from src.services.xp_service import calculate_time_based_xp, calculate_xp
 
 
 SUPPORTED_RECURRENCE_TYPES = ("selected_weekdays",)
@@ -46,7 +46,7 @@ def create_recurring_habit(
             description=(description or "").strip() or None,
             category_id=category_id,
             difficulty=normalized_difficulty,
-            xp_reward=calculate_xp(normalized_difficulty),
+            xp_reward=calculate_time_based_xp(normalized_estimated_minutes),
             estimated_minutes=normalized_estimated_minutes,
             recurrence_type=normalized_recurrence_type,
             weekdays=serialized_weekdays,

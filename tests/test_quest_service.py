@@ -55,7 +55,7 @@ def test_create_quest_persists_xp_reward_and_details(session):
     assert quest.id is not None
     assert quest.title == "Morning workout"
     assert quest.status == "Planned"
-    assert quest.xp_reward == 75
+    assert quest.xp_reward == 15
     assert quest.due_date == date(2026, 6, 26)
     assert quest.estimated_minutes == 45
 
@@ -75,11 +75,53 @@ def test_create_scheduled_quest_sets_planned_datetimes_and_duration(session):
     )
 
     assert quest.status == "Planned"
-    assert quest.xp_reward == 30
+    assert quest.xp_reward == 40
     assert quest.due_date == date(2026, 6, 26)
     assert quest.planned_start_at == datetime(2026, 6, 26, 9, 0)
     assert quest.planned_end_at == datetime(2026, 6, 26, 11, 0)
     assert quest.estimated_minutes == 120
+
+
+def test_create_scheduled_quest_uses_time_based_xp_for_short_duration(session):
+    category = session.query(Category).one()
+
+    quest = create_scheduled_quest(
+        title="Short workout",
+        category_id=category.id,
+        difficulty="Boss",
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(9, 30),
+        session=session,
+    )
+
+    assert quest.xp_reward == 10
+
+
+def test_create_scheduled_quest_difficulty_does_not_change_xp_for_same_duration(session):
+    category = session.query(Category).one()
+
+    easy = create_scheduled_quest(
+        title="Easy block",
+        category_id=category.id,
+        difficulty="Easy",
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    boss = create_scheduled_quest(
+        title="Boss block",
+        category_id=category.id,
+        difficulty="Boss",
+        planned_date=date(2026, 6, 27),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    assert easy.xp_reward == 20
+    assert boss.xp_reward == 20
 
 
 def test_create_scheduled_quest_creates_planned_checkin(session):
@@ -282,7 +324,7 @@ def test_get_quests_for_calendar_returns_event_dicts(session):
             "status": "Planned",
             "category": "Health",
             "difficulty": "Hard",
-            "xp_reward": 75,
+            "xp_reward": 30,
             "color": "#38bdf8",
             "backgroundColor": "#38bdf8",
             "borderColor": "#38bdf8",
@@ -290,7 +332,7 @@ def test_get_quests_for_calendar_returns_event_dicts(session):
                 "status": "Planned",
                 "category": "Health",
                 "difficulty": "Hard",
-                "xp_reward": 75,
+                "xp_reward": 30,
             },
         }
     ]

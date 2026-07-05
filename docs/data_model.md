@@ -37,7 +37,7 @@ Stores scheduled task or habit plans represented as RPG quests.
 | `id` | Primary key. |
 | `title` | Quest name shown to the user. |
 | `description` | Optional quest notes. |
-| `difficulty` | Difficulty label used for XP reward calculation. |
+| `difficulty` | Descriptive difficulty label retained for quest metadata. New scheduled quest XP is primarily time-based. |
 | `status` | Legacy quest-level status. Retained for compatibility/fallback, not the primary daily status source when check-ins exist. |
 | `is_habit` | Reserved habit flag. Recurring habit templates use `recurring_habits`; generated habit days can still be represented as normal quests. |
 | `xp_reward` | XP value assigned to this quest plan. |
@@ -89,8 +89,8 @@ Stores recurring habit templates. These templates are not completed directly; fu
 | `title` | Habit name shown to the user. |
 | `description` | Optional notes. |
 | `category_id` | Optional foreign key to `categories.id`, matching current quest category behavior. |
-| `difficulty` | Difficulty label copied to generated quests. |
-| `xp_reward` | XP value copied to generated quests. |
+| `difficulty` | Descriptive difficulty label copied to generated quests. |
+| `xp_reward` | Time-based XP value copied to generated quests. |
 | `estimated_minutes` | Planned duration copied to generated quests. |
 | `recurrence_type` | Recurrence type. v1 is designed around `selected_weekdays`. |
 | `weekdays` | Serialized JSON weekday list for SQLite v1. `0` is Monday and `6` is Sunday. |

@@ -19,6 +19,19 @@ def calculate_xp(difficulty: str) -> int:
     return DIFFICULTY_XP[key]
 
 
+def calculate_time_based_xp(planned_minutes: int) -> int:
+    """Return XP from planned work duration."""
+    try:
+        minutes = int(planned_minutes)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Planned minutes must be a positive integer.") from error
+
+    if minutes <= 0:
+        raise ValueError("Planned minutes must be greater than 0.")
+
+    return max(5, round(minutes / 60 * 20))
+
+
 def calculate_level(total_xp: int) -> int:
     """Calculate player level from total XP."""
     if total_xp < 0:

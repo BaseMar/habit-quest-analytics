@@ -52,7 +52,7 @@ Planned template fields:
 - habit title
 - category
 - difficulty
-- XP reward derived from difficulty
+- XP reward derived from estimated/planned minutes
 - estimated minutes
 - optional planned start/end time
 - optional notes/description
@@ -109,8 +109,8 @@ Planned fields:
 | `title` | Habit name shown to the user. |
 | `description` | Optional notes. |
 | `category_id` | Optional foreign key to `categories.id`. |
-| `difficulty` | Difficulty label used for XP reward calculation. |
-| `xp_reward` | XP value copied to generated quests. |
+| `difficulty` | Descriptive difficulty label. |
+| `xp_reward` | Time-based XP value copied to generated quests. |
 | `estimated_minutes` | Planned minutes copied to generated quests. |
 | `recurrence_type` | Recurrence type, initially `selected_weekdays`. |
 | `weekdays` | Serialized weekday list for SQLite v1, preferably a JSON string. |

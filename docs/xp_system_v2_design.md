@@ -1,7 +1,6 @@
 # XP System v2 Design
 
-This document defines the planned XP System v2 for Habit Quest Analytics before
-implementation.
+This document defines XP System v2 for Habit Quest Analytics.
 
 Current app context:
 
@@ -18,17 +17,29 @@ how future quest XP is calculated and displayed.
 
 ## Status
 
-XP System v2 is planned and not implemented yet.
+XP System v2 phase 1 is implemented.
 
-This is a design document only. It does not change code, models, services,
-dependencies, or app behavior.
+Implemented:
+
+- New scheduled quests calculate XP from planned duration.
+- New recurring habit templates calculate XP from estimated minutes.
+- Generated recurring quests inherit template XP.
+- Historical `Quest.xp_reward` and `QuestCheckin.xp_awarded` values are not
+  retroactively recalculated.
+
+Still planned:
+
+- Nonlinear character leveling.
+- Stat leveling.
+- Character Profile stat panel updates.
+- Radar chart level display.
 
 ## Product Goal
 
 XP should primarily reward planned effort, not subjective difficulty.
 
-The current difficulty-based model is simple, but it makes short "Hard" tasks
-worth more than long focused work. XP System v2 should make planned time the
+The previous difficulty-based model was simple, but it made short "Hard" tasks
+worth more than long focused work. XP System v2 makes planned time the
 main XP driver so the RPG progression better reflects invested effort.
 
 Difficulty may remain as a descriptive field for now. It should not be the main
@@ -188,14 +199,14 @@ Radar chart direction:
 
 ### Quest Planner
 
-- One-time quests should receive XP based on planned duration.
+- One-time scheduled quests receive XP based on planned duration.
 - XP reward should not be manually editable.
 - Duration/time planning becomes the main XP driver.
 - Difficulty can remain visible as descriptive metadata.
 
 ### Recurring Habits
 
-- Recurring habit templates should calculate XP from estimated minutes or
+- Recurring habit templates calculate XP from estimated minutes or
   planned duration.
 - Generated quests inherit `xp_reward` from the recurring habit template.
 - Completed generated check-ins award that stored XP once.
@@ -245,13 +256,13 @@ This is not part of XP System v2. Keep it as future work.
 
 ## Implementation Phases
 
-Recommended small commits:
+Phase status:
 
-1. `docs: add xp system v2 design`
-2. `feat: calculate quest xp from planned time`
-3. `feat: add nonlinear character leveling`
-4. `feat: add stat leveling to character profile`
-5. `docs: update xp documentation`
+1. `docs: add xp system v2 design` - implemented.
+2. `feat: calculate quest xp from planned time` - implemented.
+3. `feat: add nonlinear character leveling` - planned.
+4. `feat: add stat leveling to character profile` - planned.
+5. `docs: update xp documentation` - ongoing as phases land.
 
 ## Test Plan
 
