@@ -26,11 +26,12 @@ def test_calculate_consistency_score_without_tracked_days():
 @pytest.mark.parametrize(
     ("total_xp", "expected"),
     [
-        (0, 500),
-        (1, 499),
-        (499, 1),
-        (500, 500),
-        (875, 125),
+        (0, 100),
+        (1, 99),
+        (99, 1),
+        (100, 164),
+        (182, 82),
+        (264, 202),
     ],
 )
 def test_calculate_xp_to_next_level(total_xp, expected):

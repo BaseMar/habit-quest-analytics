@@ -17,7 +17,7 @@ how future quest XP is calculated and displayed.
 
 ## Status
 
-XP System v2 phase 1 is implemented.
+XP System v2 phases 1 and 2 are implemented.
 
 Implemented:
 
@@ -26,10 +26,10 @@ Implemented:
 - Generated recurring quests inherit template XP.
 - Historical `Quest.xp_reward` and `QuestCheckin.xp_awarded` values are not
   retroactively recalculated.
+- Character level and progress use nonlinear thresholds.
 
 Still planned:
 
-- Nonlinear character leveling.
 - Stat leveling.
 - Character Profile stat panel updates.
 - Radar chart level display.
@@ -83,15 +83,15 @@ Historical rule:
 
 ## Character Level Progression
 
-Character level should use nonlinear thresholds.
+Character level uses nonlinear thresholds.
 
-Recommended formula:
+Formula:
 
 ```text
 TotalXPForLevel(L) = baseXP * (L - 1)^exponent
 ```
 
-Recommended constants:
+Constants:
 
 ```text
 baseXP = 100
@@ -260,7 +260,7 @@ Phase status:
 
 1. `docs: add xp system v2 design` - implemented.
 2. `feat: calculate quest xp from planned time` - implemented.
-3. `feat: add nonlinear character leveling` - planned.
+3. `feat: add nonlinear character leveling` - implemented.
 4. `feat: add stat leveling to character profile` - planned.
 5. `docs: update xp documentation` - ongoing as phases land.
 

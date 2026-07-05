@@ -9,7 +9,7 @@ from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
 from src.database.models import PlayerProfile, Quest, QuestCheckin
 from src.services.checklist_service import ensure_checkin
-from src.services.xp_service import calculate_level
+from src.services.xp_service import calculate_level, get_character_level_progress
 
 STATUS_ORDER = QUEST_STATUSES
 
@@ -251,8 +251,9 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
                 checkin for checkin in checkins if _normalize_status(checkin.status) == "Completed"
             ]
             total_xp = sum(checkin.xp_awarded or 0 for checkin in checkins)
-            current_level = calculate_level(total_xp)
-            xp_to_next_level = calculate_xp_to_next_level(total_xp)
+            level_progress = get_character_level_progress(total_xp)
+            current_level = level_progress["level"]
+            xp_to_next_level = level_progress["xp_remaining_to_next_level"]
             completion_rate = calculate_completion_rate(len(completed_checkins), len(checkins))
             weekly_xp = calculate_weekly_checkin_xp(completed_checkins, today)
             rpg_stats = build_xp_by_rpg_stat_from_checkins(completed_checkins)
@@ -271,7 +272,7 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
                 "current_level": current_level,
                 "total_xp": total_xp,
                 "xp_to_next_level": xp_to_next_level,
-                "level_progress": calculate_level_progress(total_xp),
+                "level_progress": level_progress["progress_percent"] / 100,
                 "has_completed_quests": bool(completed_checkins),
                 "completed_quests": len(completed_checkins),
                 "completed_quest_days": len(completed_checkins),
@@ -283,8 +284,9 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
 
         completed_quests = [quest for quest in quests if _is_completed(quest)]
         total_xp = sum(quest.xp_reward or 0 for quest in completed_quests)
-        current_level = calculate_level(total_xp)
-        xp_to_next_level = calculate_xp_to_next_level(total_xp)
+        level_progress = get_character_level_progress(total_xp)
+        current_level = level_progress["level"]
+        xp_to_next_level = level_progress["xp_remaining_to_next_level"]
         completion_rate = calculate_completion_rate(len(completed_quests), len(quests))
         weekly_xp = calculate_weekly_xp(completed_quests, today)
         rpg_stats = build_xp_by_rpg_stat(completed_quests)
@@ -296,7 +298,7 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
             "current_level": current_level,
             "total_xp": total_xp,
             "xp_to_next_level": xp_to_next_level,
-            "level_progress": calculate_level_progress(total_xp),
+            "level_progress": level_progress["progress_percent"] / 100,
             "has_completed_quests": bool(completed_quests),
             "completed_quests": len(completed_quests),
             "completed_quest_days": len(completed_quests),
@@ -329,11 +331,8 @@ def calculate_character_title(level: int) -> str:
 
 
 def calculate_level_progress(total_xp: int) -> float:
-    """Return progress toward the next level as a 0.0 to 1.0 value."""
-    if total_xp < 0:
-        raise ValueError("Total XP cannot be negative.")
-
-    return (total_xp % 500) / 500
+    """Return nonlinear progress toward the next level as a 0.0 to 1.0 value."""
+    return get_character_level_progress(total_xp)["progress_percent"] / 100
 
 
 def build_xp_by_rpg_stat(quests: list[Quest]) -> pd.DataFrame:

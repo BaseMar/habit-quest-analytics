@@ -437,8 +437,8 @@ Current limitations:
 
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   true N-times-per-week auto-scheduling is not implemented yet.
-- XP System v2 phase 1 uses planned time for new scheduled quest and recurring
-  habit XP. Nonlinear leveling and stat-level UI are still planned. See
+- XP System v2 uses planned time for new scheduled quest and recurring habit XP,
+  plus nonlinear character leveling. Stat-level UI is still planned. See
   [docs/xp_system_v2_design.md](docs/xp_system_v2_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.

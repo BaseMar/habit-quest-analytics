@@ -45,18 +45,33 @@ Fallback:
 ## Level
 
 ```text
-level = total_xp // 500 + 1
+TotalXPForLevel(L) = round(100 * (L - 1)^1.4)
 ```
 
-Status: implemented.
+Level 1 starts at 0 XP. Character level is the highest level where
+`total_xp >= TotalXPForLevel(level)`.
+
+Examples:
+
+| Level | Total XP required |
+| ---: | ---: |
+| 1 | 0 |
+| 2 | 100 |
+| 3 | 264 |
+| 4 | 466 |
+| 5 | 696 |
+| 10 | 2167 |
+
+Status: implemented in `src/services/xp_service.py`.
 
 ## XP To Next Level
 
 ```text
-xp_to_next_level = 500 - (total_xp % 500)
+xp_to_next_level = TotalXPForLevel(current_level + 1) - total_xp
 ```
 
-If `total_xp` is exactly on a level boundary, the next level requires another `500` XP.
+At exactly a level threshold, the character reaches that level and progress
+toward the next threshold starts at 0%.
 
 Status: implemented.
 

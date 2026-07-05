@@ -113,8 +113,8 @@ def test_get_dashboard_kpis_counts_completed_quests_and_xp(session):
         "completion_rate": 66.67,
         "total_xp": 105,
         "weekly_xp": 75,
-        "current_level": 1,
-        "xp_to_next_level": 395,
+        "current_level": 2,
+        "xp_to_next_level": 159,
     }
 
 
@@ -128,7 +128,7 @@ def test_get_dashboard_kpis_handles_empty_database(session):
         "total_xp": 0,
         "weekly_xp": 0,
         "current_level": 1,
-        "xp_to_next_level": 500,
+        "xp_to_next_level": 100,
     }
 
 
@@ -684,11 +684,11 @@ def test_get_character_profile_data_summarizes_completed_quest_progress(session)
 
     assert profile["character_name"] == "Adventurer"
     assert profile["avatar_path"] is None
-    assert profile["current_level"] == 2
-    assert profile["character_title"] == "Novice Adventurer"
+    assert profile["current_level"] == 4
+    assert profile["character_title"] == "Disciplined Apprentice"
     assert profile["total_xp"] == 550
-    assert profile["xp_to_next_level"] == 450
-    assert profile["level_progress"] == 0.1
+    assert profile["xp_to_next_level"] == 146
+    assert profile["level_progress"] == pytest.approx(0.3652)
     assert profile["has_completed_quests"] is True
     assert profile["completed_quests"] == 2
     assert profile["completion_rate"] == 66.67
@@ -708,9 +708,9 @@ def test_get_character_profile_data_sums_checkin_xp_and_level_progress(session):
     profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
 
     assert profile["total_xp"] == 550
-    assert profile["current_level"] == 2
-    assert profile["xp_to_next_level"] == 450
-    assert profile["level_progress"] == 0.1
+    assert profile["current_level"] == 4
+    assert profile["xp_to_next_level"] == 146
+    assert profile["level_progress"] == pytest.approx(0.3652)
     assert profile["completed_quests"] == 1
     assert profile["completed_quest_days"] == 1
     assert profile["activity_stats"][0] == {"label": "Completed Quest Days", "value": 1}

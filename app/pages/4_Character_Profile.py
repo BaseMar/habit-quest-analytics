@@ -400,10 +400,9 @@ with st.expander("How Stats Are Calculated"):
     st.markdown(
         """
         <div class="hq-explainer">
-            Completed quest days grant XP based on difficulty. That XP contributes to one RPG stat through the quest category
+            Completed quest days grant stored check-in XP. That XP contributes to one RPG stat through the quest category
             mapping: Learning to Knowledge, Health to Strength, Work to Discipline, Social to Creativity, and Home to
-            Recovery. Your level is based on total completed quest-day XP, with each 500 XP moving the character into the next
-            level.
+            Recovery. Your level is based on total completed quest-day XP and uses nonlinear XP thresholds.
         </div>
         """,
         unsafe_allow_html=True,
