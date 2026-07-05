@@ -434,6 +434,8 @@ Current limitations:
 
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   true N-times-per-week auto-scheduling is not implemented yet.
+- XP System v2 is planned to move future XP calculation toward planned time
+  instead of difficulty. See [docs/xp_system_v2_design.md](docs/xp_system_v2_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
@@ -445,11 +447,12 @@ Current limitations:
 
 Suggested future order:
 
-1. Recurring habit editing and N-times-per-week scheduling
-2. PostgreSQL / production persistence
-3. Authentication
-4. Google Calendar sync
-5. AI planning assistant
-6. Voice quest capture / microphone input
-7. Optional auto-fail activation workflow
-8. Legacy `Quest.status` cleanup
+1. XP System v2
+2. Recurring habit editing and N-times-per-week scheduling
+3. PostgreSQL / production persistence
+4. Authentication
+5. Google Calendar sync
+6. AI planning assistant
+7. Voice quest capture / microphone input
+8. Optional auto-fail activation workflow
+9. Legacy `Quest.status` cleanup
