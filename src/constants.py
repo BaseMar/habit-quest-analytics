@@ -9,7 +9,7 @@ DEFAULT_CATEGORIES = (
     ("Social", "Relationships, family, and community quests."),
 )
 
-RPG_STATS = ("Knowledge", "Strength", "Discipline", "Creativity", "Recovery")
+RPG_STATS = ("Strength", "Discipline", "Knowledge", "Recovery", "Creativity")
 CATEGORY_TO_RPG_STAT = {
     "learning": "Knowledge",
     "health": "Strength",

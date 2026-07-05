@@ -21,7 +21,7 @@ def apply_character_profile_styles() -> None:
         """
         <style>
         .hq-character-identity {
-            padding: 0.15rem 0 0.45rem;
+            padding: 0 0 0.25rem;
         }
 
         .hq-character-name {
@@ -29,14 +29,14 @@ def apply_character_profile_styles() -> None:
             font-size: 1.55rem;
             font-weight: 850;
             line-height: 1.15;
-            margin: 0.3rem 0 0.12rem;
+            margin: 0.1rem 0 0.12rem;
         }
 
         .hq-character-title {
             color: #c4b5fd;
             font-size: 0.94rem;
             font-weight: 700;
-            margin-bottom: 0.55rem;
+            margin-bottom: 0.42rem;
         }
 
         .hq-level-badge {
@@ -50,8 +50,8 @@ def apply_character_profile_styles() -> None:
             font-size: 0.82rem;
             font-weight: 850;
             letter-spacing: 0.04em;
-            margin: 0.1rem 0 0.45rem;
-            padding: 0.42rem 0.7rem;
+            margin: 0.05rem 0 0.35rem;
+            padding: 0.38rem 0.66rem;
             text-transform: uppercase;
         }
 
@@ -81,7 +81,7 @@ def apply_character_profile_styles() -> None:
             font-size: 0.9rem;
             justify-content: center;
             line-height: 1.35;
-            min-height: 132px;
+            min-height: 118px;
             padding: 0.75rem;
             text-align: center;
         }
@@ -109,7 +109,7 @@ def apply_character_profile_styles() -> None:
         }
 
         div[data-testid="stFileUploader"] section {
-            min-height: 86px;
+            min-height: 74px;
             padding: 0.55rem;
         }
 
@@ -129,6 +129,7 @@ def apply_character_profile_styles() -> None:
             margin-top: -0.35rem;
             text-align: center;
         }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -173,10 +174,10 @@ def render_identity(profile: dict) -> None:
 
 
 def render_radar_chart(profile: dict) -> None:
-    rpg_stats = profile["rpg_stats"]
-    stats = rpg_stats["Stat"].tolist()
-    values = rpg_stats["XP"].astype(int).tolist()
-    max_value = max(values + [500])
+    stat_profile = profile["stat_profile"]
+    stats = [row["stat"] for row in stat_profile]
+    values = [int(row["level"]) for row in stat_profile]
+    max_value = max(5, max(values + [1]) + 1)
 
     fig = go.Figure(
         data=[
@@ -187,39 +188,157 @@ def render_radar_chart(profile: dict) -> None:
                 fillcolor="rgba(139, 92, 246, 0.28)",
                 line={"color": "#A78BFA", "width": 3},
                 marker={"color": "#38BDF8", "size": 7},
-                name="RPG Stats",
+                name="Stat Levels",
             )
         ]
     )
     fig.update_layout(
         title={"text": ""},
-        height=350,
+        height=322,
         paper_bgcolor="rgba(17, 24, 39, 0)",
         plot_bgcolor="rgba(17, 24, 39, 0)",
         font={"color": "#F9FAFB"},
-        margin={"l": 50, "r": 50, "t": 24, "b": 44},
+        margin={"l": 34, "r": 34, "t": 18, "b": 28},
         polar={
             "bgcolor": "rgba(17, 24, 39, 0)",
-            "domain": {"x": [0.04, 0.96], "y": [0.1, 0.96]},
+            "domain": {"x": [0.08, 0.92], "y": [0.08, 0.92]},
             "radialaxis": {
                 "gridcolor": "rgba(148, 163, 184, 0.22)",
                 "range": [0, max_value],
                 "tickfont": {"color": "#9CA3AF", "size": 10},
                 "showline": False,
+                "dtick": 1,
             },
             "angularaxis": {
                 "gridcolor": "rgba(148, 163, 184, 0.18)",
-                "tickfont": {"color": "#F9FAFB", "size": 11},
+                "tickfont": {"color": "#F9FAFB", "size": 10},
             },
         },
         showlegend=False,
     )
-    st.markdown("**RPG Stat Balance**")
-    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    st.markdown("**Stat Level Radar**")
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     st.markdown(
-        '<div class="hq-radar-caption">Based on completed quest-day XP by category.</div>',
+        '<div class="hq-radar-caption">Displays current stat levels, derived from completed quest-day XP.</div>',
         unsafe_allow_html=True,
     )
+
+
+def render_stat_panel(profile: dict) -> None:
+    rows = "".join(_render_stat_row(row) for row in profile["stat_profile"])
+    components.html(
+        f"""
+        <style>
+            body {{
+                background: transparent;
+                margin: 0;
+                overflow: hidden;
+            }}
+
+            .stat-panel {{
+                box-sizing: border-box;
+                display: grid;
+                gap: 7px;
+                padding: 2px 1px;
+                width: 100%;
+            }}
+
+            .stat-row {{
+                align-items: center;
+                background: rgba(15, 23, 42, 0.46);
+                border: 1px solid rgba(148, 163, 184, 0.14);
+                border-radius: 7px;
+                box-sizing: border-box;
+                display: grid;
+                gap: 10px;
+                grid-template-columns: minmax(92px, 0.85fr) minmax(132px, 1.55fr) 48px;
+                min-height: 44px;
+                padding: 6px 9px;
+                width: 100%;
+            }}
+
+            .stat-name {{
+                color: #f9fafb;
+                font: 800 14px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                overflow-wrap: anywhere;
+            }}
+
+            .stat-category {{
+                color: #9ca3af;
+                font: 650 11px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 2px;
+            }}
+
+            .stat-track {{
+                background: rgba(2, 6, 23, 0.76);
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                border-radius: 999px;
+                box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.38);
+                height: 11px;
+                overflow: hidden;
+                width: 100%;
+            }}
+
+            .stat-fill {{
+                background: linear-gradient(90deg, #38bdf8 0%, #a78bfa 72%, #c4b5fd 100%);
+                border-radius: inherit;
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+                height: 100%;
+                min-width: 3px;
+            }}
+
+            .stat-fill.empty {{
+                min-width: 0;
+            }}
+
+            .stat-help {{
+                color: #9ca3af;
+                font: 600 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 3px;
+                white-space: nowrap;
+            }}
+
+            .stat-level {{
+                color: #c4b5fd;
+                font: 850 14px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                text-align: right;
+                white-space: nowrap;
+            }}
+
+            @media (max-width: 520px) {{
+                .stat-row {{
+                    gap: 8px;
+                    grid-template-columns: minmax(78px, 0.82fr) minmax(104px, 1.35fr) 44px;
+                    padding: 6px 7px;
+                }}
+            }}
+        </style>
+        <div class="stat-panel">{rows}</div>
+        """,
+        height=268,
+    )
+
+
+def _render_stat_row(row: dict) -> str:
+    progress_percent = max(0, min(100, float(row["progress_percent"])))
+    fill_class = "stat-fill empty" if progress_percent <= 0 else "stat-fill"
+    return f"""
+    <div class="stat-row">
+        <div>
+            <div class="stat-name">{escape(str(row["stat"]))}</div>
+            <div class="stat-category">{escape(str(row["category"]))}</div>
+        </div>
+        <div>
+            <div class="stat-track">
+                <div class="{fill_class}" style="width: {progress_percent:.2f}%"></div>
+            </div>
+            <div class="stat-help">
+                {int(row["xp_into_current_level"])} / {int(row["xp_needed_for_next_level"])} XP to next level
+            </div>
+        </div>
+        <div class="stat-level">Lv. {int(row["level"])}</div>
+    </div>
+    """
 
 
 def render_basic_stats(profile: dict) -> None:
@@ -367,25 +486,13 @@ init_db()
 profile = get_character_profile_data()
 
 render_section_title("Character Summary", "A character-sheet view of your current quest progression.")
-left_col, right_col = st.columns([0.44, 0.56], gap="medium")
-with left_col:
-    with st.container(border=True):
-        avatar_col, identity_col = st.columns([0.72, 1.42], gap="medium")
-        with avatar_col:
-            render_avatar(profile)
-        with identity_col:
-            render_identity(profile)
-        render_avatar_controls(profile)
-
-with right_col:
-    with st.container(border=True):
-        if profile["has_completed_quests"]:
-            render_radar_chart(profile)
-        else:
-            render_empty_state(
-                "No RPG stat data yet",
-                "Complete quest days in Quest Planner to populate the stat radar.",
-            )
+with st.container(border=True):
+    avatar_col, identity_col = st.columns([0.24, 0.76], gap="medium")
+    with avatar_col:
+        render_avatar(profile)
+    with identity_col:
+        render_identity(profile)
+    render_avatar_controls(profile)
 
 if not profile["has_completed_quests"]:
     render_empty_state(
@@ -393,7 +500,17 @@ if not profile["has_completed_quests"]:
         "Complete quest days in Quest Planner to earn XP, level up, and grow your RPG stats.",
     )
 
-render_section_title("Basic Stats", "Compact activity stats that complement the hero progression panel.")
+render_section_title("RPG Stats", "Stat levels from completed quest-day XP by category.")
+stat_col, radar_col = st.columns([0.5, 0.5], gap="medium")
+with stat_col:
+    with st.container(border=True):
+        render_stat_panel(profile)
+
+with radar_col:
+    with st.container(border=True):
+        render_radar_chart(profile)
+
+render_section_title("Basic Stats", "Compact activity stats that complement the character sheet.")
 render_basic_stats(profile)
 
 with st.expander("How Stats Are Calculated"):
@@ -402,7 +519,7 @@ with st.expander("How Stats Are Calculated"):
         <div class="hq-explainer">
             Completed quest days grant stored check-in XP. That XP contributes to one RPG stat through the quest category
             mapping: Learning to Knowledge, Health to Strength, Work to Discipline, Social to Creativity, and Home to
-            Recovery. Your level is based on total completed quest-day XP and uses nonlinear XP thresholds.
+            Recovery. Character and stat levels use nonlinear XP thresholds.
         </div>
         """,
         unsafe_allow_html=True,

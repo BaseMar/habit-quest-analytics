@@ -6,6 +6,8 @@ DIFFICULTY_XP = {
 }
 CHARACTER_LEVEL_BASE_XP = 100
 CHARACTER_LEVEL_EXPONENT = 1.4
+STAT_LEVEL_BASE_XP = 60
+STAT_LEVEL_EXPONENT = 1.35
 
 
 def calculate_xp(difficulty: str) -> int:
@@ -84,6 +86,60 @@ def get_character_level_progress(total_xp: int) -> dict:
     return {
         "level": level,
         "total_xp": total_xp,
+        "current_level_total_xp": current_level_total_xp,
+        "next_level_total_xp": next_level_total_xp,
+        "xp_into_current_level": xp_into_current_level,
+        "xp_needed_for_next_level": xp_needed_for_next_level,
+        "xp_remaining_to_next_level": xp_remaining_to_next_level,
+        "progress_percent": progress_percent,
+    }
+
+
+def total_xp_for_stat_level(level: int) -> int:
+    """Return cumulative XP required to reach an RPG stat level."""
+    if level < 1:
+        raise ValueError("Level must be at least 1.")
+    if level == 1:
+        return 0
+
+    return round(STAT_LEVEL_BASE_XP * ((level - 1) ** STAT_LEVEL_EXPONENT))
+
+
+def xp_to_next_stat_level(level: int) -> int:
+    """Return XP required to move from a stat level to the next stat level."""
+    if level < 1:
+        raise ValueError("Level must be at least 1.")
+
+    return total_xp_for_stat_level(level + 1) - total_xp_for_stat_level(level)
+
+
+def calculate_stat_level(stat_xp: int) -> int:
+    """Return the highest RPG stat level reached by stat XP."""
+    if stat_xp < 0:
+        raise ValueError("Stat XP cannot be negative.")
+
+    level = 1
+    while stat_xp >= total_xp_for_stat_level(level + 1):
+        level += 1
+    return level
+
+
+def get_stat_level_progress(stat_xp: int) -> dict:
+    """Return RPG stat level progress details."""
+    if stat_xp < 0:
+        raise ValueError("Stat XP cannot be negative.")
+
+    level = calculate_stat_level(stat_xp)
+    current_level_total_xp = total_xp_for_stat_level(level)
+    next_level_total_xp = total_xp_for_stat_level(level + 1)
+    xp_needed_for_next_level = next_level_total_xp - current_level_total_xp
+    xp_into_current_level = stat_xp - current_level_total_xp
+    xp_remaining_to_next_level = next_level_total_xp - stat_xp
+    progress_percent = round((xp_into_current_level / xp_needed_for_next_level) * 100, 2)
+
+    return {
+        "level": level,
+        "total_xp": stat_xp,
         "current_level_total_xp": current_level_total_xp,
         "next_level_total_xp": next_level_total_xp,
         "xp_into_current_level": xp_into_current_level,

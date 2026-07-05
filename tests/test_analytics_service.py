@@ -585,11 +585,18 @@ def test_build_xp_by_rpg_stat_counts_completed_quest_xp_by_category(session):
     result = build_xp_by_rpg_stat(quests)
 
     assert result[["Stat", "XP"]].to_dict("records") == [
-        {"Stat": "Knowledge", "XP": 30},
         {"Stat": "Strength", "XP": 75},
         {"Stat": "Discipline", "XP": 150},
-        {"Stat": "Creativity", "XP": 10},
+        {"Stat": "Knowledge", "XP": 30},
         {"Stat": "Recovery", "XP": 10},
+        {"Stat": "Creativity", "XP": 10},
+    ]
+    assert result[["Stat", "Level"]].to_dict("records") == [
+        {"Stat": "Strength", "Level": 2},
+        {"Stat": "Discipline", "Level": 2},
+        {"Stat": "Knowledge", "Level": 1},
+        {"Stat": "Recovery", "Level": 1},
+        {"Stat": "Creativity", "Level": 1},
     ]
 
 
@@ -694,10 +701,9 @@ def test_get_character_profile_data_summarizes_completed_quest_progress(session)
     assert profile["completion_rate"] == 66.67
     assert profile["weekly_xp"] == 0
     assert profile["activity_stats"][0] == {"label": "Completed Quests", "value": 2}
-    assert profile["rpg_stats"][["Stat", "XP"]].to_dict("records")[0] == {
-        "Stat": "Knowledge",
-        "XP": 550,
-    }
+    knowledge = profile["rpg_stats"].set_index("Stat").loc["Knowledge"]
+    assert int(knowledge["XP"]) == 550
+    assert int(knowledge["Level"]) == 6
 
 
 def test_get_character_profile_data_sums_checkin_xp_and_level_progress(session):
@@ -729,6 +735,9 @@ def test_get_character_profile_data_groups_checkin_xp_by_parent_quest_category(s
     stat_rows = profile["rpg_stats"][["Stat", "XP"]].to_dict("records")
     assert {"Stat": "Strength", "XP": 30} in stat_rows
     assert {"Stat": "Discipline", "XP": 75} in stat_rows
+    stat_profile = {row["stat"]: row for row in profile["stat_profile"]}
+    assert stat_profile["Strength"]["category"] == "Health"
+    assert stat_profile["Discipline"]["category"] == "Work"
 
 
 def test_get_character_profile_data_counts_repeated_completed_checkins_for_same_quest(session):
@@ -743,6 +752,10 @@ def test_get_character_profile_data_counts_repeated_completed_checkins_for_same_
     assert profile["completed_quest_days"] == 2
     strength = profile["rpg_stats"].set_index("Stat").loc["Strength"]
     assert int(strength["XP"]) == 60
+    assert int(strength["Level"]) == 2
+    strength_profile = next(row for row in profile["stat_profile"] if row["stat"] == "Strength")
+    assert strength_profile["level"] == 2
+    assert strength_profile["xp"] == 60
 
 
 def test_get_character_profile_data_ignores_non_completed_checkins_for_activity_and_xp(session):
@@ -760,6 +773,8 @@ def test_get_character_profile_data_ignores_non_completed_checkins_for_activity_
     assert profile["completed_quest_days"] == 0
     assert profile["has_completed_quests"] is False
     assert int(profile["rpg_stats"]["XP"].sum()) == 0
+    assert all(row["level"] == 1 for row in profile["stat_profile"])
+    assert all(row["progress_percent"] == 0 for row in profile["stat_profile"])
 
 
 def test_get_character_profile_data_reset_checkin_with_zero_xp_no_longer_contributes(session):
@@ -772,6 +787,7 @@ def test_get_character_profile_data_reset_checkin_with_zero_xp_no_longer_contrib
     assert profile["total_xp"] == 0
     assert profile["completed_quest_days"] == 0
     assert int(profile["rpg_stats"]["XP"].sum()) == 0
+    assert all(row["xp"] == 0 for row in profile["stat_profile"])
 
 
 def test_get_character_profile_data_does_not_double_count_legacy_completed_quest_with_checkin(session):
@@ -785,3 +801,142 @@ def test_get_character_profile_data_does_not_double_count_legacy_completed_quest
     assert profile["completed_quest_days"] == 1
     knowledge = profile["rpg_stats"].set_index("Stat").loc["Knowledge"]
     assert int(knowledge["XP"]) == 30
+
+
+def test_get_character_profile_data_builds_default_stat_profile_without_checkins(session):
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+
+    assert profile["total_xp"] == 0
+    assert profile["stat_profile"] == [
+        {
+            "stat": "Strength",
+            "category": "Health",
+            "xp": 0,
+            "level": 1,
+            "progress_percent": 0,
+            "progress": 0,
+            "xp_into_current_level": 0,
+            "xp_needed_for_next_level": 60,
+            "xp_remaining_to_next_level": 60,
+            "current_level_total_xp": 0,
+            "next_level_total_xp": 60,
+        },
+        {
+            "stat": "Discipline",
+            "category": "Work",
+            "xp": 0,
+            "level": 1,
+            "progress_percent": 0,
+            "progress": 0,
+            "xp_into_current_level": 0,
+            "xp_needed_for_next_level": 60,
+            "xp_remaining_to_next_level": 60,
+            "current_level_total_xp": 0,
+            "next_level_total_xp": 60,
+        },
+        {
+            "stat": "Knowledge",
+            "category": "Learning",
+            "xp": 0,
+            "level": 1,
+            "progress_percent": 0,
+            "progress": 0,
+            "xp_into_current_level": 0,
+            "xp_needed_for_next_level": 60,
+            "xp_remaining_to_next_level": 60,
+            "current_level_total_xp": 0,
+            "next_level_total_xp": 60,
+        },
+        {
+            "stat": "Recovery",
+            "category": "Home",
+            "xp": 0,
+            "level": 1,
+            "progress_percent": 0,
+            "progress": 0,
+            "xp_into_current_level": 0,
+            "xp_needed_for_next_level": 60,
+            "xp_remaining_to_next_level": 60,
+            "current_level_total_xp": 0,
+            "next_level_total_xp": 60,
+        },
+        {
+            "stat": "Creativity",
+            "category": "Social",
+            "xp": 0,
+            "level": 1,
+            "progress_percent": 0,
+            "progress": 0,
+            "xp_into_current_level": 0,
+            "xp_needed_for_next_level": 60,
+            "xp_remaining_to_next_level": 60,
+            "current_level_total_xp": 0,
+            "next_level_total_xp": 60,
+        },
+    ]
+
+
+def test_get_character_profile_data_maps_checkin_xp_to_all_stat_levels(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    learning = _add_category(session, "Learning")
+    home = _add_category(session, "Home")
+    social = _add_category(session, "Social")
+
+    rows = [
+        ("Lift", health, 60),
+        ("Report", work, 90),
+        ("Study", learning, 153),
+        ("Clean", home, 30),
+        ("Call", social, 75),
+    ]
+    for title, category, xp in rows:
+        quest = _add_quest(session, title, category=category)
+        _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=xp)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+    stat_profile = {row["stat"]: row for row in profile["stat_profile"]}
+
+    assert stat_profile["Strength"]["xp"] == 60
+    assert stat_profile["Strength"]["level"] == 2
+    assert stat_profile["Discipline"]["xp"] == 90
+    assert stat_profile["Discipline"]["level"] == 2
+    assert stat_profile["Knowledge"]["xp"] == 153
+    assert stat_profile["Knowledge"]["level"] == 3
+    assert stat_profile["Recovery"]["xp"] == 30
+    assert stat_profile["Recovery"]["level"] == 1
+    assert stat_profile["Creativity"]["xp"] == 75
+    assert stat_profile["Creativity"]["level"] == 2
+
+
+def test_get_character_profile_data_stat_levels_ignore_non_completed_zero_xp_checkins(session):
+    health = _add_category(session, "Health")
+    completed = _add_quest(session, "Completed", category=health)
+    planned = _add_quest(session, "Planned", category=health)
+    skipped = _add_quest(session, "Skipped", category=health)
+    failed = _add_quest(session, "Failed", category=health)
+
+    _add_checkin(session, completed, date(2026, 6, 23), "Completed", xp_awarded=60)
+    _add_checkin(session, planned, date(2026, 6, 24), "Planned", xp_awarded=0)
+    _add_checkin(session, skipped, date(2026, 6, 25), "Skipped", xp_awarded=0)
+    _add_checkin(session, failed, date(2026, 6, 26), "Failed", xp_awarded=0)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+    strength = next(row for row in profile["stat_profile"] if row["stat"] == "Strength")
+
+    assert strength["xp"] == 60
+    assert strength["level"] == 2
+
+
+def test_character_profile_radar_source_uses_stat_levels_not_raw_xp(session):
+    health = _add_category(session, "Health")
+    quest = _add_quest(session, "Workout", category=health)
+    _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=60)
+
+    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+    strength_profile = next(row for row in profile["stat_profile"] if row["stat"] == "Strength")
+    strength_stats = profile["rpg_stats"].set_index("Stat").loc["Strength"]
+
+    assert strength_stats["XP"] == 60
+    assert strength_profile["level"] == 2
+    assert strength_profile["level"] != strength_profile["xp"]

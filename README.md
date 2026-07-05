@@ -132,8 +132,8 @@ Habit Quest Analytics turns productivity tracking into a compact RPG loop:
 - Review today's operational status in Command Center.
 - Analyze consistency, trends, status mix, category activity, and planned
   workload in Habit Analytics.
-- View level, XP progress, avatar, radar chart, and RPG stats in Character
-  Profile.
+- View level, XP progress, avatar, stat-level bars, radar chart, and RPG stats
+  in Character Profile.
 
 ## Example Insights
 
@@ -438,7 +438,7 @@ Current limitations:
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   true N-times-per-week auto-scheduling is not implemented yet.
 - XP System v2 uses planned time for new scheduled quest and recurring habit XP,
-  plus nonlinear character leveling. Stat-level UI is still planned. See
+  nonlinear character leveling, and stat-level progress in Character Profile. See
   [docs/xp_system_v2_design.md](docs/xp_system_v2_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.

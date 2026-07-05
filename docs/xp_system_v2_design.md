@@ -17,7 +17,7 @@ how future quest XP is calculated and displayed.
 
 ## Status
 
-XP System v2 phases 1 and 2 are implemented.
+XP System v2 phases 1, 2, and 3 are implemented.
 
 Implemented:
 
@@ -27,12 +27,12 @@ Implemented:
 - Historical `Quest.xp_reward` and `QuestCheckin.xp_awarded` values are not
   retroactively recalculated.
 - Character level and progress use nonlinear thresholds.
+- RPG stat levels are derived from completed check-in XP by category.
+- Character Profile stat panel and radar use stat levels.
 
 Still planned:
 
-- Stat leveling.
-- Character Profile stat panel updates.
-- Radar chart level display.
+- Long-term goals/projects.
 
 ## Product Goal
 
@@ -140,13 +140,13 @@ Category mapping:
 | Home | Recovery |
 | Social | Creativity |
 
-Recommended stat level formula:
+Stat level formula:
 
 ```text
 TotalXPForStatLevel(L) = statBaseXP * (L - 1)^statExponent
 ```
 
-Recommended constants:
+Constants:
 
 ```text
 statBaseXP = 60
@@ -188,12 +188,12 @@ Optional helper text can show the XP distance to the next level, for example:
 
 Keep the visual design clean and compact.
 
-Radar chart direction:
+Radar chart behavior:
 
 - Display current stat levels, not raw stat XP.
 - Make the radar chart visually larger inside the existing card/container.
 - Do not enlarge the card/container itself.
-- Achieve this later through Plotly layout and margin adjustments.
+- Achieved through Plotly layout and margin adjustments.
 
 ## App Impact
 
@@ -261,7 +261,7 @@ Phase status:
 1. `docs: add xp system v2 design` - implemented.
 2. `feat: calculate quest xp from planned time` - implemented.
 3. `feat: add nonlinear character leveling` - implemented.
-4. `feat: add stat leveling to character profile` - planned.
+4. `feat: add stat leveling to character profile` - implemented.
 5. `docs: update xp documentation` - ongoing as phases land.
 
 ## Test Plan

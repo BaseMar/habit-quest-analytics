@@ -9,7 +9,7 @@ from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
 from src.database.models import PlayerProfile, Quest, QuestCheckin
 from src.services.checklist_service import ensure_checkin
-from src.services.xp_service import calculate_level, get_character_level_progress
+from src.services.xp_service import calculate_level, get_character_level_progress, get_stat_level_progress
 
 STATUS_ORDER = QUEST_STATUSES
 
@@ -279,6 +279,7 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
                 "completion_rate": completion_rate,
                 "weekly_xp": weekly_xp,
                 "rpg_stats": rpg_stats,
+                "stat_profile": build_stat_profile_rows(rpg_stats),
                 "activity_stats": activity_stats,
             }
 
@@ -305,6 +306,7 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
             "completion_rate": completion_rate,
             "weekly_xp": weekly_xp,
             "rpg_stats": rpg_stats,
+            "stat_profile": build_stat_profile_rows(rpg_stats),
             "activity_stats": build_character_activity_stats(
                 completed_quests=completed_quests,
                 rpg_stats=rpg_stats,
@@ -344,9 +346,7 @@ def build_xp_by_rpg_stat(quests: list[Quest]) -> pd.DataFrame:
         stat = _stat_for_category(_category_name(quest))
         totals[stat] += quest.xp_reward or 0
 
-    return pd.DataFrame(
-        [{"Stat": stat, "XP": totals[stat], "Progress": min(totals[stat] / 500, 1.0)} for stat in RPG_STATS]
-    )
+    return build_rpg_stat_dataframe(totals)
 
 
 def build_xp_by_rpg_stat_from_checkins(checkins: list[QuestCheckin]) -> pd.DataFrame:
@@ -355,14 +355,79 @@ def build_xp_by_rpg_stat_from_checkins(checkins: list[QuestCheckin]) -> pd.DataF
     for checkin in checkins:
         if _normalize_status(checkin.status) != "Completed":
             continue
+        if (checkin.xp_awarded or 0) <= 0:
+            continue
         quest = checkin.quest
         category_name = _category_name(quest) if quest is not None else "Uncategorized"
         stat = _stat_for_category(category_name)
         totals[stat] += checkin.xp_awarded or 0
 
-    return pd.DataFrame(
-        [{"Stat": stat, "XP": totals[stat], "Progress": min(totals[stat] / 500, 1.0)} for stat in RPG_STATS]
-    )
+    return build_rpg_stat_dataframe(totals)
+
+
+def build_rpg_stat_dataframe(totals: dict[str, int]) -> pd.DataFrame:
+    """Return RPG stat rows with XP, level, and progress data."""
+    rows = []
+    for stat in RPG_STATS:
+        xp = int(totals.get(stat, 0))
+        progress = get_stat_level_progress(xp)
+        rows.append(
+            {
+                "Stat": stat,
+                "Category": _category_for_stat(stat),
+                "XP": xp,
+                "Level": progress["level"],
+                "Progress": progress["progress_percent"] / 100,
+                "Progress Percent": progress["progress_percent"],
+                "XP Into Current Level": progress["xp_into_current_level"],
+                "XP Needed For Next Level": progress["xp_needed_for_next_level"],
+                "XP Remaining To Next Level": progress["xp_remaining_to_next_level"],
+                "Current Level Total XP": progress["current_level_total_xp"],
+                "Next Level Total XP": progress["next_level_total_xp"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_stat_profile_rows(rpg_stats: pd.DataFrame) -> list[dict]:
+    """Return stat profile data for Character Profile UI and radar chart."""
+    if rpg_stats.empty:
+        return [
+            _stat_profile_row_from_progress(stat, _category_for_stat(stat), 0, get_stat_level_progress(0))
+            for stat in RPG_STATS
+        ]
+
+    rows_by_stat = {row["Stat"]: row for row in rpg_stats.to_dict("records")}
+    stat_rows = []
+    for stat in RPG_STATS:
+        row = rows_by_stat.get(stat, {})
+        xp = int(row.get("XP", 0) or 0)
+        progress = get_stat_level_progress(xp)
+        stat_rows.append(
+            _stat_profile_row_from_progress(
+                stat=stat,
+                category=str(row.get("Category") or _category_for_stat(stat)),
+                xp=xp,
+                progress=progress,
+            )
+        )
+    return stat_rows
+
+
+def _stat_profile_row_from_progress(stat: str, category: str, xp: int, progress: dict) -> dict:
+    return {
+        "stat": stat,
+        "category": category,
+        "xp": xp,
+        "level": progress["level"],
+        "progress_percent": progress["progress_percent"],
+        "progress": progress["progress_percent"] / 100,
+        "xp_into_current_level": progress["xp_into_current_level"],
+        "xp_needed_for_next_level": progress["xp_needed_for_next_level"],
+        "xp_remaining_to_next_level": progress["xp_remaining_to_next_level"],
+        "current_level_total_xp": progress["current_level_total_xp"],
+        "next_level_total_xp": progress["next_level_total_xp"],
+    }
 
 
 def calculate_weekly_xp(quests: list[Quest], today: date) -> int:
@@ -777,6 +842,13 @@ def _quest_time_range(quest: Quest) -> str:
 
 def _stat_for_category(category_name: str) -> str:
     return CATEGORY_TO_RPG_STAT.get(category_name.strip().lower(), "Recovery")
+
+
+def _category_for_stat(stat: str) -> str:
+    for category, mapped_stat in CATEGORY_TO_RPG_STAT.items():
+        if mapped_stat == stat:
+            return category.title()
+    return "Uncategorized"
 
 
 def _count_boss_quests(quests: list[Quest]) -> int:

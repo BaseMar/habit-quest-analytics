@@ -182,6 +182,30 @@ Default category mapping:
 - Social -> Creativity
 - Home -> Recovery
 
+Only completed check-ins with awarded XP contribute to stat XP. Planned,
+skipped, failed, and reset check-ins with `xp_awarded = 0` do not contribute.
+
+## RPG Stat Levels
+
+```text
+TotalXPForStatLevel(L) = round(60 * (L - 1)^1.35)
+```
+
+Level 1 starts at 0 XP. Stat level is the highest level where
+`stat_xp >= TotalXPForStatLevel(level)`.
+
+Examples:
+
+| Stat level | Total XP required |
+| ---: | ---: |
+| 1 | 0 |
+| 2 | 60 |
+| 3 | 153 |
+| 4 | 264 |
+
+Character Profile stat bars show progress toward the next stat level. The radar
+chart displays stat levels, not raw stat XP.
+
 ## Consistency Score
 
 ```text

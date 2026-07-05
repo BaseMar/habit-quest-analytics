@@ -2,11 +2,15 @@ import pytest
 
 from src.services.xp_service import (
     calculate_character_level,
+    calculate_stat_level,
     calculate_level,
     calculate_time_based_xp,
     calculate_xp,
     get_character_level_progress,
+    get_stat_level_progress,
+    total_xp_for_stat_level,
     total_xp_for_level,
+    xp_to_next_stat_level,
     xp_to_next_level,
 )
 
@@ -150,6 +154,86 @@ def test_get_character_level_progress(total_xp, expected_progress):
     assert get_character_level_progress(total_xp) == expected_progress
 
 
+@pytest.mark.parametrize(
+    ("level", "expected_total_xp"),
+    [
+        (1, 0),
+        (2, 60),
+        (3, 153),
+        (4, 264),
+    ],
+)
+def test_total_xp_for_stat_level(level, expected_total_xp):
+    assert total_xp_for_stat_level(level) == expected_total_xp
+
+
+def test_xp_to_next_stat_level():
+    assert xp_to_next_stat_level(1) == 60
+    assert xp_to_next_stat_level(2) == 93
+
+
+@pytest.mark.parametrize(
+    ("stat_xp", "expected_level"),
+    [
+        (0, 1),
+        (59, 1),
+        (60, 2),
+        (152, 2),
+        (153, 3),
+    ],
+)
+def test_calculate_stat_level(stat_xp, expected_level):
+    assert calculate_stat_level(stat_xp) == expected_level
+
+
+@pytest.mark.parametrize(
+    ("stat_xp", "expected_progress"),
+    [
+        (
+            0,
+            {
+                "level": 1,
+                "total_xp": 0,
+                "current_level_total_xp": 0,
+                "next_level_total_xp": 60,
+                "xp_into_current_level": 0,
+                "xp_needed_for_next_level": 60,
+                "xp_remaining_to_next_level": 60,
+                "progress_percent": 0,
+            },
+        ),
+        (
+            60,
+            {
+                "level": 2,
+                "total_xp": 60,
+                "current_level_total_xp": 60,
+                "next_level_total_xp": 153,
+                "xp_into_current_level": 0,
+                "xp_needed_for_next_level": 93,
+                "xp_remaining_to_next_level": 93,
+                "progress_percent": 0,
+            },
+        ),
+        (
+            90,
+            {
+                "level": 2,
+                "total_xp": 90,
+                "current_level_total_xp": 60,
+                "next_level_total_xp": 153,
+                "xp_into_current_level": 30,
+                "xp_needed_for_next_level": 93,
+                "xp_remaining_to_next_level": 63,
+                "progress_percent": 32.26,
+            },
+        ),
+    ],
+)
+def test_get_stat_level_progress(stat_xp, expected_progress):
+    assert get_stat_level_progress(stat_xp) == expected_progress
+
+
 def test_calculate_xp_rejects_unknown_difficulty():
     with pytest.raises(ValueError):
         calculate_xp("Legendary")
@@ -167,3 +251,11 @@ def test_level_helpers_reject_invalid_values():
         xp_to_next_level(0)
     with pytest.raises(ValueError):
         get_character_level_progress(-1)
+    with pytest.raises(ValueError):
+        total_xp_for_stat_level(0)
+    with pytest.raises(ValueError):
+        xp_to_next_stat_level(0)
+    with pytest.raises(ValueError):
+        calculate_stat_level(-1)
+    with pytest.raises(ValueError):
+        get_stat_level_progress(-1)
