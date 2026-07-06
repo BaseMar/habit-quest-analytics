@@ -13,61 +13,32 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.database.db import init_db
 from src.services.analytics_service import get_character_profile_data
 from src.services.profile_service import remove_avatar, resolve_avatar_path, save_avatar
-from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
+from src.ui import apply_theme, render_page_header, render_section_title
 
 
 def apply_character_profile_styles() -> None:
     st.markdown(
         """
         <style>
-        .hq-character-identity {
-            padding: 0 0 0.25rem;
+        .block-container {
+            padding-top: 1.7rem;
         }
 
-        .hq-character-name {
-            color: #f9fafb;
-            font-size: 1.55rem;
-            font-weight: 850;
-            line-height: 1.15;
-            margin: 0.1rem 0 0.12rem;
+        .hq-page-header {
+            margin-bottom: 0.85rem;
+            padding-top: 0.3rem;
         }
 
-        .hq-character-title {
-            color: #c4b5fd;
-            font-size: 0.94rem;
-            font-weight: 700;
-            margin-bottom: 0.42rem;
+        .hq-section-title {
+            margin-top: 1.05rem;
+            margin-bottom: 0.18rem;
         }
 
-        .hq-level-badge {
-            align-items: center;
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(56, 189, 248, 0.75));
-            border: 1px solid rgba(221, 214, 254, 0.34);
-            border-radius: 8px;
-            box-shadow: 0 12px 28px rgba(2, 6, 23, 0.28);
-            color: #ffffff;
-            display: inline-flex;
-            font-size: 0.82rem;
-            font-weight: 850;
-            letter-spacing: 0.04em;
-            margin: 0.05rem 0 0.35rem;
-            padding: 0.38rem 0.66rem;
-            text-transform: uppercase;
+        .hq-section-description {
+            margin-bottom: 0.55rem;
         }
 
-        .hq-xp-line {
-            color: #d1d5db;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.85rem;
-            margin: 0.25rem 0 0.45rem;
-        }
-
-        .hq-xp-line strong {
-            color: #f9fafb;
-        }
-
-        .hq-avatar-placeholder {
+        .hq-hero-avatar-placeholder {
             align-items: center;
             aspect-ratio: 1;
             background:
@@ -78,29 +49,97 @@ def apply_character_profile_styles() -> None:
             color: #d1d5db;
             display: flex;
             flex-direction: column;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             justify-content: center;
-            line-height: 1.35;
-            min-height: 118px;
-            padding: 0.75rem;
+            line-height: 1.3;
+            min-height: 104px;
+            padding: 0.65rem;
             text-align: center;
         }
 
-        .hq-avatar-icon {
+        .hq-hero-avatar-icon {
             color: #c4b5fd;
-            font-size: 2.1rem;
+            font-size: 1.8rem;
             line-height: 1;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.32rem;
         }
 
-        .hq-avatar-title {
+        .hq-hero-avatar-title {
             color: #f9fafb;
             font-weight: 760;
         }
 
-        .hq-avatar-subtitle {
+        .hq-hero-identity {
+            padding: 0.05rem 0 0;
+        }
+
+        .hq-character-name {
+            color: #f9fafb;
+            font-size: 1.58rem;
+            font-weight: 850;
+            line-height: 1.12;
+            margin: 0 0 0.12rem;
+        }
+
+        .hq-character-title {
+            color: #c4b5fd;
+            font-size: 0.92rem;
+            font-weight: 750;
+            line-height: 1.25;
+            margin-bottom: 0.45rem;
+        }
+
+        .hq-level-badge {
+            align-items: center;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(56, 189, 248, 0.75));
+            border: 1px solid rgba(221, 214, 254, 0.34);
+            border-radius: 8px;
+            box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
+            color: #ffffff;
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 850;
+            letter-spacing: 0.07em;
+            margin: 0 0 0.4rem;
+            padding: 0.36rem 0.64rem;
+            text-transform: uppercase;
+        }
+
+        .hq-empty-compact {
+            background: rgba(31, 41, 55, 0.58);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 8px;
+            color: #d1d5db;
+            font-size: 0.9rem;
+            line-height: 1.35;
+            margin-top: 0.7rem;
+            padding: 0.62rem 0.78rem;
+        }
+
+        .hq-empty-compact strong {
+            color: #f9fafb;
+        }
+
+        .hq-radar-caption {
             color: #9ca3af;
             font-size: 0.78rem;
+            line-height: 1.25;
+            margin-top: -0.45rem;
+            text-align: center;
+        }
+
+        .hq-explainer {
+            background: linear-gradient(180deg, rgba(31, 41, 55, 0.88), rgba(17, 24, 39, 0.88));
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 8px;
+            color: #d1d5db;
+            line-height: 1.5;
+            padding: 0.82rem 0.95rem;
+        }
+
+        .hq-achievements-note {
+            color: #9ca3af;
+            font-size: 0.88rem;
             margin-top: 0.15rem;
         }
 
@@ -113,23 +152,15 @@ def apply_character_profile_styles() -> None:
             padding: 0.55rem;
         }
 
-        .hq-explainer {
-            background: linear-gradient(180deg, rgba(31, 41, 55, 0.92), rgba(17, 24, 39, 0.92));
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 8px;
-            color: #d1d5db;
-            line-height: 1.55;
-            padding: 1rem 1.1rem;
-        }
+        @media (max-width: 820px) {
+            .hq-hero-quick-stats {
+                grid-template-columns: 1fr;
+            }
 
-        .hq-radar-caption {
-            color: #9ca3af;
-            font-size: 0.82rem;
-            line-height: 1.25;
-            margin-top: -0.35rem;
-            text-align: center;
+            .hq-xp-row {
+                grid-template-columns: 1fr;
+            }
         }
-
         </style>
         """,
         unsafe_allow_html=True,
@@ -139,41 +170,422 @@ def apply_character_profile_styles() -> None:
 def render_avatar(profile: dict) -> None:
     avatar_path = resolve_avatar_path(profile.get("avatar_path"))
     if avatar_path:
-        st.image(str(avatar_path), width=145)
+        st.image(str(avatar_path), width=116)
     else:
         st.markdown(
             """
-            <div class="hq-avatar-placeholder">
-                <div class="hq-avatar-icon">[+]</div>
-                <div class="hq-avatar-title">No avatar yet</div>
-                <div class="hq-avatar-subtitle">Upload your portrait below</div>
+            <div class="hq-hero-avatar-placeholder">
+                <div class="hq-hero-avatar-icon">[+]</div>
+                <div class="hq-hero-avatar-title">No avatar</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
 
-def render_identity(profile: dict) -> None:
+def render_avatar_controls(profile: dict) -> None:
+    with st.popover("Change avatar", use_container_width=True):
+        uploaded_avatar = st.file_uploader(
+            "Drag and drop an avatar image",
+            type=["png", "jpg", "jpeg"],
+            accept_multiple_files=False,
+        )
+        if uploaded_avatar is not None:
+            try:
+                save_avatar(uploaded_avatar.name, uploaded_avatar.getvalue())
+                st.success("Avatar uploaded.")
+                st.rerun()
+            except ValueError as error:
+                st.error(str(error))
+
+        if profile.get("avatar_path") and st.button("Remove Avatar", use_container_width=True):
+            remove_avatar()
+            st.rerun()
+
+
+def render_character_hero(profile: dict) -> None:
     progress_percent = int(profile["level_progress"] * 100)
-    st.markdown(
-        f"""
-        <div class="hq-character-identity">
-            <div class="hq-character-name">{escape(profile["character_name"])}</div>
-            <div class="hq-character-title">{escape(profile["character_title"])}</div>
-            <div class="hq-level-badge">Level {profile["current_level"]}</div>
-            <div class="hq-xp-line">
-                <span><strong>{profile["total_xp"]}</strong> total XP</span>
-                <span><strong>{profile["xp_to_next_level"]}</strong> XP to next level</span>
+    quest_days = _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)
+    completion_rate = _activity_value(profile, ["Completion Rate"], default="0.0%")
+    weekly_xp = _activity_value(profile, ["Weekly XP"], default=0)
+
+    with st.container(border=True):
+        avatar_col, identity_col, xp_col = st.columns([0.16, 0.51, 0.33], gap="medium")
+        with avatar_col:
+            render_avatar(profile)
+            render_avatar_controls(profile)
+
+        with identity_col:
+            components.html(
+                f"""
+                <style>
+                    body {{
+                        background: transparent;
+                        margin: 0;
+                        overflow: hidden;
+                    }}
+
+                    .hero-identity {{
+                        box-sizing: border-box;
+                        padding: 1px 0 0;
+                        width: 100%;
+                    }}
+
+                    .character-name {{
+                        color: #f9fafb;
+                        font: 850 25px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        margin: 0 0 2px;
+                    }}
+
+                    .character-title {{
+                        color: #c4b5fd;
+                        font: 750 14px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        margin-bottom: 7px;
+                    }}
+
+                    .level-badge {{
+                        align-items: center;
+                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(56, 189, 248, 0.75));
+                        border: 1px solid rgba(221, 214, 254, 0.34);
+                        border-radius: 8px;
+                        box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
+                        color: #ffffff;
+                        display: inline-flex;
+                        font: 850 12px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        letter-spacing: 0.07em;
+                        margin: 0 0 9px;
+                        padding: 7px 10px;
+                        text-transform: uppercase;
+                    }}
+
+                    .hero-quick-stats {{
+                        display: grid;
+                        gap: 7px;
+                        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+                    }}
+
+                    .hero-chip {{
+                        background: rgba(15, 23, 42, 0.5);
+                        border: 1px solid rgba(148, 163, 184, 0.16);
+                        border-radius: 7px;
+                        box-sizing: border-box;
+                        min-height: 48px;
+                        padding: 7px 8px;
+                    }}
+
+                    .hero-chip-label {{
+                        color: #9ca3af;
+                        font: 760 9.5px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        letter-spacing: 0.05em;
+                        overflow-wrap: anywhere;
+                        text-transform: uppercase;
+                    }}
+
+                    .hero-chip-value {{
+                        color: #f9fafb;
+                        font: 850 14px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        margin-top: 2px;
+                        overflow-wrap: anywhere;
+                    }}
+                </style>
+                <div class="hero-identity">
+                    <div class="character-name">{escape(str(profile["character_name"]))}</div>
+                    <div class="character-title">{escape(str(profile["character_title"]))}</div>
+                    <div class="level-badge">Level {int(profile["current_level"])}</div>
+                    <div class="hero-quick-stats">
+                        {_hero_chip("Quest Days", quest_days)}
+                        {_hero_chip("Completion", completion_rate)}
+                        {_hero_chip("Weekly XP", weekly_xp)}
+                    </div>
+                </div>
+                """,
+                height=144,
+            )
+
+        with xp_col:
+            progress_width = max(0, min(100, progress_percent))
+            components.html(
+                f"""
+                <style>
+                    body {{
+                        background: transparent;
+                        margin: 0;
+                        overflow: hidden;
+                    }}
+
+                    .xp-shell {{
+                        align-items: center;
+                        box-sizing: border-box;
+                        display: flex;
+                        height: 100%;
+                        justify-content: flex-end;
+                        width: 100%;
+                    }}
+
+                    .xp-panel {{
+                        background: rgba(15, 23, 42, 0.5);
+                        border: 1px solid rgba(148, 163, 184, 0.16);
+                        border-radius: 8px;
+                        box-sizing: border-box;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                        max-width: 390px;
+                        min-height: 134px;
+                        padding: 14px 16px 13px;
+                        width: 100%;
+                    }}
+
+                    .xp-row {{
+                        display: grid;
+                        gap: 10px;
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                    }}
+
+                    .xp-metric {{
+                        background: rgba(2, 6, 23, 0.28);
+                        border: 1px solid rgba(148, 163, 184, 0.12);
+                        border-radius: 7px;
+                        box-sizing: border-box;
+                        min-height: 52px;
+                        padding: 8px 9px;
+                    }}
+
+                    .xp-label {{
+                        color: #9ca3af;
+                        font: 780 10.5px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        letter-spacing: 0.06em;
+                        text-transform: uppercase;
+                    }}
+
+                    .xp-value {{
+                        color: #f9fafb;
+                        font: 860 18px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        margin-top: 3px;
+                    }}
+
+                    .xp-track {{
+                        background: rgba(2, 6, 23, 0.76);
+                        border: 1px solid rgba(148, 163, 184, 0.22);
+                        border-radius: 999px;
+                        height: 10px;
+                        margin-top: 11px;
+                        overflow: hidden;
+                        width: 100%;
+                    }}
+
+                    .xp-fill {{
+                        background: linear-gradient(90deg, #38bdf8, #a78bfa);
+                        border-radius: inherit;
+                        height: 100%;
+                        width: {progress_width}%;
+                    }}
+
+                    .xp-caption {{
+                        color: #9ca3af;
+                        font: 650 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                        margin-top: 6px;
+                    }}
+                </style>
+                <div class="xp-shell">
+                    <div class="xp-panel">
+                        <div class="xp-row">
+                            <div class="xp-metric">
+                                <div class="xp-label">Total XP</div>
+                                <div class="xp-value">{int(profile["total_xp"])}</div>
+                            </div>
+                            <div class="xp-metric">
+                                <div class="xp-label">Next Level</div>
+                                <div class="xp-value">{int(profile["xp_to_next_level"])}</div>
+                            </div>
+                        </div>
+                        <div class="xp-track"><div class="xp-fill"></div></div>
+                        <div class="xp-caption">{progress_percent}% progress toward the next level</div>
+                    </div>
+                </div>
+                """,
+                height=144,
+            )
+
+    if not profile["has_completed_quests"]:
+        st.markdown(
+            """
+            <div class="hq-empty-compact">
+                <strong>No completed quest days yet.</strong>
+                Complete quest days in Quest Planner to earn XP and grow RPG stats.
             </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_rpg_stats_section(profile: dict) -> None:
+    render_section_title("RPG Stats", "Stat levels from completed quest-day XP by category.")
+    rows = "".join(_render_stat_row(row) for row in profile["stat_profile"])
+    radar_html = _build_radar_figure(profile, height=260).to_html(
+        full_html=False,
+        include_plotlyjs=True,
+        config={"displayModeBar": False, "responsive": True},
+    )
+    components.html(
+        f"""
+        <style>
+            body {{
+                background: transparent;
+                margin: 0;
+                overflow: hidden;
+            }}
+
+            .rpg-stats-grid {{
+                box-sizing: border-box;
+                display: grid;
+                gap: 14px;
+                grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.95fr);
+                height: 334px;
+                width: 100%;
+            }}
+
+            .rpg-card {{
+                background: rgba(17, 24, 39, 0.72);
+                border: 1px solid rgba(148, 163, 184, 0.22);
+                border-radius: 8px;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                padding: 12px;
+                width: 100%;
+            }}
+
+            .rpg-card-title {{
+                color: #f9fafb;
+                font: 800 15px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin: 0 0 8px;
+            }}
+
+            .stat-panel {{
+                box-sizing: border-box;
+                display: flex;
+                flex: 1;
+                flex-direction: column;
+                justify-content: space-between;
+                min-height: 0;
+                width: 100%;
+            }}
+
+            .stat-row {{
+                align-items: center;
+                background: rgba(15, 23, 42, 0.46);
+                border: 1px solid rgba(148, 163, 184, 0.14);
+                border-radius: 7px;
+                box-sizing: border-box;
+                display: grid;
+                gap: 8px;
+                grid-template-columns: minmax(96px, 0.86fr) minmax(150px, 1.55fr) 50px;
+                min-height: 43px;
+                padding: 6px 8px;
+                width: 100%;
+            }}
+
+            .stat-name {{
+                color: #f9fafb;
+                font: 800 13px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                overflow-wrap: anywhere;
+            }}
+
+            .stat-category {{
+                color: #9ca3af;
+                font: 650 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 1px;
+            }}
+
+            .stat-track {{
+                background: rgba(2, 6, 23, 0.76);
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                border-radius: 999px;
+                box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.38);
+                height: 10px;
+                overflow: hidden;
+                width: 100%;
+            }}
+
+            .stat-fill {{
+                background: linear-gradient(90deg, #38bdf8 0%, #a78bfa 72%, #c4b5fd 100%);
+                border-radius: inherit;
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+                height: 100%;
+                min-width: 3px;
+            }}
+
+            .stat-fill.empty {{
+                min-width: 0;
+            }}
+
+            .stat-help {{
+                color: #9ca3af;
+                font: 600 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 3px;
+                white-space: nowrap;
+            }}
+
+            .stat-level {{
+                color: #c4b5fd;
+                font: 850 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                text-align: right;
+                white-space: nowrap;
+            }}
+
+            .radar-card {{
+                align-items: stretch;
+            }}
+
+            .radar-wrap {{
+                align-items: center;
+                display: flex;
+                flex: 1;
+                justify-content: center;
+                min-height: 0;
+                width: 100%;
+            }}
+
+            .radar-caption {{
+                color: #9ca3af;
+                font: 650 11px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 2px;
+                text-align: center;
+            }}
+
+            @media (max-width: 900px) {{
+                .rpg-stats-grid {{
+                    grid-template-columns: 1fr;
+                    height: 672px;
+                }}
+            }}
+        </style>
+        <div class="rpg-stats-grid">
+            <section class="rpg-card">
+                <div class="rpg-card-title">RPG Stat Progress</div>
+                <div class="stat-panel">{rows}</div>
+            </section>
+            <section class="rpg-card radar-card">
+                <div class="rpg-card-title">Stat Level Radar</div>
+                <div class="radar-wrap">{radar_html}</div>
+                <div class="radar-caption">Current stat levels, not raw XP.</div>
+            </section>
         </div>
         """,
-        unsafe_allow_html=True,
+        height=348,
     )
-    st.progress(profile["level_progress"])
-    st.caption(f"{progress_percent}% progress toward the next level")
 
 
 def render_radar_chart(profile: dict) -> None:
+    fig = _build_radar_figure(profile, height=250)
+    st.markdown("**Stat Level Radar**")
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.caption("Current stat levels, not raw XP.")
+
+
+def _build_radar_figure(profile: dict, height: int) -> go.Figure:
     stat_profile = profile["stat_profile"]
     stats = [row["stat"] for row in stat_profile]
     values = [int(row["level"]) for row in stat_profile]
@@ -194,18 +606,19 @@ def render_radar_chart(profile: dict) -> None:
     )
     fig.update_layout(
         title={"text": ""},
-        height=322,
+        autosize=True,
+        height=height,
         paper_bgcolor="rgba(17, 24, 39, 0)",
         plot_bgcolor="rgba(17, 24, 39, 0)",
         font={"color": "#F9FAFB"},
-        margin={"l": 34, "r": 34, "t": 18, "b": 28},
+        margin={"l": 24, "r": 24, "t": 0, "b": 8},
         polar={
             "bgcolor": "rgba(17, 24, 39, 0)",
-            "domain": {"x": [0.08, 0.92], "y": [0.08, 0.92]},
+            "domain": {"x": [0.08, 0.92], "y": [0.07, 0.95]},
             "radialaxis": {
                 "gridcolor": "rgba(148, 163, 184, 0.22)",
                 "range": [0, max_value],
-                "tickfont": {"color": "#9CA3AF", "size": 10},
+                "tickfont": {"color": "#9CA3AF", "size": 9},
                 "showline": False,
                 "dtick": 1,
             },
@@ -216,12 +629,7 @@ def render_radar_chart(profile: dict) -> None:
         },
         showlegend=False,
     )
-    st.markdown("**Stat Level Radar**")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    st.markdown(
-        '<div class="hq-radar-caption">Displays current stat levels, derived from completed quest-day XP.</div>',
-        unsafe_allow_html=True,
-    )
+    return fig
 
 
 def render_stat_panel(profile: dict) -> None:
@@ -238,8 +646,8 @@ def render_stat_panel(profile: dict) -> None:
             .stat-panel {{
                 box-sizing: border-box;
                 display: grid;
-                gap: 7px;
-                padding: 2px 1px;
+                gap: 6px;
+                padding: 0;
                 width: 100%;
             }}
 
@@ -250,23 +658,23 @@ def render_stat_panel(profile: dict) -> None:
                 border-radius: 7px;
                 box-sizing: border-box;
                 display: grid;
-                gap: 10px;
+                gap: 8px;
                 grid-template-columns: minmax(92px, 0.85fr) minmax(132px, 1.55fr) 48px;
                 min-height: 44px;
-                padding: 6px 9px;
+                padding: 6px 8px;
                 width: 100%;
             }}
 
             .stat-name {{
                 color: #f9fafb;
-                font: 800 14px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font: 800 13px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 overflow-wrap: anywhere;
             }}
 
             .stat-category {{
                 color: #9ca3af;
-                font: 650 11px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 2px;
+                font: 650 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 1px;
             }}
 
             .stat-track {{
@@ -274,7 +682,7 @@ def render_stat_panel(profile: dict) -> None:
                 border: 1px solid rgba(148, 163, 184, 0.24);
                 border-radius: 999px;
                 box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.38);
-                height: 11px;
+                height: 10px;
                 overflow: hidden;
                 width: 100%;
             }}
@@ -293,29 +701,29 @@ def render_stat_panel(profile: dict) -> None:
 
             .stat-help {{
                 color: #9ca3af;
-                font: 600 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font: 600 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 margin-top: 3px;
                 white-space: nowrap;
             }}
 
             .stat-level {{
                 color: #c4b5fd;
-                font: 850 14px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font: 850 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 text-align: right;
                 white-space: nowrap;
             }}
 
             @media (max-width: 520px) {{
                 .stat-row {{
-                    gap: 8px;
+                    gap: 7px;
                     grid-template-columns: minmax(78px, 0.82fr) minmax(104px, 1.35fr) 44px;
-                    padding: 6px 7px;
+                    padding: 5px 7px;
                 }}
             }}
         </style>
         <div class="stat-panel">{rows}</div>
         """,
-        height=268,
+        height=274,
     )
 
 
@@ -341,137 +749,121 @@ def _render_stat_row(row: dict) -> str:
     """
 
 
-def render_basic_stats(profile: dict) -> None:
-    stats = profile["activity_stats"]
-    midpoint = (len(stats) + 1) // 2
-    left_stats = _format_basic_stats(stats[:midpoint])
-    right_stats = _format_basic_stats(stats[midpoint:])
+def render_activity_snapshot(profile: dict) -> None:
+    tiles = [
+        ("Quest Days", _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)),
+        ("Avg XP / Day", _activity_value(profile, ["Average XP / Quest Day", "Average XP / Completed Quest"], default=0)),
+        ("Completion Rate", _activity_value(profile, ["Completion Rate"], default="0.0%")),
+        ("Weekly XP", _activity_value(profile, ["Weekly XP"], default=0)),
+        ("Most Active Category", _activity_value(profile, ["Most Active Category"], default="Not enough data")),
+        ("Strongest Stat", _activity_value(profile, ["Strongest RPG Stat"], default="Not enough data")),
+        ("Boss Days", _activity_value(profile, ["Boss Quest Days", "Boss Quests Completed"], default=0)),
+        ("Best Weekday", _activity_value(profile, ["Most Productive Weekday"], default="Not enough data")),
+    ]
+    tile_markup = "".join(_activity_tile(label, value) for label, value in tiles)
 
+    render_section_title("Activity Snapshot", "Compact activity metrics for the current character sheet.")
     components.html(
         f"""
         <style>
             body {{
                 background: transparent;
                 margin: 0;
-                overflow: visible;
+                overflow: hidden;
             }}
 
-            .rpg-basic-stats-card {{
-                background: linear-gradient(180deg, rgba(31, 41, 55, 0.96), rgba(17, 24, 39, 0.96));
-                border: 1px solid rgba(148, 163, 184, 0.22);
-                border-radius: 8px;
+            .snapshot-grid {{
                 box-sizing: border-box;
-                padding: 10px 10px 12px;
-                overflow: visible;
+                display: grid;
+                gap: 8px;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
                 width: 100%;
             }}
 
-            .rpg-stat-columns {{
-                display: grid;
-                gap: 10px;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }}
-
-            .rpg-stat-panel {{
-                display: grid;
-                gap: 5px;
-            }}
-
-            .rpg-stat-row {{
-                align-items: center;
-                background: rgba(15, 23, 42, 0.58);
+            .snapshot-tile {{
+                background: linear-gradient(180deg, rgba(31, 41, 55, 0.86), rgba(17, 24, 39, 0.86));
                 border: 1px solid rgba(148, 163, 184, 0.16);
-                border-radius: 6px;
-                display: grid;
-                grid-template-columns: minmax(0, 1fr) auto;
-                min-height: 38px;
-                padding: 5px 8px;
+                border-radius: 8px;
+                box-sizing: border-box;
+                min-height: 58px;
+                padding: 8px 9px;
             }}
 
-            .rpg-stat-label {{
+            .snapshot-label {{
                 color: #9ca3af;
-                font: 700 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                letter-spacing: 0.04em;
+                font: 760 10px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                letter-spacing: 0.05em;
                 overflow: hidden;
-                padding-right: 10px;
                 text-overflow: ellipsis;
                 text-transform: uppercase;
                 white-space: nowrap;
             }}
 
-            .rpg-stat-value {{
+            .snapshot-value {{
                 color: #f9fafb;
-                font: 800 14px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                min-width: 42px;
-                text-align: right;
-                white-space: nowrap;
+                font: 850 15px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                margin-top: 5px;
+                overflow-wrap: anywhere;
             }}
 
-            .rpg-stat-value.accent {{
-                color: #c4b5fd;
+            @media (max-width: 900px) {{
+                .snapshot-grid {{
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }}
             }}
         </style>
-        <div class="rpg-basic-stats-card">
-            <div class="rpg-stat-columns">
-                <div class="rpg-stat-panel">{_render_basic_stat_rows(left_stats)}</div>
-                <div class="rpg-stat-panel">{_render_basic_stat_rows(right_stats, accent_values=True)}</div>
-            </div>
-        </div>
+        <div class="snapshot-grid">{tile_markup}</div>
         """,
-        height=244,
+        height=136,
     )
 
 
-def _format_basic_stats(stats: list[dict]) -> list[dict]:
-    label_overrides = {
-        "Boss Quests Completed": "Boss Quests",
-        "Completed Quest Days": "Quest Days",
-        "Boss Quest Days": "Boss Days",
-        "Average XP / Quest Day": "Avg XP / Day",
-        "Average XP / Completed Quest": "Avg XP / Quest",
-        "Strongest RPG Stat": "Strongest Stat",
-        "Most Productive Weekday": "Best Weekday",
-    }
-    return [
-        {
-            "label": label_overrides.get(str(stat["label"]), str(stat["label"])),
-            "value": str(stat["value"]),
-        }
-        for stat in stats
-    ]
-
-
-def _render_basic_stat_rows(stats: list[dict], accent_values: bool = False) -> str:
-    value_class = "rpg-stat-value accent" if accent_values else "rpg-stat-value"
-    return "".join(
-        f"""
-        <div class="rpg-stat-row">
-            <div class="rpg-stat-label">{escape(stat["label"])}</div>
-            <div class="{value_class}">{escape(stat["value"])}</div>
-        </div>
-        """
-        for stat in stats
-    )
-
-
-def render_avatar_controls(profile: dict) -> None:
-    with st.expander("Change avatar"):
-        uploaded_avatar = st.file_uploader(
-            "Drag and drop an avatar image",
-            type=["png", "jpg", "jpeg"],
-            accept_multiple_files=False,
+def render_how_stats_are_calculated() -> None:
+    with st.expander("How Stats Are Calculated"):
+        st.markdown(
+            """
+            <div class="hq-explainer">
+                Completed quest days grant stored check-in XP. That XP contributes to one RPG stat through the quest category
+                mapping: Learning to Knowledge, Health to Strength, Work to Discipline, Social to Creativity, and Home to
+                Recovery. Character and stat levels use nonlinear XP thresholds.
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        if uploaded_avatar is not None:
-            try:
-                save_avatar(uploaded_avatar.name, uploaded_avatar.getvalue())
-                st.success("Avatar uploaded.")
-                st.rerun()
-            except ValueError as error:
-                st.error(str(error))
 
-        if profile.get("avatar_path") and st.button("Remove Avatar", use_container_width=True):
-            remove_avatar()
-            st.rerun()
+
+def render_achievements_planned() -> None:
+    render_section_title("Achievements - planned")
+    st.markdown(
+        '<div class="hq-achievements-note">Achievement unlocks will be added in a future update.</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _activity_value(profile: dict, labels: list[str], default):
+    values = {str(item["label"]): item["value"] for item in profile["activity_stats"]}
+    for label in labels:
+        if label in values:
+            return values[label]
+    return default
+
+
+def _hero_chip(label: str, value) -> str:
+    return f"""
+    <div class="hero-chip">
+        <div class="hero-chip-label">{escape(label)}</div>
+        <div class="hero-chip-value">{escape(str(value))}</div>
+    </div>
+    """
+
+
+def _activity_tile(label: str, value) -> str:
+    return f"""
+    <div class="snapshot-tile">
+        <div class="snapshot-label">{escape(label)}</div>
+        <div class="snapshot-value">{escape(str(value))}</div>
+    </div>
+    """
 
 
 apply_theme()
@@ -479,51 +871,14 @@ apply_character_profile_styles()
 render_page_header(
     "Character Profile",
     "Character Profile",
-    "Your RPG-style progression based on completed quests and habit data.",
+    "A compact RPG character sheet for quest XP, stat growth, and daily progress.",
 )
 
 init_db()
 profile = get_character_profile_data()
 
-render_section_title("Character Summary", "A character-sheet view of your current quest progression.")
-with st.container(border=True):
-    avatar_col, identity_col = st.columns([0.24, 0.76], gap="medium")
-    with avatar_col:
-        render_avatar(profile)
-    with identity_col:
-        render_identity(profile)
-    render_avatar_controls(profile)
-
-if not profile["has_completed_quests"]:
-    render_empty_state(
-        "No completed quest days yet",
-        "Complete quest days in Quest Planner to earn XP, level up, and grow your RPG stats.",
-    )
-
-render_section_title("RPG Stats", "Stat levels from completed quest-day XP by category.")
-stat_col, radar_col = st.columns([0.5, 0.5], gap="medium")
-with stat_col:
-    with st.container(border=True):
-        render_stat_panel(profile)
-
-with radar_col:
-    with st.container(border=True):
-        render_radar_chart(profile)
-
-render_section_title("Basic Stats", "Compact activity stats that complement the character sheet.")
-render_basic_stats(profile)
-
-with st.expander("How Stats Are Calculated"):
-    st.markdown(
-        """
-        <div class="hq-explainer">
-            Completed quest days grant stored check-in XP. That XP contributes to one RPG stat through the quest category
-            mapping: Learning to Knowledge, Health to Strength, Work to Discipline, Social to Creativity, and Home to
-            Recovery. Character and stat levels use nonlinear XP thresholds.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-render_section_title("Achievements - planned")
-st.caption("Achievement unlocks will be added in a future update.")
+render_character_hero(profile)
+render_rpg_stats_section(profile)
+render_activity_snapshot(profile)
+render_how_stats_are_calculated()
+render_achievements_planned()

@@ -32,3 +32,6 @@ Thumbs.db
 .idea/
 
 # documentation
+
+# files
+run_streamlit.py
