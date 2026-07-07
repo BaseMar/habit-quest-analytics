@@ -4,7 +4,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.database.db import get_session
-from src.database.models import Category, Quest, QuestCheckin, utc_now
+from src.database.models import Category, Quest, QuestCheckin, RecurringHabitInstance, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.checklist_service import ensure_checkin
 from src.services.xp_service import calculate_time_based_xp, calculate_xp
@@ -251,6 +251,51 @@ def update_quest_status(quest_id: int, status: str, session=None) -> Quest:
             session.close()
 
 
+def get_one_time_quest_deletion_summary(quest_id: int, session=None) -> dict:
+    """Return whether a non-recurring quest can be safely hard-deleted."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quest = session.get(Quest, quest_id)
+        if quest is None:
+            raise ValueError(f"Quest with id {quest_id} was not found.")
+        return _build_one_time_quest_deletion_summary(session, quest)
+    finally:
+        if owns_session:
+            session.close()
+
+
+def delete_one_time_quest_if_unresolved(quest_id: int, session=None) -> dict:
+    """Delete a non-recurring quest only when all related check-ins are unresolved Planned rows."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quest = session.get(Quest, quest_id)
+        if quest is None:
+            raise ValueError(f"Quest with id {quest_id} was not found.")
+
+        summary = _build_one_time_quest_deletion_summary(session, quest)
+        if not summary["can_delete"]:
+            return summary
+
+        checkins = _get_quest_checkins(session, quest.id)
+        for checkin in checkins:
+            session.delete(checkin)
+        session.delete(quest)
+        session.commit()
+
+        summary["deleted"] = True
+        summary["deleted_checkins_count"] = len(checkins)
+        summary["deleted_quest_count"] = 1
+        return summary
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 def get_categories(session=None) -> list[Category]:
     """Return categories ordered by name."""
     owns_session = session is None
@@ -357,6 +402,49 @@ def _get_checkin_statuses_for_quest_dates(
         for checkin in checkins
         if (checkin.quest_id, checkin.checkin_date) in requested_pairs
     }
+
+
+def _build_one_time_quest_deletion_summary(session, quest: Quest) -> dict:
+    summary = {
+        "quest_id": quest.id,
+        "can_delete": False,
+        "deleted": False,
+        "reason": None,
+        "checkins_count": 0,
+        "deleted_checkins_count": 0,
+        "deleted_quest_count": 0,
+    }
+
+    if _get_recurring_instance_for_quest(session, quest.id) is not None:
+        summary["reason"] = "Recurring generated quests must be removed through the recurring occurrence workflow."
+        return summary
+
+    checkins = _get_quest_checkins(session, quest.id)
+    summary["checkins_count"] = len(checkins)
+    if any(not _is_unresolved_planned_checkin(checkin) for checkin in checkins):
+        summary["reason"] = "This quest has historical status or awarded XP and cannot be deleted safely."
+        return summary
+
+    summary["can_delete"] = True
+    return summary
+
+
+def _get_recurring_instance_for_quest(session, quest_id: int) -> RecurringHabitInstance | None:
+    return session.query(RecurringHabitInstance).filter(RecurringHabitInstance.quest_id == quest_id).one_or_none()
+
+
+def _get_quest_checkins(session, quest_id: int) -> list[QuestCheckin]:
+    return session.query(QuestCheckin).filter(QuestCheckin.quest_id == quest_id).order_by(QuestCheckin.id).all()
+
+
+def _is_unresolved_planned_checkin(checkin: QuestCheckin) -> bool:
+    return (
+        checkin.status == "Planned"
+        and checkin.xp_awarded == 0
+        and checkin.completed_at is None
+        and checkin.skipped_at is None
+        and checkin.failed_at is None
+    )
 
 
 def _normalize_status(status: str) -> str:

@@ -11,9 +11,11 @@ from src.services.checklist_service import (
     ensure_checkin,
     fail_checkin,
     get_month_checklist,
+    is_checklist_cell_editable,
     mark_stale_planned_checkins_failed,
     reset_checkin,
     skip_checkin,
+    update_checklist_cell_status,
     update_checkin_status,
 )
 from src.services.quest_service import create_quest
@@ -281,6 +283,48 @@ def test_get_month_checklist_uses_neutral_cells_for_days_without_checkins(sessio
     assert empty_cell["failed_at"] is None
 
 
+def test_one_time_quest_scheduled_date_is_editable_from_checklist(session):
+    quest = _create_raw_quest(session, "Monthly due quest", due_date=date(2026, 7, 5))
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+
+    updated = update_checklist_cell_status(row, date(2026, 7, 5), "Completed", session=session)
+
+    assert is_checklist_cell_editable(row, date(2026, 7, 5)) is True
+    assert updated.quest_id == quest.id
+    assert updated.checkin_date == date(2026, 7, 5)
+    assert updated.status == "Completed"
+
+
+def test_one_time_quest_unscheduled_date_is_blocked_from_checklist(session):
+    _create_raw_quest(session, "Monthly due quest", due_date=date(2026, 7, 5))
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+
+    with pytest.raises(ValueError, match="not scheduled"):
+        update_checklist_cell_status(row, date(2026, 7, 8), "Completed", session=session)
+
+    assert is_checklist_cell_editable(row, date(2026, 7, 8)) is False
+    assert session.query(QuestCheckin).filter_by(checkin_date=date(2026, 7, 8)).count() == 0
+
+
+def test_neutral_checklist_cell_is_not_editable_and_does_not_create_checkin(session):
+    _create_raw_quest(session, "Monthly due quest", due_date=date(2026, 7, 5))
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+    neutral_cell = row["cells"][date(2026, 7, 8)]
+
+    assert neutral_cell["status"] is None
+    assert neutral_cell["quest_id"] is None
+    assert neutral_cell["checkin_id"] is None
+    assert is_checklist_cell_editable(row, date(2026, 7, 8)) is False
+
+    with pytest.raises(ValueError, match="not scheduled"):
+        update_checklist_cell_status(row, date(2026, 7, 8), "Skipped", session=session)
+
+    assert session.query(QuestCheckin).filter_by(checkin_date=date(2026, 7, 8)).count() == 0
+
+
 def test_get_month_checklist_preserves_completed_checkin_status_and_xp(session):
     quest = _create_raw_quest(session, "Completed quest", due_date=date(2026, 7, 6))
     completed_checkin = complete_checkin(quest.id, date(2026, 7, 6), session=session)
@@ -392,6 +436,33 @@ def test_get_month_checklist_recurring_habit_non_scheduled_dates_are_neutral(ses
     assert neutral_cell["quest_id"] is None
     assert neutral_cell["checkin_id"] is None
     assert session.query(QuestCheckin).filter_by(checkin_date=date(2026, 7, 2)).count() == 0
+
+
+def test_recurring_generated_date_is_editable_from_checklist(session):
+    habit = _create_recurring_habit(session, weekdays=[1])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+
+    updated = update_checklist_cell_status(row, date(2026, 7, 7), "Completed", session=session)
+
+    assert is_checklist_cell_editable(row, date(2026, 7, 7)) is True
+    assert updated.checkin_date == date(2026, 7, 7)
+    assert updated.status == "Completed"
+    assert updated.xp_awarded == habit.xp_reward
+
+
+def test_recurring_blank_day_is_blocked_from_checklist(session):
+    habit = _create_recurring_habit(session, weekdays=[1])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+
+    with pytest.raises(ValueError, match="not scheduled"):
+        update_checklist_cell_status(row, date(2026, 7, 8), "Completed", session=session)
+
+    assert is_checklist_cell_editable(row, date(2026, 7, 8)) is False
+    assert session.query(QuestCheckin).filter_by(checkin_date=date(2026, 7, 8)).count() == 0
 
 
 def test_completing_recurring_habit_checklist_cell_updates_generated_checkin(session):

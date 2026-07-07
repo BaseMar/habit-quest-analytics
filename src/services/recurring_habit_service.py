@@ -299,6 +299,61 @@ def remove_future_planned_recurring_instances(
             session.close()
 
 
+def delete_recurring_generated_occurrence_if_unresolved(
+    quest_id: int,
+    session=None,
+) -> dict:
+    """Delete one generated recurring occurrence only when it has no resolved history."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        instance = (
+            session.query(RecurringHabitInstance)
+            .filter(RecurringHabitInstance.quest_id == quest_id)
+            .one_or_none()
+        )
+        if instance is None:
+            raise ValueError(f"Recurring generated occurrence for quest id {quest_id} was not found.")
+
+        summary = {
+            "recurring_habit_id": instance.recurring_habit_id,
+            "instance_id": instance.id,
+            "quest_id": instance.quest_id,
+            "scheduled_date": instance.scheduled_date,
+            "deleted": False,
+            "reason": None,
+            "deleted_checkins_count": 0,
+            "deleted_instance_count": 0,
+            "deleted_quest_count": 0,
+        }
+
+        if not _is_removable_generated_occurrence(session, instance):
+            summary["reason"] = "This generated habit day has history and cannot be deleted safely."
+            return summary
+
+        quest = instance.quest
+        checkin = _get_instance_scheduled_checkin(session, instance)
+        session.delete(checkin)
+        summary["deleted_checkins_count"] = 1
+        session.delete(instance)
+        summary["deleted_instance_count"] = 1
+        session.flush()
+
+        if quest is not None and not _quest_has_checkins(session, quest.id):
+            session.delete(quest)
+            summary["deleted_quest_count"] = 1
+
+        session.commit()
+        summary["deleted"] = True
+        return summary
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 def build_recurring_habit_dates_for_month(
     habit: RecurringHabit,
     year: int,
@@ -565,6 +620,13 @@ def _is_removable_future_planned_instance(
     today: date,
 ) -> bool:
     if instance.scheduled_date < today or instance.quest is None:
+        return False
+
+    return _is_removable_generated_occurrence(session, instance)
+
+
+def _is_removable_generated_occurrence(session, instance: RecurringHabitInstance) -> bool:
+    if instance.quest is None:
         return False
 
     checkins = (

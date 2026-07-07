@@ -155,6 +155,31 @@ def update_checkin_status(
             session.close()
 
 
+def get_checklist_cell_for_date(row: dict, checkin_date: date) -> dict | None:
+    """Return the checklist cell for a row/date from a built monthly checklist row."""
+    return row.get("cells", {}).get(checkin_date)
+
+
+def is_checklist_cell_editable(row: dict, checkin_date: date) -> bool:
+    """Return whether a checklist row/date has a scheduled quest day to update."""
+    cell = get_checklist_cell_for_date(row, checkin_date)
+    return cell is not None and cell.get("quest_id") is not None and cell.get("checkin_id") is not None
+
+
+def update_checklist_cell_status(
+    row: dict,
+    checkin_date: date,
+    status: str,
+    session=None,
+) -> QuestCheckin:
+    """Update status only for a scheduled/generated checklist cell."""
+    if not is_checklist_cell_editable(row, checkin_date):
+        raise ValueError("This quest is not scheduled for the selected date.")
+
+    cell = get_checklist_cell_for_date(row, checkin_date)
+    return update_checkin_status(cell["quest_id"], checkin_date, status, session=session)
+
+
 def complete_checkin(quest_id: int, checkin_date: date, session=None) -> QuestCheckin:
     """Mark a daily quest check-in as completed."""
     return update_checkin_status(quest_id, checkin_date, "Completed", session=session)

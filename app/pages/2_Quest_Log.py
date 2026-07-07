@@ -20,14 +20,13 @@ from src.constants import QUEST_DIFFICULTIES
 from src.database.db import init_db
 from src.database.seed import ensure_default_categories
 from src.services.checklist_service import (
-    complete_checkin,
-    fail_checkin,
     get_month_checklist,
-    reset_checkin,
-    skip_checkin,
+    is_checklist_cell_editable,
+    update_checklist_cell_status,
 )
 from src.services.quest_service import (
     create_scheduled_quest,
+    delete_one_time_quest_if_unresolved,
     get_categories,
     get_quests_for_calendar,
     get_quests_for_day,
@@ -37,6 +36,7 @@ from src.services.recurring_habit_service import (
     archive_recurring_habit,
     create_recurring_habit,
     delete_recurring_habit_if_unused,
+    delete_recurring_generated_occurrence_if_unresolved,
     deserialize_weekdays,
     generate_all_recurring_habits_for_month,
     get_recurring_habit_history_summary,
@@ -655,40 +655,47 @@ def render_monthly_checklist() -> None:
             )
 
     selected_cell = selected_row["cells"][selected_checklist_date]
-    current_status = CHECKLIST_STATUS_LABELS.get(selected_cell["status"], "Unknown")
+    cell_is_editable = is_checklist_cell_editable(selected_row, selected_checklist_date)
+    current_status = (
+        CHECKLIST_STATUS_LABELS.get(selected_cell["status"], "Unknown")
+        if cell_is_editable
+        else "Locked - Not scheduled"
+    )
 
     with status_col:
         marker = CHECKLIST_STATUS_MARKERS.get(selected_cell["status"], "")
-        status_prefix = f"{marker} - " if marker else ""
+        status_prefix = f"{marker} - " if marker and cell_is_editable else ""
         st.info(f"Current: {status_prefix}{current_status}")
-        if _is_unscheduled_recurring_cell(selected_row, selected_cell):
-            st.caption("This recurring habit is not scheduled for the selected date.")
+        if not cell_is_editable:
+            st.warning("This quest is not scheduled for the selected date.")
 
     action_cols = st.columns(4)
     actions = (
-        ("Complete", complete_checkin, "checklist_complete"),
-        ("Skip", skip_checkin, "checklist_skip"),
-        ("Fail", fail_checkin, "checklist_fail"),
-        ("Reset", reset_checkin, "checklist_reset"),
+        ("Complete", "Completed", "checklist_complete"),
+        ("Skip", "Skipped", "checklist_skip"),
+        ("Fail", "Failed", "checklist_fail"),
+        ("Reset", "Planned", "checklist_reset"),
     )
-    for column, (label, action, key) in zip(action_cols, actions):
+    for column, (label, status, key) in zip(action_cols, actions):
         with column:
-            if st.button(label, use_container_width=True, key=key):
-                action_quest_id = _checklist_action_quest_id(selected_row, selected_cell)
-                if action_quest_id is None:
-                    st.warning("This recurring habit is not scheduled for the selected date.")
+            if st.button(label, use_container_width=True, disabled=not cell_is_editable, key=key):
+                try:
+                    update_checklist_cell_status(selected_row, selected_checklist_date, status)
+                except ValueError as error:
+                    st.warning(str(error))
                     continue
-                action(action_quest_id, selected_checklist_date)
                 st.session_state["pending_selected_date"] = selected_checklist_date
                 st.session_state["checklist_status_message"] = (
                     f"{label} saved for {selected_checklist_date:%Y-%m-%d}."
                 )
                 st.rerun()
 
+    _render_checklist_delete_action(selected_row, selected_cell, selected_checklist_date, cell_is_editable)
+
 
 def _render_checklist_legend() -> None:
     legend_items = (
-        ("blank", "Empty / not scheduled"),
+        ("blank", "Not scheduled / locked"),
         ("P", "Planned"),
         ("C", "Completed"),
         ("S", "Skipped"),
@@ -697,6 +704,68 @@ def _render_checklist_legend() -> None:
     legend_cols = st.columns(len(legend_items))
     for column, (marker, label) in zip(legend_cols, legend_items):
         column.caption(f"{marker} = {label}")
+
+
+def _render_checklist_delete_action(row: dict, cell: dict, selected_date: date, cell_is_editable: bool) -> None:
+    st.divider()
+    st.write("**Delete Planned Item**")
+    if not cell_is_editable:
+        st.caption("No scheduled quest day exists for this date, so there is nothing to delete.")
+        return
+
+    is_unresolved = _is_unresolved_planned_cell(cell)
+    is_recurring = row.get("row_type") == "recurring_habit"
+    if is_recurring:
+        st.caption("Remove only this generated recurring day. Completed, skipped, failed, and XP-awarded days are blocked.")
+        confirm_label = "Confirm remove this generated day"
+        button_label = "Remove This Generated Day"
+        blocked_message = "This generated habit day has history and cannot be deleted safely."
+    else:
+        st.caption("Delete this one-time planned quest only if it has no historical status or awarded XP.")
+        confirm_label = "Confirm delete planned quest"
+        button_label = "Delete Planned Quest"
+        blocked_message = "This quest has historical status or awarded XP and cannot be deleted safely."
+
+    if not is_unresolved:
+        st.warning(blocked_message)
+
+    confirm_delete = st.checkbox(
+        confirm_label,
+        key=f"checklist_confirm_delete_{row.get('row_id')}_{selected_date.isoformat()}",
+        disabled=not is_unresolved,
+    )
+    if st.button(
+        button_label,
+        use_container_width=True,
+        disabled=not is_unresolved or not confirm_delete,
+        key=f"checklist_delete_{row.get('row_id')}",
+    ):
+        if is_recurring:
+            summary = delete_recurring_generated_occurrence_if_unresolved(cell["quest_id"])
+            if summary["deleted"]:
+                st.session_state["checklist_status_message"] = "Removed this generated recurring planned day."
+            else:
+                st.warning(summary.get("reason") or blocked_message)
+                return
+        else:
+            summary = delete_one_time_quest_if_unresolved(cell["quest_id"])
+            if summary["deleted"]:
+                st.session_state["checklist_status_message"] = "Deleted planned quest."
+            else:
+                st.warning(summary.get("reason") or blocked_message)
+                return
+        st.session_state["pending_selected_date"] = selected_date
+        st.rerun()
+
+
+def _is_unresolved_planned_cell(cell: dict) -> bool:
+    return (
+        cell.get("status") == "Planned"
+        and cell.get("xp_awarded", 0) == 0
+        and cell.get("completed_at") is None
+        and cell.get("skipped_at") is None
+        and cell.get("failed_at") is None
+    )
 
 
 def _build_checklist_dataframe(checklist: dict) -> pd.DataFrame:
@@ -715,18 +784,6 @@ def _build_checklist_dataframe(checklist: dict) -> pd.DataFrame:
 
 def _checklist_row_id(row: dict) -> str:
     return row.get("row_id") or f"quest:{row['quest_id']}"
-
-
-def _checklist_action_quest_id(row: dict, cell: dict) -> int | None:
-    if cell.get("quest_id") is not None:
-        return cell["quest_id"]
-    if row.get("row_type") == "recurring_habit":
-        return None
-    return row.get("quest_id")
-
-
-def _is_unscheduled_recurring_cell(row: dict, cell: dict) -> bool:
-    return row.get("row_type") == "recurring_habit" and cell.get("quest_id") is None
 
 
 def _build_checklist_quest_labels(rows: list[dict]) -> dict[str, str]:
