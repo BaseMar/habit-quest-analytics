@@ -34,10 +34,14 @@ from src.services.quest_service import (
     validate_schedule_times,
 )
 from src.services.recurring_habit_service import (
+    archive_recurring_habit,
     create_recurring_habit,
+    delete_recurring_habit_if_unused,
     deserialize_weekdays,
     generate_all_recurring_habits_for_month,
+    get_recurring_habit_history_summary,
     list_recurring_habits,
+    remove_future_planned_recurring_instances,
     set_recurring_habit_active,
 )
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
@@ -460,22 +464,97 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
 
             st.divider()
             selected_habit = st.selectbox(
-                "Manage active status",
+                "Manage recurring habit",
                 habits,
                 format_func=lambda habit: f"{habit.title} | {_format_habit_pattern(habit)} | {_active_label(habit)}",
                 key="recurring_habit_manage",
             )
-            toggle_cols = st.columns(2)
-            with toggle_cols[0]:
-                if st.button("Activate", use_container_width=True, key="recurring_habit_activate"):
-                    set_recurring_habit_active(selected_habit.id, True)
-                    st.session_state["recurring_habit_status_message"] = "Recurring habit activated."
+            history_summary = get_recurring_habit_history_summary(selected_habit.id)
+            st.caption(
+                f"{history_summary['generated_instances_count']} generated days | "
+                f"{history_summary['planned_count']} planned | "
+                f"{history_summary['completed_count']} completed | "
+                f"{history_summary['skipped_count']} skipped | "
+                f"{history_summary['failed_count']} failed"
+            )
+
+            if history_summary["generated_instances_count"] == 0:
+                st.caption("No generated history exists, so this template can be deleted safely.")
+                confirm_delete = st.checkbox(
+                    "Confirm delete unused recurring habit",
+                    key=f"recurring_habit_confirm_delete_{selected_habit.id}",
+                )
+                if st.button(
+                    "Delete",
+                    use_container_width=True,
+                    disabled=not confirm_delete,
+                    key="recurring_habit_delete",
+                ):
+                    delete_summary = delete_recurring_habit_if_unused(selected_habit.id)
+                    if delete_summary["deleted"]:
+                        st.session_state["recurring_habit_status_message"] = (
+                            "Recurring habit deleted because it had no generated history."
+                        )
+                    else:
+                        st.session_state["recurring_habit_status_message"] = (
+                            "Recurring habit was not deleted because generated history exists."
+                        )
                     st.rerun()
-            with toggle_cols[1]:
-                if st.button("Deactivate", use_container_width=True, key="recurring_habit_deactivate"):
-                    set_recurring_habit_active(selected_habit.id, False)
-                    st.session_state["recurring_habit_status_message"] = "Recurring habit deactivated."
-                    st.rerun()
+            else:
+                st.info("This habit has generated history, so it will be archived/deactivated instead of deleted.")
+                action_cols = st.columns(2)
+                with action_cols[0]:
+                    if st.button(
+                        "Activate",
+                        use_container_width=True,
+                        disabled=selected_habit.is_active,
+                        key="recurring_habit_activate",
+                    ):
+                        set_recurring_habit_active(selected_habit.id, True)
+                        st.session_state["recurring_habit_status_message"] = "Recurring habit activated."
+                        st.rerun()
+                with action_cols[1]:
+                    if st.button(
+                        "Archive / Deactivate",
+                        use_container_width=True,
+                        disabled=not selected_habit.is_active,
+                        key="recurring_habit_archive",
+                    ):
+                        archive_recurring_habit(selected_habit.id)
+                        st.session_state["recurring_habit_status_message"] = (
+                            "Recurring habit archived. Existing history was preserved."
+                        )
+                        st.rerun()
+
+                if history_summary["removable_future_planned_count"] > 0:
+                    st.caption(
+                        "Remove only future unresolved Planned generated days. "
+                        "Completed, skipped, and failed history will be preserved."
+                    )
+                    confirm_remove = st.checkbox(
+                        "Confirm remove future planned days",
+                        key=f"recurring_habit_confirm_remove_future_{selected_habit.id}",
+                    )
+                    if st.button(
+                        "Remove Future Planned Days",
+                        use_container_width=True,
+                        disabled=not confirm_remove,
+                        key="recurring_habit_remove_future",
+                    ):
+                        removal_summary = remove_future_planned_recurring_instances(selected_habit.id)
+                        removed_count = removal_summary["removed_instances_count"]
+                        if removed_count:
+                            st.session_state["recurring_habit_status_message"] = (
+                                f"Removed {removed_count} future planned days. "
+                                "Completed, skipped, and failed history was preserved."
+                            )
+                        else:
+                            st.session_state["recurring_habit_status_message"] = (
+                                "No removable future planned days found."
+                            )
+                        st.rerun()
+                else:
+                    st.caption("No removable future planned days found.")
 
         st.divider()
         generation_summary = st.session_state.pop("recurring_generation_summary", None)

@@ -126,6 +126,179 @@ def set_recurring_habit_active(
             session.close()
 
 
+def get_recurring_habit_history_summary(
+    recurring_habit_id: int,
+    session=None,
+    today: date | None = None,
+) -> dict:
+    """Return generated history and removable planned-day counts for a recurring habit."""
+    current_date = today or date.today()
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, recurring_habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {recurring_habit_id} was not found.")
+
+        instances = _get_recurring_habit_instances(session, recurring_habit_id)
+        summary = {
+            "recurring_habit_id": recurring_habit_id,
+            "generated_instances_count": len(instances),
+            "completed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "planned_count": 0,
+            "removable_future_planned_count": 0,
+        }
+
+        for instance in instances:
+            checkin = _get_instance_scheduled_checkin(session, instance)
+            if checkin is not None:
+                if checkin.status == "Completed":
+                    summary["completed_count"] += 1
+                elif checkin.status == "Skipped":
+                    summary["skipped_count"] += 1
+                elif checkin.status == "Failed":
+                    summary["failed_count"] += 1
+                elif checkin.status == "Planned":
+                    summary["planned_count"] += 1
+
+            if _is_removable_future_planned_instance(session, instance, current_date):
+                summary["removable_future_planned_count"] += 1
+
+        return summary
+    finally:
+        if owns_session:
+            session.close()
+
+
+def delete_recurring_habit_if_unused(recurring_habit_id: int, session=None) -> dict:
+    """Hard-delete a recurring habit only when it has no generated instances."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, recurring_habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {recurring_habit_id} was not found.")
+
+        instances_count = (
+            session.query(RecurringHabitInstance)
+            .filter(RecurringHabitInstance.recurring_habit_id == recurring_habit_id)
+            .count()
+        )
+        summary = {
+            "recurring_habit_id": recurring_habit_id,
+            "generated_instances_count": instances_count,
+            "deleted": False,
+        }
+        if instances_count > 0:
+            return summary
+
+        session.delete(habit)
+        session.commit()
+        summary["deleted"] = True
+        return summary
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
+def archive_recurring_habit(recurring_habit_id: int, session=None) -> dict:
+    """Deactivate a recurring habit while preserving generated history."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, recurring_habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {recurring_habit_id} was not found.")
+
+        habit.is_active = False
+        habit.updated_at = utc_now()
+        session.commit()
+        return get_recurring_habit_history_summary(recurring_habit_id, session=session)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
+def remove_future_planned_recurring_instances(
+    recurring_habit_id: int,
+    today: date | None = None,
+    session=None,
+) -> dict:
+    """Remove future generated recurring days only when they are unresolved planned rows."""
+    current_date = today or date.today()
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, recurring_habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {recurring_habit_id} was not found.")
+
+        instances = _get_recurring_habit_instances(session, recurring_habit_id)
+        removable_instances = [
+            instance
+            for instance in instances
+            if _is_removable_future_planned_instance(session, instance, current_date)
+        ]
+        summary = {
+            "recurring_habit_id": recurring_habit_id,
+            "generated_instances_count": len(instances),
+            "completed_count": 0,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "planned_count": 0,
+            "removable_future_planned_count": len(removable_instances),
+            "removed_instances_count": 0,
+            "removed_checkins_count": 0,
+            "removed_quests_count": 0,
+        }
+
+        for instance in instances:
+            checkin = _get_instance_scheduled_checkin(session, instance)
+            if checkin is None:
+                continue
+            if checkin.status == "Completed":
+                summary["completed_count"] += 1
+            elif checkin.status == "Skipped":
+                summary["skipped_count"] += 1
+            elif checkin.status == "Failed":
+                summary["failed_count"] += 1
+            elif checkin.status == "Planned":
+                summary["planned_count"] += 1
+
+        for instance in removable_instances:
+            quest = instance.quest
+            checkin = _get_instance_scheduled_checkin(session, instance)
+            if checkin is None or quest is None:
+                continue
+
+            session.delete(checkin)
+            summary["removed_checkins_count"] += 1
+            session.delete(instance)
+            summary["removed_instances_count"] += 1
+            session.flush()
+
+            if not _quest_has_checkins(session, quest.id):
+                session.delete(quest)
+                summary["removed_quests_count"] += 1
+
+        session.commit()
+        return summary
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 def build_recurring_habit_dates_for_month(
     habit: RecurringHabit,
     year: int,
@@ -364,3 +537,54 @@ def _get_recurring_habit_instance(
         )
         .one_or_none()
     )
+
+
+def _get_recurring_habit_instances(session, habit_id: int) -> list[RecurringHabitInstance]:
+    return (
+        session.query(RecurringHabitInstance)
+        .filter(RecurringHabitInstance.recurring_habit_id == habit_id)
+        .order_by(RecurringHabitInstance.scheduled_date, RecurringHabitInstance.id)
+        .all()
+    )
+
+
+def _get_instance_scheduled_checkin(session, instance: RecurringHabitInstance) -> QuestCheckin | None:
+    return (
+        session.query(QuestCheckin)
+        .filter(
+            QuestCheckin.quest_id == instance.quest_id,
+            QuestCheckin.checkin_date == instance.scheduled_date,
+        )
+        .one_or_none()
+    )
+
+
+def _is_removable_future_planned_instance(
+    session,
+    instance: RecurringHabitInstance,
+    today: date,
+) -> bool:
+    if instance.scheduled_date < today or instance.quest is None:
+        return False
+
+    checkins = (
+        session.query(QuestCheckin)
+        .filter(QuestCheckin.quest_id == instance.quest_id)
+        .all()
+    )
+    if len(checkins) != 1:
+        return False
+
+    checkin = checkins[0]
+    return (
+        checkin.checkin_date == instance.scheduled_date
+        and checkin.status == "Planned"
+        and checkin.xp_awarded == 0
+        and checkin.completed_at is None
+        and checkin.skipped_at is None
+        and checkin.failed_at is None
+    )
+
+
+def _quest_has_checkins(session, quest_id: int) -> bool:
+    return session.query(QuestCheckin).filter(QuestCheckin.quest_id == quest_id).count() > 0
