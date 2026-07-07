@@ -335,8 +335,8 @@ def render_home_base() -> None:
             </div>
             <div class="home-step-card">
                 <div class="home-step-number">2</div>
-                <div class="home-step-title">Review todays mission</div>
-                <div class="home-step-body">Use Command Center to see todays focus and attention items.</div>
+                <div class="home-step-title">Review today's mission</div>
+                <div class="home-step-body">Use Command Center to see today's focus and attention items.</div>
             </div>
             <div class="home-step-card">
                 <div class="home-step-number">3</div>
@@ -362,7 +362,7 @@ def render_home_base() -> None:
         <div class="hq-card-grid">
             <div class="hq-card">
                 <div class="hq-card-title">Command Center</div>
-                <div class="hq-card-body">Todays focus and operational quest status.</div>
+                <div class="hq-card-body">Today's focus and operational quest status.</div>
             </div>
             <div class="hq-card">
                 <div class="hq-card-title">Quest Planner</div>

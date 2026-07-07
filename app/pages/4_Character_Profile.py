@@ -578,13 +578,6 @@ def render_rpg_stats_section(profile: dict) -> None:
     )
 
 
-def render_radar_chart(profile: dict) -> None:
-    fig = _build_radar_figure(profile, height=250)
-    st.markdown("**Stat Level Radar**")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    st.caption("Current stat levels, not raw XP.")
-
-
 def _build_radar_figure(profile: dict, height: int) -> go.Figure:
     stat_profile = profile["stat_profile"]
     stats = [row["stat"] for row in stat_profile]
@@ -630,101 +623,6 @@ def _build_radar_figure(profile: dict, height: int) -> go.Figure:
         showlegend=False,
     )
     return fig
-
-
-def render_stat_panel(profile: dict) -> None:
-    rows = "".join(_render_stat_row(row) for row in profile["stat_profile"])
-    components.html(
-        f"""
-        <style>
-            body {{
-                background: transparent;
-                margin: 0;
-                overflow: hidden;
-            }}
-
-            .stat-panel {{
-                box-sizing: border-box;
-                display: grid;
-                gap: 6px;
-                padding: 0;
-                width: 100%;
-            }}
-
-            .stat-row {{
-                align-items: center;
-                background: rgba(15, 23, 42, 0.46);
-                border: 1px solid rgba(148, 163, 184, 0.14);
-                border-radius: 7px;
-                box-sizing: border-box;
-                display: grid;
-                gap: 8px;
-                grid-template-columns: minmax(92px, 0.85fr) minmax(132px, 1.55fr) 48px;
-                min-height: 44px;
-                padding: 6px 8px;
-                width: 100%;
-            }}
-
-            .stat-name {{
-                color: #f9fafb;
-                font: 800 13px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                overflow-wrap: anywhere;
-            }}
-
-            .stat-category {{
-                color: #9ca3af;
-                font: 650 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 1px;
-            }}
-
-            .stat-track {{
-                background: rgba(2, 6, 23, 0.76);
-                border: 1px solid rgba(148, 163, 184, 0.24);
-                border-radius: 999px;
-                box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.38);
-                height: 10px;
-                overflow: hidden;
-                width: 100%;
-            }}
-
-            .stat-fill {{
-                background: linear-gradient(90deg, #38bdf8 0%, #a78bfa 72%, #c4b5fd 100%);
-                border-radius: inherit;
-                box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
-                height: 100%;
-                min-width: 3px;
-            }}
-
-            .stat-fill.empty {{
-                min-width: 0;
-            }}
-
-            .stat-help {{
-                color: #9ca3af;
-                font: 600 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 3px;
-                white-space: nowrap;
-            }}
-
-            .stat-level {{
-                color: #c4b5fd;
-                font: 850 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                text-align: right;
-                white-space: nowrap;
-            }}
-
-            @media (max-width: 520px) {{
-                .stat-row {{
-                    gap: 7px;
-                    grid-template-columns: minmax(78px, 0.82fr) minmax(104px, 1.35fr) 44px;
-                    padding: 5px 7px;
-                }}
-            }}
-        </style>
-        <div class="stat-panel">{rows}</div>
-        """,
-        height=274,
-    )
 
 
 def _render_stat_row(row: dict) -> str:

@@ -80,11 +80,14 @@ Implemented:
 - Calendar-based Quest Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - Recurring Habit templates with explicit selected-month planned-day generation.
+- Recurring habit archive/delete controls and safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
 - Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset
   behavior, XP idempotency, and a stale planned failure helper.
 - Scheduled quest creation that creates a planned check-in for the scheduled
   date.
+- Time-based quest XP for new scheduled quests and recurring habit templates.
+- Nonlinear character leveling and RPG stat leveling.
 - Command Center operational metrics powered by check-ins.
 - Character Profile XP, level, completed quest days, and RPG stats powered by
   check-in XP.
@@ -96,10 +99,12 @@ Implemented:
 Still evolving:
 
 - Recurring habit editing and true N-times-per-week scheduling.
+- Long-term Goals / Projects.
 - Production persistence.
 - Authentication and user-specific data.
 - External calendar sync.
 - AI and voice planning assistants.
+- Streak system / bonus XP.
 - Optional automatic stale planned failure workflow.
 - Eventual cleanup of legacy `Quest.status` once the check-in migration is fully
   stable.
@@ -153,12 +158,17 @@ The app is designed to answer questions such as:
 - Calendar-based scheduled quest creation.
 - Title, category, difficulty, start time, end time, and notes.
 - XP reward calculation from planned time.
+- Difficulty remains descriptive metadata rather than the primary XP driver.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
 - Recurring Habit templates for Every day, Weekdays, and custom selected
   weekdays.
 - Explicit selected-month generation for recurring planned quest days.
 - Recurring habits can be all-day or use a planned start/end time window.
+- Unused recurring habits can be deleted.
+- Recurring habits with generated history can be archived/deactivated.
+- Future unresolved planned generated days can be removed while completed,
+  skipped, failed, and XP-awarded history is preserved.
 
 ### Monthly Checklist
 
@@ -196,7 +206,8 @@ The app is designed to answer questions such as:
 - Level, XP to next level, and level progress.
 - Completed Quest Days count.
 - RPG stat XP from completed check-ins joined to quest categories.
-- Radar chart for stat balance.
+- RPG stat levels with progress bars.
+- Radar chart for stat-level balance.
 
 ### Navigation / UI
 
@@ -219,7 +230,7 @@ The app is designed to answer questions such as:
 - `Command Center` - read-only operational overview powered by daily quest
   check-ins.
 - `Quest Planner` - calendar planner, selected day schedule, new quest form,
-  Recurring Habits, and Monthly Checklist.
+  Recurring Habits with archive/delete/cleanup controls, and Monthly Checklist.
 - `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
   charts, planned minutes, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
@@ -233,6 +244,8 @@ The app is designed to answer questions such as:
   migration.
 - XP is stored in `QuestCheckin.xp_awarded` so historical XP values are
   preserved and repeated completion does not duplicate XP.
+- New scheduled quest and recurring habit template XP is time-based:
+  `max(5, round(planned_minutes / 60 * 20))`.
 - Scheduled quests create a planned check-in for the scheduled date.
 - Business logic lives in service layers instead of Streamlit page code.
 - Metrics are covered by pytest before the UI consumes them.
@@ -283,6 +296,9 @@ Core entities:
 - `Quest` - scheduled task or habit plan with difficulty, XP reward, due date,
   optional time window, and legacy status.
 - `QuestCheckin` - daily status record for one quest on one date.
+- `RecurringHabit` - reusable selected-weekday habit template.
+- `RecurringHabitInstance` - link from one generated habit date to one generated
+  quest.
 - `PlayerProfile` - local character profile name, avatar path, and legacy total
   XP field.
 - `Achievement` - planned milestone definition.
@@ -296,11 +312,16 @@ Important relationship:
   `checkin_date`.
 - `QuestCheckin.xp_awarded` is used for XP, progression, RPG stats, and
   analytics when check-ins exist.
+- One `RecurringHabit` can have many generated `RecurringHabitInstance` rows.
+- One `RecurringHabitInstance` points to one generated `Quest`.
 
 ```mermaid
 erDiagram
     categories ||--o{ quests : groups
+    categories ||--o{ recurring_habits : groups
     quests ||--o{ quest_checkins : has
+    recurring_habits ||--o{ recurring_habit_instances : generates
+    quests ||--o| recurring_habit_instances : generated_as
     player_profiles ||--o{ unlocked_achievements : earns
     achievements ||--o{ unlocked_achievements : unlocks
 
@@ -338,6 +359,33 @@ erDiagram
         datetime failed_at
         datetime created_at
         datetime updated_at
+    }
+
+    recurring_habits {
+        int id PK
+        string title
+        text description
+        string difficulty
+        int xp_reward
+        int estimated_minutes
+        string recurrence_type
+        text weekdays
+        date start_date
+        date end_date
+        time planned_start_time
+        time planned_end_time
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+        int category_id FK
+    }
+
+    recurring_habit_instances {
+        int id PK
+        int recurring_habit_id FK
+        date scheduled_date
+        int quest_id FK
+        datetime created_at
     }
 
     player_profiles {
@@ -436,27 +484,28 @@ python -m compileall -q app src tests
 Current limitations:
 
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
-  true N-times-per-week auto-scheduling is not implemented yet.
-- XP System v2 uses planned time for new scheduled quest and recurring habit XP,
-  nonlinear character leveling, and stat-level progress in Character Profile. See
-  [docs/xp_system_v2_design.md](docs/xp_system_v2_design.md).
+  recurring habit editing and true N-times-per-week auto-scheduling are not
+  implemented yet.
+- Long-term Goals / Projects are not implemented.
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
 - Google Calendar sync is not implemented.
 - AI planning assistant and voice quest capture are not implemented.
+- Streak tracking and bonus XP are not implemented.
 - Auto-fail exists as service logic but is not automatically enabled.
 - `Quest.status` still exists for compatibility/fallback and should be cleaned
   up only after the check-in migration is stable.
 
 Suggested future order:
 
-1. XP System v2
+1. Long-term Goals / Projects
 2. Recurring habit editing and N-times-per-week scheduling
 3. PostgreSQL / production persistence
 4. Authentication
 5. Google Calendar sync
 6. AI planning assistant
 7. Voice quest capture / microphone input
-8. Optional auto-fail activation workflow
-9. Legacy `Quest.status` cleanup
+8. Streak system / bonus XP
+9. Optional auto-fail activation workflow
+10. Legacy `Quest.status` cleanup

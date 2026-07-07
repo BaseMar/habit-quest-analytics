@@ -10,14 +10,15 @@ Current app context:
   records.
 - Command Center, Character Profile, and Habit Analytics use check-in records as
   the main source of truth.
-- Character Profile currently reads progression from `QuestCheckin.xp_awarded`.
+- Character Profile reads progression from `QuestCheckin.xp_awarded`.
 
-XP System v2 should preserve that check-in source-of-truth model while changing
-how future quest XP is calculated and displayed.
+XP System v2 preserves that check-in source-of-truth model while changing how
+new quest XP is calculated and displayed.
 
 ## Status
 
-XP System v2 phases 1, 2, and 3 are implemented.
+XP System v2 is implemented for scheduled quest XP, recurring habit template XP,
+nonlinear character leveling, stat leveling, and Character Profile display.
 
 Implemented:
 
@@ -42,8 +43,7 @@ The previous difficulty-based model was simple, but it made short "Hard" tasks
 worth more than long focused work. XP System v2 makes planned time the
 main XP driver so the RPG progression better reflects invested effort.
 
-Difficulty may remain as a descriptive field for now. It should not be the main
-XP driver in v2.
+Difficulty remains a descriptive field. It is not the main XP driver in v2.
 
 ## Time-Based Quest XP
 
@@ -78,7 +78,7 @@ Examples:
 Historical rule:
 
 - Existing completed check-ins keep their stored `QuestCheckin.xp_awarded`.
-- Future completions should award the stored XP from the quest/check-in flow.
+- Future completions award the stored XP from the quest/check-in flow.
 - A separate explicit migration would be required to recalculate old data.
 
 ## Character Level Progression
@@ -159,16 +159,16 @@ overall character level too fast.
 
 ## Character Profile Stat UI
 
-The RPG stat section should use a compact stat panel design.
+The RPG stat section uses a compact stat panel design.
 
-Each stat row should show:
+Each stat row shows:
 
 - stat name on the left,
 - horizontal progress/loading bar in the middle,
 - current stat level on the right, such as `Lv. 4`.
 
-Do not show values such as `7/10`. The bar should represent progress toward the
-next stat level based on current stat XP within that level.
+The bar represents progress toward the next stat level based on current stat XP
+within that level.
 
 Example layout:
 
@@ -191,9 +191,8 @@ Keep the visual design clean and compact.
 Radar chart behavior:
 
 - Display current stat levels, not raw stat XP.
-- Make the radar chart visually larger inside the existing card/container.
-- Do not enlarge the card/container itself.
-- Achieved through Plotly layout and margin adjustments.
+- The current Character Profile renders the radar through Plotly using stat
+  levels.
 
 ## App Impact
 
@@ -262,11 +261,11 @@ Phase status:
 2. `feat: calculate quest xp from planned time` - implemented.
 3. `feat: add nonlinear character leveling` - implemented.
 4. `feat: add stat leveling to character profile` - implemented.
-5. `docs: update xp documentation` - ongoing as phases land.
+5. `docs: update xp documentation` - implemented.
 
 ## Test Plan
 
-Add focused tests for:
+Covered by focused tests for:
 
 - time-based XP formula,
 - minimum XP,

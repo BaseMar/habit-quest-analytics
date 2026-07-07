@@ -81,7 +81,9 @@ Constraints and relationships:
 
 ### recurring_habits
 
-Stores recurring habit templates. These templates are not completed directly; future generation logic will use them to create normal planned quest days and planned check-ins.
+Stores recurring habit templates. These templates are not completed directly;
+explicit month generation creates normal planned quest days and planned
+check-ins.
 
 | Field | Purpose |
 | --- | --- |
@@ -107,6 +109,14 @@ Relationships:
 - Many recurring habit templates can belong to one category.
 - One recurring habit can have many generated instances.
 
+Retention behavior:
+
+- Templates with no generated instances can be hard-deleted.
+- Templates with generated history are archived/deactivated with
+  `is_active = False` instead of being hard-deleted.
+- Archived/inactive templates remain available for historical joins but do not
+  generate new planned days.
+
 ### recurring_habit_instances
 
 Links one recurring habit template and scheduled date to one generated quest.
@@ -126,6 +136,16 @@ Constraints and relationships:
 - Many generated instances belong to one recurring habit.
 - One generated instance points to one quest.
 - Generated quests can then use existing `QuestCheckin` records for daily status and XP.
+
+Safe cleanup behavior:
+
+- Future generated instances can be removed only when the related scheduled
+  `QuestCheckin` is still `Planned`, has `xp_awarded = 0`, and has no
+  completed/skipped/failed timestamp.
+- Completed, skipped, failed, past historical records, and XP-awarded check-ins
+  are preserved.
+- If cleanup removes the only planned check-in for the generated quest, the
+  generated quest can also be removed.
 
 ### player_profiles
 
@@ -289,9 +309,23 @@ Startup can:
 
 These helpers do not drop existing data.
 
+## Category To RPG Stat Mapping
+
+Character Profile stat XP is grouped from completed check-ins through the parent
+quest category.
+
+| Category | RPG stat |
+| --- | --- |
+| Health | Strength |
+| Work | Discipline |
+| Learning | Knowledge |
+| Home | Recovery |
+| Social | Creativity |
+
+The radar chart displays calculated stat levels, not raw XP.
+
 ## Notes For Future Development
 
-- Recurring habit model tables exist, but recurrence services, month generation, and UI are not implemented yet.
 - Planned vs actual time analysis will require an actual-time field; `estimated_minutes` already stores planned workload.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - A production deployment with users should use a production database and a real migration strategy.

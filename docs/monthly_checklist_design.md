@@ -18,10 +18,11 @@ Implemented:
 - Command Center metrics using check-ins.
 - Character Profile XP/progression using check-in XP.
 - Habit Analytics using check-ins.
+- Generated recurring habit days grouped into one logical checklist row per
+  template.
 
 Not implemented:
 
-- recurring habit generation,
 - automatic app/page-level stale planned failure,
 - production database,
 - authentication,
@@ -219,6 +220,7 @@ Current behavior:
 - Level and XP to next level use check-in XP.
 - Completed Quest Days counts completed check-ins.
 - RPG stat XP groups completed check-in XP by parent quest category.
+- RPG stat levels and radar chart are derived from stat XP.
 - Resetting a completed check-in to planned removes its XP contribution because `xp_awarded` becomes `0`.
 
 Legacy quest-based fallback remains only for databases with no check-ins.
@@ -238,13 +240,12 @@ Current phase status:
 
 Future phases:
 
-1. Recurring habit design and generation.
-2. Optional auto-fail activation workflow.
-3. Production persistence and migration strategy.
-4. Authentication and user-specific data.
-5. External calendar sync.
-6. AI and voice planning extensions.
-7. Legacy `Quest.status` cleanup.
+1. Optional auto-fail activation workflow.
+2. Production persistence and migration strategy.
+3. Authentication and user-specific data.
+4. External calendar sync.
+5. AI and voice planning extensions.
+6. Legacy `Quest.status` cleanup.
 
 ## Test Plan
 
@@ -264,6 +265,7 @@ Covered by current tests:
 - Quest Planner calendar/day status helpers.
 - Character Profile XP/stat calculations from check-ins.
 - Habit Analytics metrics from check-ins.
+- Monthly Checklist recurring habit grouping from generated instances.
 
 Manual verification focus:
 
@@ -274,7 +276,6 @@ Manual verification focus:
 
 ## Non-Goals For V1
 
-- No recurring habit engine.
 - No PostgreSQL migration.
 - No authentication.
 - No Google Calendar sync.

@@ -7,7 +7,12 @@ Rule: do not implement any item from this list without explicit user confirmatio
 Current baseline:
 
 - Monthly Checklist v1 is implemented.
+- Recurring Habits v1 is implemented for selected-weekday templates, explicit
+  month generation, archive/delete controls, and safe future planned-day
+  cleanup.
 - `QuestCheckin` is the main source of truth for daily status when check-ins exist.
+- New scheduled quest and recurring habit XP is time-based.
+- Character Profile includes nonlinear character leveling and RPG stat levels.
 - Command Center, Habit Analytics, and Character Profile use check-ins for their current metrics/progression paths.
 - `Quest.status` remains only as legacy compatibility/fallback.
 
@@ -100,26 +105,25 @@ Positive value:
 - Keeps the UI clean while preserving analytics integrity.
 - Supports better long-term tracking.
 
-## Priority 5. Today View / Daily Command Center
+## Priority 5. Command Center Quick Actions
 
 What it adds:
 
-- A daily operational section showing today's quest check-ins, XP context, daily progress, and completion rate.
+- Optional status action controls in Command Center for today's quest check-ins.
 
 Why it matters:
 
-- A habit app is not only for analyzing history. Users need a daily answer to: what should I do today?
-- This makes the app useful as a daily workflow tool, not just an analytics dashboard.
+- Command Center already provides a read-only daily overview.
+- Quick actions could make the daily workflow faster if the app later needs that
+  behavior outside Quest Planner.
 
 Positive value:
 
-- Increases real-world daily usefulness.
-- Makes the app feel actionable immediately after opening.
-- Connects planning, execution, XP, and analytics in one flow.
+- Reduces navigation for users who update today's check-ins frequently.
+- Keeps planning, execution, XP, and analytics connected in one flow.
 
 Implementation note:
 
-- Command Center already provides a read-only daily overview.
 - Keep status changes in Quest Planner / Monthly Checklist unless a later design explicitly adds quick actions.
 
 ## Priority 6. Date Filters for Dashboard and Analytics
@@ -138,21 +142,26 @@ Positive value:
 - Makes analytics more useful without changing the core quest model.
 - Helps compare recent behavior against long-term trends.
 
-## Priority 7. Recurring Quests / Habit Templates
+## Priority 7. Recurring Habit Editing / Scheduling
 
 What it adds:
 
-- Reusable quests for repeated habits such as workouts, reading, sleep, or weekly planning.
+- Editing existing recurring habit templates beyond active/archive/delete
+  controls.
+- True `N times per week` scheduling if a clear product rule is designed.
 
 Why it matters:
 
-- Habit tracking depends on repetition.
-- Manually recreating the same quest every day is friction.
+- Recurring Habits v1 already covers selected-weekday templates and explicit
+  generation.
+- Users will eventually need to refine existing templates without deleting or
+  recreating them.
 
 Positive value:
 
-- Makes the product more useful for daily habit loops.
-- Increases retention because recurring behavior becomes easier to track.
+- Improves long-running habit management.
+- Reduces accidental data loss because template edits can be designed around
+  historical preservation rules.
 
 ## Priority 8. Streak Tracking
 
@@ -439,14 +448,16 @@ Implementation note:
 
 ### Suggested Implementation Order
 
-1. Recurring habits
-2. PostgreSQL / production persistence
-3. Authentication
-4. Google Calendar sync
-5. AI planning assistant
-6. Voice input
-7. Optional auto-fail activation workflow
-8. Legacy `Quest.status` cleanup
+1. Long-term Goals / Projects
+2. Recurring habit editing and N-times-per-week scheduling
+3. PostgreSQL / production persistence
+4. Authentication
+5. Google Calendar sync
+6. AI planning assistant
+7. Voice input
+8. Streak system / bonus XP
+9. Optional auto-fail activation workflow
+10. Legacy `Quest.status` cleanup
 
 ## Deferred Ideas
 

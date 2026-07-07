@@ -11,10 +11,18 @@ main source of truth for daily status, XP, and progression.
 Recurring Habits v1 is implemented for selected-weekday templates and explicit
 selected-month generation from Quest Planner.
 
+Template management is also implemented:
+
+- unused recurring habit templates can be hard-deleted,
+- templates with generated history are archived/deactivated instead of
+  hard-deleted,
+- future unresolved planned generated days can be removed safely while
+  preserving completed, skipped, failed, and XP-awarded history.
+
 Still not implemented:
 
 - true `N times per week` auto-scheduling,
-- recurring habit editing beyond active/inactive status,
+- recurring habit editing beyond active/inactive/archive/delete controls,
 - automatic background generation,
 - generation from analytics, profile, Command Center, or app startup.
 
@@ -22,7 +30,7 @@ Still not implemented:
 
 Recurring habits are templates. They are not completed directly.
 
-The planned flow is:
+The implemented flow is:
 
 ```text
 RecurringHabit template
@@ -45,9 +53,9 @@ use the existing `QuestCheckin` status rules.
 
 ## Product Behavior
 
-A recurring habit template should describe the reusable plan for a habit.
+A recurring habit template describes the reusable plan for a habit.
 
-Planned template fields:
+Template fields:
 
 - habit title
 - category
@@ -93,15 +101,15 @@ True `N times per week` recurrence is deferred because it requires either user-s
 auto-scheduling logic. For v1, "Gym Workout 4 times per week" should be represented as a custom
 selected-weekdays habit such as Monday, Tuesday, Thursday, and Saturday.
 
-## Proposed Data Model
+## Data Model
 
-Recurring Habits v1 should add two planned models.
+Recurring Habits v1 uses two models.
 
 ### RecurringHabit
 
 Stores the recurring habit template.
 
-Planned fields:
+Fields:
 
 | Field | Purpose |
 | --- | --- |
@@ -129,7 +137,7 @@ such as `[0, 2, 4]`.
 
 Links one generated habit date to the generated quest.
 
-Planned fields:
+Fields:
 
 | Field | Purpose |
 | --- | --- |
@@ -139,7 +147,7 @@ Planned fields:
 | `quest_id` | Foreign key to the generated `quests.id`. |
 | `created_at` | Timestamp set when the instance is generated. |
 
-Planned constraints:
+Constraints:
 
 - Unique `recurring_habit_id + scheduled_date`.
 - Unique `quest_id`.
@@ -155,11 +163,11 @@ For each eligible recurring habit date, generation should create:
 - one planned `QuestCheckin` row,
 - one `RecurringHabitInstance` row linking the template/date to the generated quest.
 
-The generated `Quest` should copy the template's title, description, category, difficulty,
-XP reward, estimated minutes, and optional time window. The generated quest should be scheduled
+The generated `Quest` copies the template's title, description, category, difficulty,
+XP reward, estimated minutes, and optional time window. The generated quest is scheduled
 for the generated date.
 
-Generated `QuestCheckin` records should start with:
+Generated `QuestCheckin` records start with:
 
 - `status = Planned`
 - `xp_awarded = 0`
@@ -173,7 +181,7 @@ Generation must not:
 
 ## Generation Strategy
 
-Recurring Habits v1 should use explicit month-based generation.
+Recurring Habits v1 uses explicit month-based generation.
 
 User flow:
 
@@ -184,7 +192,7 @@ User flow:
 5. `start_date` and `end_date` are respected.
 6. Duplicate generation is prevented by `RecurringHabitInstance`.
 
-The generation service should be idempotent. Clicking the generation button multiple times for
+The generation service is idempotent. Clicking the generation button multiple times for
 the same month should not create duplicate quests or check-ins.
 
 Do not auto-generate recurring records from:
@@ -200,26 +208,49 @@ Those surfaces should only display already-generated `QuestCheckin` records.
 
 Quest Planner remains the planning surface.
 
-Planned UI:
+Current UI:
 
 - Keep the one-time `New Quest` form.
-- Add a `Recurring Habits` section.
-- Provide a compact form to create recurring habit templates.
-- Provide an active habits table.
-- Provide a selected-month generation button.
+- Includes a `Recurring Habits` section.
+- Provides a compact form to create recurring habit templates.
+- Provides a recurring habits table.
+- Provides selected template management controls.
+- Provides a selected-month generation button.
+- Allows unused templates to be deleted after confirmation.
+- Archives/deactivates templates with generated history instead of hard-deleting
+  them.
+- Removes future unresolved planned generated days when the generated check-in is
+  still `Planned`, has `xp_awarded = 0`, and has no completed/skipped/failed
+  timestamps.
 - Show generated habits in calendar, day schedule, and Monthly Checklist as normal planned quest days.
 
 The Recurring Habits section should stay compact and practical for the MVP. It should avoid
 advanced scheduling, drag-and-drop recurrence editing, streak dashboards, or automatic day
 selection in v1.
 
+## Archive, Delete, And Future Cleanup
+
+Deletion is intentionally conservative.
+
+- If a template has no `RecurringHabitInstance` rows, it can be hard-deleted.
+- If a template has generated history, it is archived/deactivated by setting
+  `is_active = False`; existing generated quests, check-ins, and instances stay
+  in place.
+- Archived/inactive templates do not generate new planned days.
+- Future generated planned days can be removed only when their scheduled
+  `QuestCheckin` is still `Planned`, has `xp_awarded = 0`, and has no
+  completed/skipped/failed timestamp.
+- Completed, skipped, failed, past historical records, and any check-in with
+  awarded XP are preserved.
+- If a generated row is ambiguous, the cleanup keeps it.
+
 ## Monthly Checklist Impact
 
 Monthly Checklist should not calculate recurrence itself.
 
-It should display persisted generated `QuestCheckin` records exactly like other planned quest
+It displays persisted generated `QuestCheckin` records exactly like other planned quest
 days, grouped into one logical row per recurring habit template. Empty days should remain blank.
-Generated recurring habit days should use the same status actions:
+Generated recurring habit days use the same status actions:
 
 - Complete
 - Skip
@@ -259,7 +290,7 @@ Recurring-habit-specific charts, streaks, and adherence reports are out of scope
 
 ## Character Profile Impact
 
-Character Profile should continue using `QuestCheckin.xp_awarded`.
+Character Profile continues using `QuestCheckin.xp_awarded`.
 
 Completed generated habit check-ins should award XP and RPG stat progress like normal quest
 check-ins. Skipped, failed, and planned generated check-ins should award no XP.
@@ -285,18 +316,19 @@ page load. A future activation workflow should be designed before automatic fail
 
 ## Implementation Phases
 
-Recommended small commits:
+Implemented small commits:
 
 1. `docs: add recurring habits design`
 2. `feat: add recurring habit models`
 3. `feat: add recurring habit service`
 4. `feat: generate recurring habit instances for month`
 5. `feat: add recurring habits UI`
-6. `test/docs cleanup`
+6. `feat: add recurring habit archive/delete workflow`
+7. `test/docs cleanup`
 
 ## Test Plan
 
-Add focused pytest coverage for:
+Covered by focused pytest coverage for:
 
 - creating a recurring habit template,
 - selected weekdays generation,
@@ -313,6 +345,11 @@ Add focused pytest coverage for:
 - completed generated check-ins award XP once,
 - Character Profile includes generated check-in XP,
 - Habit Analytics includes generated check-ins.
+- unused recurring habits can be deleted,
+- recurring habits with generated history are archived instead of hard-deleted,
+- future unresolved planned generated days can be removed,
+- completed, skipped, failed, and XP-awarded history is preserved,
+- archived/inactive recurring habits do not generate new planned days.
 
 ## Risks And Decisions
 
