@@ -500,7 +500,8 @@ Current limitations:
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   recurring habit editing and true N-times-per-week auto-scheduling are not
   implemented yet.
-- Long-term Goals / Projects are not implemented.
+- Long-term Goals / Projects are not implemented; the future design is
+  documented in [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
