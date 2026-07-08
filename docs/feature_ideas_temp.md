@@ -8,9 +8,12 @@ Current baseline:
 
 - Monthly Checklist v1 is implemented.
 - Recurring Habits v1 is implemented for selected-weekday templates, explicit
-  month generation, archive/delete controls, and safe future planned-day
-  cleanup.
+  month generation, archive/delete controls, safe single generated-day deletion,
+  and safe future planned-day cleanup.
 - `QuestCheckin` is the main source of truth for daily status when check-ins exist.
+- Monthly Checklist status updates are blocked for unscheduled/blank cells.
+- Unused recurring templates and unresolved one-time planned quests can be
+  deleted safely while historical and XP-awarded records are preserved.
 - New scheduled quest and recurring habit XP is time-based.
 - Character Profile includes nonlinear character leveling and RPG stat levels.
 - Command Center, Habit Analytics, and Character Profile use check-ins for their current metrics/progression paths.
@@ -82,7 +85,8 @@ Why it matters:
 
 - Users often create tasks quickly and refine them later.
 - It makes Quest Planner feel practical instead of one-shot.
-- It reduces the need for delete/recreate workflows.
+- It reduces the need for delete/recreate workflows when a planned quest should
+  be changed rather than safely removed.
 
 Positive value:
 
@@ -93,12 +97,13 @@ Positive value:
 
 What it adds:
 
-- Ability to hide quests from active views without permanently deleting records.
+- Ability to hide historical or active quests from active views without
+  permanently deleting records.
 
 Why it matters:
 
-- Users need cleanup, but analytics should not lose historical context.
-- Soft delete avoids accidental data loss.
+- The implemented hard-delete path is intentionally limited to unresolved
+  planned records. Historical quests still need a soft-hide/archive model.
 
 Positive value:
 

@@ -80,12 +80,15 @@ Implemented:
 - Calendar-based Quest Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - Recurring Habit templates with explicit selected-month planned-day generation.
-- Recurring habit archive/delete controls and safe future planned-day cleanup.
+- Recurring habit archive/deactivate controls, unused-template deletion, single
+  generated-day deletion, and safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
 - Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset
-  behavior, XP idempotency, and a stale planned failure helper.
+  behavior, XP idempotency, unscheduled-date blocking, and a stale planned
+  failure helper.
 - Scheduled quest creation that creates a planned check-in for the scheduled
   date.
+- Safe deletion for unresolved one-time planned quests.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
 - Nonlinear character leveling and RPG stat leveling.
 - Command Center operational metrics powered by check-ins.
@@ -169,6 +172,9 @@ The app is designed to answer questions such as:
 - Recurring habits with generated history can be archived/deactivated.
 - Future unresolved planned generated days can be removed while completed,
   skipped, failed, and XP-awarded history is preserved.
+- Single unresolved generated recurring days can be removed safely.
+- One-time planned quests can be deleted only while they have no resolved
+  history or awarded XP.
 
 ### Monthly Checklist
 
@@ -178,6 +184,10 @@ The app is designed to answer questions such as:
 - Status legend for empty, planned, completed, skipped, and failed days.
 - Compact status editor for selected quest/date actions.
 - Complete, Skip, Fail, and Reset actions.
+- Status actions are enabled only for scheduled/generated cells; blank
+  not-scheduled cells are locked and do not create new check-ins.
+- Compact delete controls for unresolved one-time planned quests and unresolved
+  generated recurring days.
 - `QuestCheckin.xp_awarded` prevents duplicate XP from repeated completion
   actions.
 
@@ -247,6 +257,10 @@ The app is designed to answer questions such as:
 - New scheduled quest and recurring habit template XP is time-based:
   `max(5, round(planned_minutes / 60 * 20))`.
 - Scheduled quests create a planned check-in for the scheduled date.
+- Monthly Checklist updates and delete controls use the built checklist cell as
+  the editability source of truth, so unscheduled dates stay locked.
+- Deletion workflows are conservative: completed, skipped, failed, and
+  XP-awarded records are preserved.
 - Business logic lives in service layers instead of Streamlit page code.
 - Metrics are covered by pytest before the UI consumes them.
 - Auto-fail service logic exists with `grace_days = 3`, but it is not
@@ -493,6 +507,7 @@ Current limitations:
 - Google Calendar sync is not implemented.
 - AI planning assistant and voice quest capture are not implemented.
 - Streak tracking and bonus XP are not implemented.
+- Achievement unlock rules are not implemented.
 - Auto-fail exists as service logic but is not automatically enabled.
 - `Quest.status` still exists for compatibility/fallback and should be cleaned
   up only after the check-in migration is stable.
@@ -507,5 +522,6 @@ Suggested future order:
 6. AI planning assistant
 7. Voice quest capture / microphone input
 8. Streak system / bonus XP
-9. Optional auto-fail activation workflow
-10. Legacy `Quest.status` cleanup
+9. Achievement system
+10. Optional auto-fail activation workflow
+11. Legacy `Quest.status` cleanup

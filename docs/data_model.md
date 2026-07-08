@@ -55,6 +55,14 @@ Relationships:
 - One quest can have many daily check-ins.
 - One generated recurring habit instance can point to one quest.
 
+Retention behavior:
+
+- Unresolved one-time planned quests can be hard-deleted only when their
+  check-ins are still `Planned`, have `xp_awarded = 0`, and have no resolved
+  timestamps.
+- Quests with completed, skipped, failed, or XP-awarded check-ins are preserved.
+- Generated recurring quests follow recurring habit instance cleanup rules.
+
 ### quest_checkins
 
 Stores daily completion records for quests.
@@ -78,6 +86,8 @@ Constraints and relationships:
 - The pair `quest_id` and `checkin_date` is unique.
 - Completed check-ins award XP once by storing the awarded value in `xp_awarded`.
 - Skipped, failed, and planned check-ins should have `xp_awarded = 0`.
+- Completed, skipped, failed, and XP-awarded check-ins are historical records and
+  are intentionally preserved by cleanup workflows.
 
 ### recurring_habits
 
@@ -142,6 +152,8 @@ Safe cleanup behavior:
 - Future generated instances can be removed only when the related scheduled
   `QuestCheckin` is still `Planned`, has `xp_awarded = 0`, and has no
   completed/skipped/failed timestamp.
+- A single generated recurring occurrence can be removed under the same
+  unresolved planned safety rule.
 - Completed, skipped, failed, past historical records, and XP-awarded check-ins
   are preserved.
 - If cleanup removes the only planned check-in for the generated quest, the

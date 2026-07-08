@@ -12,6 +12,7 @@ from src.services.recurring_habit_service import (
     build_recurring_habit_dates_for_month,
     create_recurring_habit,
     delete_recurring_habit_if_unused,
+    delete_recurring_generated_occurrence_if_unresolved,
     deserialize_weekdays,
     generate_all_recurring_habits_for_month,
     generate_recurring_habit_for_month,
@@ -648,6 +649,61 @@ def test_remove_future_planned_recurring_instances_preserves_history_and_past_pl
     assert _checkin_on(session, date(2026, 7, 11)).status == "Skipped"
     assert _checkin_on(session, date(2026, 7, 12)).status == "Failed"
     assert _checkin_on(session, date(2026, 7, 13)).xp_awarded == 5
+
+
+def test_delete_single_recurring_generated_planned_occurrence_removes_instance_checkin_and_quest(session):
+    habit = _create_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    instance = _instance_on(session, date(2026, 7, 1))
+    quest_id = instance.quest_id
+
+    summary = delete_recurring_generated_occurrence_if_unresolved(quest_id, session=session)
+
+    assert summary["deleted"] is True
+    assert summary["deleted_checkins_count"] == 1
+    assert summary["deleted_instance_count"] == 1
+    assert summary["deleted_quest_count"] == 1
+    assert _instance_on(session, date(2026, 7, 1)) is None
+    assert session.get(Quest, quest_id) is None
+    assert session.query(QuestCheckin).filter_by(quest_id=quest_id).count() == 0
+    assert _instance_on(session, date(2026, 7, 8)) is not None
+
+
+def test_delete_completed_recurring_generated_occurrence_is_blocked_and_preserves_xp(session):
+    habit = _create_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    instance = _instance_on(session, date(2026, 7, 1))
+    checkin = complete_checkin(instance.quest_id, instance.scheduled_date, session=session)
+
+    summary = delete_recurring_generated_occurrence_if_unresolved(instance.quest_id, session=session)
+    session.refresh(checkin)
+
+    assert summary["deleted"] is False
+    assert summary["reason"] == "This generated habit day has history and cannot be deleted safely."
+    assert _instance_on(session, date(2026, 7, 1)) is not None
+    assert session.get(Quest, instance.quest_id) is not None
+    assert checkin.status == "Completed"
+    assert checkin.xp_awarded == habit.xp_reward
+
+
+@pytest.mark.parametrize("status", ["Skipped", "Failed"])
+def test_delete_skipped_or_failed_recurring_generated_occurrence_is_blocked(session, status):
+    habit = _create_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    instance = _instance_on(session, date(2026, 7, 1))
+    checkin = (
+        _skip_instance_on(session, instance.scheduled_date)
+        if status == "Skipped"
+        else _fail_instance_on(session, instance.scheduled_date)
+    )
+
+    summary = delete_recurring_generated_occurrence_if_unresolved(instance.quest_id, session=session)
+    session.refresh(checkin)
+
+    assert summary["deleted"] is False
+    assert _instance_on(session, date(2026, 7, 1)) is not None
+    assert session.get(Quest, instance.quest_id) is not None
+    assert checkin.status == status
 
 
 def test_month_checklist_still_groups_remaining_instances_after_future_removal(session):

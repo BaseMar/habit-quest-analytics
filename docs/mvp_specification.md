@@ -64,13 +64,17 @@ Status: implemented for scheduled one-time quests and recurring habit templates.
 - Generate recurring habit planned days for a selected month.
 - Archive/deactivate recurring habit templates with generated history.
 - Delete unused recurring habit templates.
+- Delete unresolved one-time planned quests while preserving historical or
+  XP-awarded records.
+- Delete a single unresolved generated recurring occurrence while preserving
+  historical or XP-awarded records.
 - Remove future unresolved planned generated days while preserving completed,
   skipped, failed, and XP-awarded history.
 
 Still planned:
 
 - quest editing,
-- one-time quest delete/archive workflow,
+- one-time quest archive/soft-delete workflow for historical records,
 - recurring habit editing beyond active/archive/delete controls.
 
 ### Phase 3: Monthly Checklist
@@ -82,6 +86,8 @@ Status: implemented v1.
 - Build monthly checklist data with rows as quests and columns as days.
 - Render a compact matrix preview in Quest Planner.
 - Allow Complete, Skip, Fail, and Reset actions for a selected quest/date.
+- Block status updates for unscheduled/blank cells so the Monthly Checklist
+  cannot create check-ins for dates where the quest is not scheduled/generated.
 - Keep XP idempotent with `QuestCheckin.xp_awarded`.
 
 Not implemented:
@@ -148,6 +154,9 @@ Legacy quest-based fallback remains only for databases with no check-ins.
 - A user can schedule quests locally.
 - Scheduled quests create planned check-ins.
 - A user can resolve daily check-ins as completed, skipped, failed, or planned.
+- A user cannot resolve a quest on an unscheduled Monthly Checklist date.
+- A user can safely remove unresolved planned records without deleting
+  completed, skipped, failed, or XP-awarded history.
 - Completed check-ins award XP once.
 - Command Center, Habit Analytics, and Character Profile use check-ins when available.
 - Quest records and check-ins persist in SQLite.

@@ -190,8 +190,10 @@ def delete_recurring_habit_if_unused(recurring_habit_id: int, session=None) -> d
             "recurring_habit_id": recurring_habit_id,
             "generated_instances_count": instances_count,
             "deleted": False,
+            "reason": None,
         }
         if instances_count > 0:
+            summary["reason"] = "This recurring habit has generated history and cannot be deleted safely."
             return summary
 
         session.delete(habit)

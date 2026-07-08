@@ -14,6 +14,7 @@ Implemented:
 - Scheduled quest -> planned check-in integration.
 - Monthly checklist data builder.
 - Quest Planner Monthly Checklist UI.
+- Monthly Checklist blocks status updates for not-scheduled cells.
 - Quest Planner calendar and selected day schedule using check-in status.
 - Command Center metrics using check-ins.
 - Character Profile XP/progression using check-in XP.
@@ -53,11 +54,20 @@ Core behavior:
 - Rows represent planned quests.
 - Columns represent days of the selected month.
 - Each cell represents one quest on one date.
-- User selects a quest/date and marks it `Completed`, `Skipped`, `Failed`, or resets it to `Planned`.
+- User selects a quest/date and marks it `Completed`, `Skipped`, `Failed`, or resets it to `Planned` only when that cell is scheduled/generated.
 - Unresolved planned cells remain `Planned`.
-- Empty days remain neutral/blank.
+- Empty days remain neutral/blank and are locked.
 - Completed check-ins award XP once.
 - Skipped and failed check-ins award no XP.
+
+Editability rules:
+
+- One-time quests can be updated only on their scheduled/check-in date.
+- Recurring habits can be updated only on generated dates.
+- Neutral blank/not-scheduled cells are not editable.
+- Status actions must not create check-ins for unscheduled dates.
+- The UI shows a locked/not-scheduled state when a user selects an invalid
+  quest/date pair.
 
 ## Status Semantics
 
@@ -160,7 +170,8 @@ Current v1 structure:
   - select quest,
   - select date,
   - view current status,
-  - Complete, Skip, Fail, Reset.
+  - show locked/not-scheduled state for blank cells,
+  - Complete, Skip, Fail, Reset only for scheduled/generated cells.
 
 V1 intentionally avoids a fragile fully editable 31-column widget grid. The matrix preview plus selected quest/date controls is simpler, more reliable in Streamlit, and easier to test.
 
@@ -176,6 +187,10 @@ Current behavior:
 - The old Maintenance, Quest Ledger, and Legacy Status Controls UI were removed.
 - Calendar events display check-in status for the event date when available.
 - Selected Day Schedule displays check-in status for the selected date when available.
+- Blank/not-scheduled Monthly Checklist cells cannot create check-ins through
+  status updates.
+- Safe delete controls are available only for unresolved scheduled/generated
+  cells.
 - `Quest.status` is not synchronized from check-in status.
 
 ## Command Center Impact
@@ -263,6 +278,7 @@ Covered by current tests:
 - Monthly checklist data builder.
 - Command Center metrics from check-ins.
 - Quest Planner calendar/day status helpers.
+- Monthly Checklist unscheduled-date blocking.
 - Character Profile XP/stat calculations from check-ins.
 - Habit Analytics metrics from check-ins.
 - Monthly Checklist recurring habit grouping from generated instances.
@@ -271,6 +287,8 @@ Manual verification focus:
 
 - Create scheduled quest.
 - Confirm planned check-in appears in Monthly Checklist.
+- Confirm unscheduled cells show locked/not-scheduled state and do not create
+  check-ins.
 - Mark Complete, Skip, Fail, and Reset.
 - Confirm matrix, calendar, selected day schedule, Command Center, Habit Analytics, and Character Profile reflect the expected check-in data.
 

@@ -32,11 +32,15 @@ Implemented:
 - Command Center operational overview powered by `QuestCheckin` records.
 - Quest Planner with calendar scheduling, selected day schedule, new quest form, and Monthly Checklist.
 - Recurring Habits v1 with selected-weekday templates, explicit selected-month
-  generation, archive/delete controls, and safe future planned-day cleanup.
+  generation, archive/delete controls, safe single generated-day deletion, and
+  safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
-- Checklist service for planned, completed, skipped, failed, and reset transitions.
+- Checklist service for planned, completed, skipped, failed, and reset
+  transitions, with Monthly Checklist updates blocked for unscheduled dates.
 - XP idempotency through `QuestCheckin.xp_awarded`.
 - Scheduled quest creation that creates a planned check-in for the scheduled date.
+- Safe deletion for unused recurring templates and unresolved one-time planned
+  quests while preserving historical and XP-awarded records.
 - Time-based XP for new scheduled quests and recurring habit templates.
 - Habit Analytics using check-ins for weekly pulse, XP trends, status/category breakdowns, consistency, planned minutes, and insights.
 - Character Profile using check-in XP for total XP, nonlinear level, completed

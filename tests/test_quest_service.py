@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, QuestCheckin
+from src.database.models import Base, Category, Quest, QuestCheckin
 from src.services.checklist_service import (
     complete_checkin,
     ensure_checkin,
@@ -15,7 +15,9 @@ from src.services.checklist_service import (
 from src.services.quest_service import (
     create_quest,
     create_scheduled_quest,
+    delete_one_time_quest_if_unresolved,
     get_all_quests,
+    get_one_time_quest_deletion_summary,
     get_quests_by_date,
     get_quests_for_calendar,
     get_quests_for_day,
@@ -160,6 +162,86 @@ def test_create_scheduled_quest_checkin_is_not_duplicated_by_ensure_checkin(sess
 
     assert ensured_checkin.id == existing_checkin.id
     assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 1
+
+
+def test_delete_one_time_planned_quest_removes_quest_and_planned_checkin(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Planned workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    summary = delete_one_time_quest_if_unresolved(quest.id, session=session)
+
+    assert summary["deleted"] is True
+    assert summary["deleted_checkins_count"] == 1
+    assert summary["deleted_quest_count"] == 1
+    assert session.get(Quest, quest.id) is None
+    assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 0
+
+
+def test_one_time_planned_quest_deletion_summary_allows_only_unresolved_history(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Planned workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    summary = get_one_time_quest_deletion_summary(quest.id, session=session)
+
+    assert summary["can_delete"] is True
+    assert summary["checkins_count"] == 1
+
+
+def test_delete_one_time_completed_quest_is_blocked_and_preserves_xp(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Completed workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    completed = complete_checkin(quest.id, date(2026, 6, 26), session=session)
+
+    summary = delete_one_time_quest_if_unresolved(quest.id, session=session)
+    session.refresh(completed)
+
+    assert summary["deleted"] is False
+    assert summary["reason"] == "This quest has historical status or awarded XP and cannot be deleted safely."
+    assert session.get(Quest, quest.id) is not None
+    assert completed.status == "Completed"
+    assert completed.xp_awarded == quest.xp_reward
+
+
+@pytest.mark.parametrize("action,expected_status", [(skip_checkin, "Skipped"), (fail_checkin, "Failed")])
+def test_delete_one_time_skipped_or_failed_quest_is_blocked(session, action, expected_status):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        "Resolved workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    checkin = action(quest.id, date(2026, 6, 26), session=session)
+
+    summary = delete_one_time_quest_if_unresolved(quest.id, session=session)
+    session.refresh(checkin)
+
+    assert summary["deleted"] is False
+    assert session.get(Quest, quest.id) is not None
+    assert checkin.status == expected_status
 
 
 def test_validate_schedule_times_rejects_end_before_start():

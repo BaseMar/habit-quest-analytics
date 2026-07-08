@@ -17,7 +17,8 @@ Template management is also implemented:
 - templates with generated history are archived/deactivated instead of
   hard-deleted,
 - future unresolved planned generated days can be removed safely while
-  preserving completed, skipped, failed, and XP-awarded history.
+  preserving completed, skipped, failed, and XP-awarded history,
+- a single unresolved generated recurring occurrence can be deleted safely.
 
 Still not implemented:
 
@@ -222,6 +223,8 @@ Current UI:
 - Removes future unresolved planned generated days when the generated check-in is
   still `Planned`, has `xp_awarded = 0`, and has no completed/skipped/failed
   timestamps.
+- Removes one selected generated day under the same unresolved `Planned`
+  safety rule.
 - Show generated habits in calendar, day schedule, and Monthly Checklist as normal planned quest days.
 
 The Recurring Habits section should stay compact and practical for the MVP. It should avoid
@@ -240,6 +243,9 @@ Deletion is intentionally conservative.
 - Future generated planned days can be removed only when their scheduled
   `QuestCheckin` is still `Planned`, has `xp_awarded = 0`, and has no
   completed/skipped/failed timestamp.
+- A single generated recurring occurrence can be removed by deleting its
+  generated `QuestCheckin`, `RecurringHabitInstance`, and generated `Quest` when
+  that occurrence is still unresolved `Planned` history.
 - Completed, skipped, failed, past historical records, and any check-in with
   awarded XP are preserved.
 - If a generated row is ambiguous, the cleanup keeps it.
@@ -348,6 +354,7 @@ Covered by focused pytest coverage for:
 - unused recurring habits can be deleted,
 - recurring habits with generated history are archived instead of hard-deleted,
 - future unresolved planned generated days can be removed,
+- single unresolved generated recurring occurrences can be removed,
 - completed, skipped, failed, and XP-awarded history is preserved,
 - archived/inactive recurring habits do not generate new planned days.
 

@@ -485,7 +485,7 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
                     key=f"recurring_habit_confirm_delete_{selected_habit.id}",
                 )
                 if st.button(
-                    "Delete",
+                    "Delete Template",
                     use_container_width=True,
                     disabled=not confirm_delete,
                     key="recurring_habit_delete",
