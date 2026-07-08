@@ -4,7 +4,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.database.db import get_session
-from src.database.models import Category, Quest, QuestCheckin, RecurringHabitInstance, utc_now
+from src.database.models import Category, Goal, Quest, QuestCheckin, RecurringHabitInstance, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.checklist_service import ensure_checkin
 from src.services.xp_service import calculate_time_based_xp, calculate_xp
@@ -31,6 +31,7 @@ def create_quest(
     difficulty: str = "Easy",
     planned_date: date | None = None,
     estimated_minutes: int | None = None,
+    goal_id: int | None = None,
     session=None,
 ) -> Quest:
     """Create and persist a quest."""
@@ -44,10 +45,12 @@ def create_quest(
     owns_session = session is None
     session = session or get_session()
     try:
+        normalized_goal_id = _validate_goal_for_link(session, goal_id)
         quest = Quest(
             title=_normalize_title(title),
             description=(description or "").strip() or None,
             category_id=category_id,
+            goal_id=normalized_goal_id,
             difficulty=difficulty.strip().title(),
             status="Planned",
             xp_reward=xp_reward,
@@ -75,6 +78,7 @@ def create_scheduled_quest(
     start_time: time | None = None,
     end_time: time | None = None,
     estimated_minutes: int | None = None,
+    goal_id: int | None = None,
     session=None,
 ) -> Quest:
     """Create a quest planned for a specific day and time window."""
@@ -91,10 +95,12 @@ def create_scheduled_quest(
     owns_session = session is None
     session = session or get_session()
     try:
+        normalized_goal_id = _validate_goal_for_link(session, goal_id)
         quest = Quest(
             title=_normalize_title(title),
             description=(description or "").strip() or None,
             category_id=category_id,
+            goal_id=normalized_goal_id,
             difficulty=difficulty.strip().title(),
             status="Planned",
             xp_reward=calculate_time_based_xp(estimated_minutes),
@@ -475,6 +481,18 @@ def _normalize_estimated_minutes(estimated_minutes: int | None) -> int | None:
         return None
 
     return value
+
+
+def _validate_goal_for_link(session, goal_id: int | None) -> int | None:
+    if goal_id is None:
+        return None
+
+    goal = session.get(Goal, goal_id)
+    if goal is None:
+        raise ValueError(f"Goal with id {goal_id} was not found.")
+    if goal.status != "Active":
+        raise ValueError("Only active goals can receive new quest sessions.")
+    return goal.id
 
 
 def _quest_event_date(quest: Quest) -> date | None:

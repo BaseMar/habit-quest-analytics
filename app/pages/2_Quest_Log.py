@@ -24,6 +24,7 @@ from src.services.checklist_service import (
     is_checklist_cell_editable,
     update_checklist_cell_status,
 )
+from src.services.goal_service import list_active_goals
 from src.services.quest_service import (
     create_scheduled_quest,
     delete_one_time_quest_if_unresolved,
@@ -1028,6 +1029,16 @@ with planner_col:
 
         estimated_minutes = _calculate_duration_minutes(start_time, end_time)
         notes = st.text_area("Notes", height=64, placeholder="Optional notes")
+        active_goals = list_active_goals()
+        selected_goal_id = None
+        if active_goals:
+            goal_options = [None] + [goal.id for goal in active_goals]
+            goal_labels = {None: "None"} | {goal.id: goal.title for goal in active_goals}
+            selected_goal_id = st.selectbox(
+                "Link to Goal / Project",
+                goal_options,
+                format_func=lambda goal_id: goal_labels[goal_id],
+            )
 
         if estimated_minutes is None:
             st.error("End time must be after start time.")
@@ -1049,6 +1060,7 @@ with planner_col:
                         start_time=start_time,
                         end_time=end_time,
                         estimated_minutes=estimated_minutes,
+                        goal_id=selected_goal_id,
                     )
                 except ValueError as error:
                     st.error(str(error))

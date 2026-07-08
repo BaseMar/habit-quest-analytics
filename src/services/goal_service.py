@@ -1,11 +1,11 @@
 from datetime import date
 
 from src.database.db import get_session
-from src.database.models import Goal, utc_now
+from src.database.models import Goal, Quest, QuestCheckin, utc_now
+from src.services.xp_service import calculate_time_based_xp
 
 
 GOAL_STATUSES = ("Active", "Completed", "Archived")
-_UNSET = object()
 
 
 def create_goal(
@@ -70,6 +70,11 @@ def list_goals(status: str | None = None, session=None) -> list[Goal]:
     finally:
         if owns_session:
             session.close()
+
+
+def list_active_goals(session=None) -> list[Goal]:
+    """Return active goals that can receive new one-time quest sessions."""
+    return list_goals(status="Active", session=session)
 
 
 def get_goal(goal_id: int, session=None) -> Goal | None:
@@ -152,7 +157,7 @@ def reopen_goal(goal_id: int, session=None) -> Goal:
 
 
 def delete_goal_if_unused(goal_id: int, session=None) -> dict:
-    """Hard-delete a goal that has no linked quest history in the current phase."""
+    """Hard-delete a goal only when it has no linked quests."""
     owns_session = session is None
     session = session or get_session()
     try:
@@ -160,12 +165,17 @@ def delete_goal_if_unused(goal_id: int, session=None) -> dict:
         if goal is None:
             raise ValueError(f"Goal with id {goal_id} was not found.")
 
+        linked_quests_count = _get_linked_quests_count(session, goal_id)
         summary = {
             "goal_id": goal_id,
-            "linked_quests_count": 0,
+            "linked_quests_count": linked_quests_count,
             "deleted": False,
             "reason": None,
         }
+        if linked_quests_count > 0:
+            summary["reason"] = "This goal has linked quest sessions and cannot be deleted safely."
+            return summary
+
         session.delete(goal)
         session.commit()
         summary["deleted"] = True
@@ -179,7 +189,7 @@ def delete_goal_if_unused(goal_id: int, session=None) -> dict:
 
 
 def get_goal_progress(goal_id: int, session=None) -> dict:
-    """Return placeholder goal progress until quest-to-goal linking exists."""
+    """Return goal progress derived from linked quest sessions and check-ins."""
     owns_session = session is None
     session = session or get_session()
     try:
@@ -187,13 +197,30 @@ def get_goal_progress(goal_id: int, session=None) -> dict:
         if goal is None:
             raise ValueError(f"Goal with id {goal_id} was not found.")
 
+        return _build_goal_progress(session, goal)
+    finally:
+        if owns_session:
+            session.close()
+
+
+def get_goal_history_summary(goal_id: int, session=None) -> dict:
+    """Return linked session status counts and earned XP for a goal."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        goal = session.get(Goal, goal_id)
+        if goal is None:
+            raise ValueError(f"Goal with id {goal_id} was not found.")
+
+        progress = _build_goal_progress(session, goal)
         return {
             "goal_id": goal.id,
-            "planned_total_minutes": goal.planned_total_minutes,
-            "completed_minutes": 0,
-            "remaining_minutes": goal.planned_total_minutes,
-            "progress_percent": 0,
-            "earned_xp": 0,
+            "linked_quests_count": progress["linked_sessions_count"],
+            "completed_sessions_count": progress["completed_sessions_count"],
+            "planned_sessions_count": progress["planned_sessions_count"],
+            "skipped_sessions_count": progress["skipped_sessions_count"],
+            "failed_sessions_count": progress["failed_sessions_count"],
+            "earned_xp": progress["earned_xp"],
         }
     finally:
         if owns_session:
@@ -219,6 +246,83 @@ def _set_goal_status(goal_id: int, status: str, session=None) -> Goal:
     finally:
         if owns_session:
             session.close()
+
+
+def _build_goal_progress(session, goal: Goal) -> dict:
+    linked_quests = _get_linked_quests(session, goal.id)
+    linked_quest_ids = [quest.id for quest in linked_quests]
+    checkins = _get_linked_checkins(session, linked_quest_ids)
+    quests_by_id = {quest.id: quest for quest in linked_quests}
+
+    completed_minutes = 0
+    completed_sessions_count = 0
+    planned_sessions_count = 0
+    skipped_sessions_count = 0
+    failed_sessions_count = 0
+    earned_xp = 0
+
+    for checkin in checkins:
+        quest = quests_by_id.get(checkin.quest_id)
+        if quest is None:
+            continue
+
+        earned_xp += checkin.xp_awarded or 0
+        if checkin.status == "Completed":
+            completed_sessions_count += 1
+            completed_minutes += _get_quest_planned_minutes(quest)
+        elif checkin.status == "Planned":
+            planned_sessions_count += 1
+        elif checkin.status == "Skipped":
+            skipped_sessions_count += 1
+        elif checkin.status == "Failed":
+            failed_sessions_count += 1
+
+    remaining_minutes = max(goal.planned_total_minutes - completed_minutes, 0)
+    raw_progress = completed_minutes / goal.planned_total_minutes * 100
+    progress_percent = max(0, min(raw_progress, 100))
+
+    return {
+        "goal_id": goal.id,
+        "title": goal.title,
+        "planned_total_minutes": goal.planned_total_minutes,
+        "completed_minutes": completed_minutes,
+        "remaining_minutes": remaining_minutes,
+        "progress_percent": progress_percent,
+        "linked_sessions_count": len(linked_quests),
+        "completed_sessions_count": completed_sessions_count,
+        "planned_sessions_count": planned_sessions_count,
+        "skipped_sessions_count": skipped_sessions_count,
+        "failed_sessions_count": failed_sessions_count,
+        "earned_xp": earned_xp,
+        "expected_total_xp": calculate_time_based_xp(goal.planned_total_minutes),
+    }
+
+
+def _get_linked_quests(session, goal_id: int) -> list[Quest]:
+    return session.query(Quest).filter(Quest.goal_id == goal_id).order_by(Quest.id).all()
+
+
+def _get_linked_quests_count(session, goal_id: int) -> int:
+    return session.query(Quest).filter(Quest.goal_id == goal_id).count()
+
+
+def _get_linked_checkins(session, quest_ids: list[int]) -> list[QuestCheckin]:
+    if not quest_ids:
+        return []
+    return (
+        session.query(QuestCheckin)
+        .filter(QuestCheckin.quest_id.in_(quest_ids))
+        .order_by(QuestCheckin.checkin_date, QuestCheckin.id)
+        .all()
+    )
+
+
+def _get_quest_planned_minutes(quest: Quest) -> int:
+    if quest.estimated_minutes and quest.estimated_minutes > 0:
+        return quest.estimated_minutes
+    if quest.planned_start_at is not None and quest.planned_end_at is not None:
+        return max(int((quest.planned_end_at - quest.planned_start_at).total_seconds() // 60), 0)
+    return 0
 
 
 def _normalize_title(title: str) -> str:

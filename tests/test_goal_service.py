@@ -1,21 +1,25 @@
-from datetime import date
+from datetime import date, time
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, Goal
+from src.database.models import Base, Category, Goal, Quest, QuestCheckin
+from src.services.checklist_service import complete_checkin, fail_checkin, reset_checkin, skip_checkin
 from src.services.goal_service import (
     archive_goal,
     complete_goal,
     create_goal,
     delete_goal_if_unused,
     get_goal,
+    get_goal_history_summary,
     get_goal_progress,
+    list_active_goals,
     list_goals,
     reopen_goal,
     update_goal,
 )
+from src.services.quest_service import create_scheduled_quest
 
 
 @pytest.fixture()
@@ -30,6 +34,26 @@ def session():
         yield session
     finally:
         session.close()
+
+
+def _create_goal_session(
+    session,
+    goal: Goal,
+    title: str = "Portfolio session",
+    planned_date: date = date(2026, 7, 1),
+    minutes: int = 120,
+) -> Quest:
+    category = session.query(Category).one()
+    return create_scheduled_quest(
+        title=title,
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=planned_date,
+        start_time=time(9, 0),
+        end_time=time(9 + minutes // 60, minutes % 60),
+        estimated_minutes=minutes,
+        session=session,
+    )
 
 
 def test_create_goal_creates_valid_goal(session):
@@ -109,6 +133,21 @@ def test_list_goals_can_filter_by_status(session):
     assert archived not in goals
 
 
+def test_list_active_goals_returns_only_active_goals(session):
+    active = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    archived = create_goal(
+        "Old Project",
+        planned_total_minutes=300,
+        status="Archived",
+        session=session,
+    )
+
+    goals = list_active_goals(session=session)
+
+    assert goals == [active]
+    assert archived not in goals
+
+
 def test_get_goal_returns_correct_goal(session):
     goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
 
@@ -183,16 +222,143 @@ def test_delete_goal_if_unused_deletes_goal(session):
     assert session.get(Goal, goal.id) is None
 
 
-def test_get_goal_progress_returns_placeholder_until_quests_are_linked(session):
+def test_delete_goal_if_unused_blocks_goal_with_linked_quest(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal)
+
+    summary = delete_goal_if_unused(goal.id, session=session)
+
+    assert summary["deleted"] is False
+    assert summary["linked_quests_count"] == 1
+    assert summary["reason"] == "This goal has linked quest sessions and cannot be deleted safely."
+    assert session.get(Goal, goal.id) is not None
+    assert session.get(Quest, quest.id) is not None
+
+
+def test_archive_goal_with_linked_quest_preserves_quest_and_checkin(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal)
+    checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+
+    archived = archive_goal(goal.id, session=session)
+
+    assert archived.status == "Archived"
+    assert session.get(Quest, quest.id) is not None
+    assert session.get(QuestCheckin, checkin.id) is not None
+
+
+def test_get_goal_progress_with_no_linked_quests_returns_zero_progress(session):
     goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
 
     progress = get_goal_progress(goal.id, session=session)
 
     assert progress == {
         "goal_id": goal.id,
+        "title": "Portfolio Project",
         "planned_total_minutes": 1200,
         "completed_minutes": 0,
         "remaining_minutes": 1200,
         "progress_percent": 0,
+        "linked_sessions_count": 0,
+        "completed_sessions_count": 0,
+        "planned_sessions_count": 0,
+        "skipped_sessions_count": 0,
+        "failed_sessions_count": 0,
         "earned_xp": 0,
+        "expected_total_xp": 400,
+    }
+
+
+def test_planned_linked_quest_does_not_increase_completed_minutes(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    _create_goal_session(session, goal)
+
+    progress = get_goal_progress(goal.id, session=session)
+
+    assert progress["linked_sessions_count"] == 1
+    assert progress["planned_sessions_count"] == 1
+    assert progress["completed_minutes"] == 0
+    assert progress["earned_xp"] == 0
+
+
+def test_completed_linked_quest_increases_completed_minutes_and_earned_xp(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal, minutes=120)
+    complete_checkin(quest.id, date(2026, 7, 1), session=session)
+
+    progress = get_goal_progress(goal.id, session=session)
+
+    assert progress["completed_sessions_count"] == 1
+    assert progress["completed_minutes"] == 120
+    assert progress["remaining_minutes"] == 1080
+    assert progress["progress_percent"] == 10
+    assert progress["earned_xp"] == 40
+
+
+@pytest.mark.parametrize(
+    ("action", "status_key"),
+    [
+        (skip_checkin, "skipped_sessions_count"),
+        (fail_checkin, "failed_sessions_count"),
+    ],
+)
+def test_skipped_or_failed_linked_quest_does_not_increase_completed_minutes(session, action, status_key):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal)
+    action(quest.id, date(2026, 7, 1), session=session)
+
+    progress = get_goal_progress(goal.id, session=session)
+
+    assert progress[status_key] == 1
+    assert progress["completed_minutes"] == 0
+    assert progress["earned_xp"] == 0
+
+
+def test_reset_linked_checkin_removes_completed_contribution(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal, minutes=120)
+    complete_checkin(quest.id, date(2026, 7, 1), session=session)
+    reset_checkin(quest.id, date(2026, 7, 1), session=session)
+
+    progress = get_goal_progress(goal.id, session=session)
+
+    assert progress["completed_sessions_count"] == 0
+    assert progress["planned_sessions_count"] == 1
+    assert progress["completed_minutes"] == 0
+    assert progress["earned_xp"] == 0
+
+
+def test_goal_progress_percent_is_capped_and_remaining_minutes_not_negative(session):
+    goal = create_goal("Tiny Goal", planned_total_minutes=60, session=session)
+    quest = _create_goal_session(session, goal, minutes=120)
+    complete_checkin(quest.id, date(2026, 7, 1), session=session)
+
+    progress = get_goal_progress(goal.id, session=session)
+
+    assert progress["completed_minutes"] == 120
+    assert progress["remaining_minutes"] == 0
+    assert progress["progress_percent"] == 100
+
+
+def test_goal_history_summary_counts_linked_sessions(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    planned = _create_goal_session(session, goal, title="Planned", planned_date=date(2026, 7, 1))
+    completed = _create_goal_session(session, goal, title="Completed", planned_date=date(2026, 7, 2))
+    skipped = _create_goal_session(session, goal, title="Skipped", planned_date=date(2026, 7, 3))
+    failed = _create_goal_session(session, goal, title="Failed", planned_date=date(2026, 7, 4))
+    complete_checkin(completed.id, date(2026, 7, 2), session=session)
+    skip_checkin(skipped.id, date(2026, 7, 3), session=session)
+    fail_checkin(failed.id, date(2026, 7, 4), session=session)
+
+    summary = get_goal_history_summary(goal.id, session=session)
+
+    assert planned.goal_id == goal.id
+    assert summary == {
+        "goal_id": goal.id,
+        "linked_quests_count": 4,
+        "completed_sessions_count": 1,
+        "planned_sessions_count": 1,
+        "skipped_sessions_count": 1,
+        "failed_sessions_count": 1,
+        "earned_xp": 40,
     }

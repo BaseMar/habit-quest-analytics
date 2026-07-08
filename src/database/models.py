@@ -62,6 +62,7 @@ class Goal(Base):
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     category = relationship("Category", back_populates="goals")
+    quests = relationship("Quest", back_populates="goal")
 
 
 class Quest(Base):
@@ -82,7 +83,9 @@ class Quest(Base):
     created_at = Column(DateTime, nullable=False, default=utc_now)
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=True)
     category = relationship("Category", back_populates="quests")
+    goal = relationship("Goal", back_populates="quests")
     checkins = relationship("QuestCheckin", back_populates="quest")
     recurring_habit_instance = relationship(
         "RecurringHabitInstance",

@@ -6,9 +6,11 @@ Analytics.
 Current implementation status:
 
 - `Goal` model and service-layer foundation are implemented.
-- Quest-to-goal linking is not implemented yet.
-- Goal progress from linked sessions is not implemented yet.
-- No UI is implemented yet.
+- One-time scheduled quests can link to active goals through `Quest.goal_id`.
+- Goal progress is derived from linked quest sessions and
+  `QuestCheckin.xp_awarded`.
+- Recurring habits are not linked to goals.
+- Full Goal Dashboard / Project Board UI is not implemented yet.
 
 ## Problem
 
@@ -46,20 +48,20 @@ Suggested fields:
 - `created_at`
 - `updated_at`
 
-A goal/project should not award XP directly by default. XP should be earned
-through completed linked quest sessions once quest linking is implemented.
+A goal/project does not award XP directly. XP is earned through completed linked
+quest sessions.
 
 ## Quest / Session Relationship
 
-A quest can eventually belong to a goal/project.
+A quest can optionally belong to a goal/project.
 
-Suggested future field, not implemented in the model yet:
+Implemented field:
 
 - `Quest.goal_id`, nullable foreign key
 
 Rules:
 
-- One-time quests can be linked to a goal.
+- One-time scheduled quests can be linked to an active goal.
 - Recurring habits can remain separate for v1.
 - Generated recurring habit quests do not need goal linking in v1 unless that is
   explicitly added later.
@@ -134,10 +136,16 @@ Rules:
 
 ### Quest Planner
 
+Current backend/minimal UI behavior:
+
+- A one-time scheduled quest can optionally be linked to an active goal/project
+  at creation time.
+- Recurring habit template creation does not show or set a goal link.
+- Linked quest sessions continue to create normal planned `QuestCheckin` rows.
+
 Future Quest Planner capabilities:
 
 - Create a goal/project.
-- Link a one-time quest/session to a goal/project.
 - View goal progress.
 - Create a new session for a goal.
 
@@ -201,10 +209,10 @@ Possible model additions:
 
 | Field | Purpose |
 | --- | --- |
-| `goal_id` | Nullable foreign key to `goals.id`. |
+| `goal_id` | Nullable foreign key to `goals.id`. Implemented for one-time scheduled quests. |
 
-No new XP table should be added in v1. `QuestCheckin.xp_awarded` remains the XP
-source of truth.
+No new XP table is added in v1. `QuestCheckin.xp_awarded` remains the XP source
+of truth.
 
 ## Safe Deletion / Archive Rules
 
@@ -223,8 +231,8 @@ Rules:
 
 1. `docs: add long-term goals design` - implemented.
 2. `feat: add goal/project model and service layer` - implemented.
-3. `feat: link one-time quests to goals`
-4. `feat: add goal progress UI in Quest Planner`
+3. `feat: link one-time quests to goals` - implemented.
+4. `feat: add goal creation and progress UI in Quest Planner`
 5. `feat: add goal analytics`
 6. `docs: update long-term goals documentation`
 

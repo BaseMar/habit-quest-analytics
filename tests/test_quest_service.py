@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, Quest, QuestCheckin
+from src.database.models import Base, Category, Goal, Quest, QuestCheckin
 from src.services.checklist_service import (
     complete_checkin,
     ensure_checkin,
@@ -162,6 +162,85 @@ def test_create_scheduled_quest_checkin_is_not_duplicated_by_ensure_checkin(sess
 
     assert ensured_checkin.id == existing_checkin.id
     assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 1
+
+
+def test_create_scheduled_quest_without_goal_id_still_works(session):
+    category = session.query(Category).one()
+
+    quest = create_scheduled_quest(
+        title="Morning workout",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    assert quest.goal_id is None
+    assert session.query(QuestCheckin).filter_by(quest_id=quest.id).count() == 1
+
+
+def test_create_scheduled_quest_with_active_goal_links_quest(session):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+
+    quest = create_scheduled_quest(
+        title="Portfolio session",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(11, 0),
+        session=session,
+    )
+    session.refresh(goal)
+
+    assert quest.goal_id == goal.id
+    assert quest.goal == goal
+    assert quest in goal.quests
+    assert quest.xp_reward == 40
+
+
+def test_create_scheduled_quest_with_invalid_goal_id_fails_without_creating_checkin(session):
+    category = session.query(Category).one()
+
+    with pytest.raises(ValueError, match="Goal with id 999 was not found"):
+        create_scheduled_quest(
+            title="Portfolio session",
+            category_id=category.id,
+            goal_id=999,
+            planned_date=date(2026, 6, 26),
+            start_time=time(9, 0),
+            end_time=time(11, 0),
+            session=session,
+        )
+
+    assert session.query(Quest).count() == 0
+    assert session.query(QuestCheckin).count() == 0
+
+
+@pytest.mark.parametrize("status", ["Archived", "Completed"])
+def test_create_scheduled_quest_rejects_non_active_goal(session, status):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", planned_total_minutes=1200, status=status)
+    session.add(goal)
+    session.commit()
+
+    with pytest.raises(ValueError, match="Only active goals can receive new quest sessions"):
+        create_scheduled_quest(
+            title="Portfolio session",
+            category_id=category.id,
+            goal_id=goal.id,
+            planned_date=date(2026, 6, 26),
+            start_time=time(9, 0),
+            end_time=time(11, 0),
+            session=session,
+        )
+
+    assert session.query(Quest).count() == 0
+    assert session.query(QuestCheckin).count() == 0
 
 
 def test_delete_one_time_planned_quest_removes_quest_and_planned_checkin(session):

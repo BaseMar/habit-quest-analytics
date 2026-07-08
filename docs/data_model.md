@@ -31,9 +31,9 @@ Relationships:
 
 ### goals
 
-Stores long-term goal/project definitions. This is the backend foundation only:
-quests are not linked to goals yet, and goal progress from linked sessions is
-future work.
+Stores long-term goal/project definitions. One-time scheduled quests can link to
+goals, and goal progress is derived from linked quest check-ins. Recurring
+habits are not linked to goals in the current phase.
 
 | Field | Purpose |
 | --- | --- |
@@ -51,8 +51,9 @@ future work.
 Relationships:
 
 - Many goals can belong to one category.
+- One goal can have many linked one-time quest sessions.
 - Goals do not award XP directly.
-- Quest-to-goal linking is not implemented yet.
+- Goal earned XP is derived from linked `QuestCheckin.xp_awarded` values.
 
 ### quests
 
@@ -74,12 +75,15 @@ Stores scheduled task or habit plans represented as RPG quests.
 | `completed_at` | Legacy completion timestamp for quest-level completion. |
 | `created_at` | Timestamp set when the quest is created. |
 | `category_id` | Optional foreign key to `categories.id`. |
+| `goal_id` | Optional foreign key to `goals.id` for one-time goal/project sessions. |
 
 Relationships:
 
 - Many quests can belong to one category.
+- Many quests can optionally belong to one goal/project.
 - One quest can have many daily check-ins.
 - One generated recurring habit instance can point to one quest.
+- Recurring generated quests keep `goal_id = NULL` in the current phase.
 
 Retention behavior:
 
@@ -241,6 +245,7 @@ erDiagram
     categories ||--o{ quests : groups
     categories ||--o{ recurring_habits : groups
     categories ||--o{ goals : groups
+    goals ||--o{ quests : links
     quests ||--o{ quest_checkins : tracks
     recurring_habits ||--o{ recurring_habit_instances : generates
     quests ||--o| recurring_habit_instances : generated_as
@@ -268,6 +273,7 @@ erDiagram
         datetime completed_at
         datetime created_at
         int category_id FK
+        int goal_id FK
     }
 
     goals {
@@ -358,6 +364,7 @@ Startup can:
 - create `goals` for existing local databases if the table is missing,
 - create `recurring_habits` and `recurring_habit_instances` for existing local databases if the tables are missing,
 - add missing `estimated_minutes`, `planned_start_at`, and `planned_end_at` columns to `quests`,
+- add missing `goal_id` to `quests`,
 - add missing `avatar_path` to `player_profiles`.
 
 These helpers do not drop existing data.

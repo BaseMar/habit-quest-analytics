@@ -64,6 +64,9 @@ def _ensure_sqlite_schema() -> None:
     if "planned_end_at" not in quest_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE quests ADD COLUMN planned_end_at DATETIME"))
+    if "goal_id" not in quest_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE quests ADD COLUMN goal_id INTEGER"))
 
     recurring_habit_columns = (
         set(RecurringHabit.__table__.columns.keys())
