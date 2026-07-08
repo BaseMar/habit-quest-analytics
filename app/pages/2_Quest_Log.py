@@ -1262,6 +1262,124 @@ def _pluralize(word: str, count: int) -> str:
     return word if count == 1 else f"{word}s"
 
 
+def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
+    st.caption("Plan one-time quests, review the selected day, and link sessions to active goals.")
+    calendar_events = get_quests_for_calendar()
+
+    render_section_title("Quest Calendar", "Review planned quests and select a day to build its schedule.")
+    with st.container(border=True):
+        render_calendar(calendar_events, st.session_state["selected_date"])
+
+    selected_day_quests = get_quests_for_day(st.session_state["selected_date"])
+
+    render_section_title("Selected Day Board")
+    with st.container(border=True):
+        header_left, header_right = st.columns([0.68, 0.32], vertical_alignment="center")
+        with header_left:
+            st.subheader(_format_selected_date(st.session_state["selected_date"]))
+            st.caption("Daily quest plan for the selected calendar date.")
+        with header_right:
+            st.date_input("Selected date", key="selected_date")
+
+        render_day_summary(selected_day_quests)
+
+        schedule_col, planner_col = st.columns([0.6, 0.4], gap="large")
+
+    with schedule_col:
+        st.write("**Day Schedule**")
+        st.caption("Planned quests ordered by start time.")
+        render_schedule_list(selected_day_quests)
+
+    with planner_col:
+        st.write("**New Quest**")
+        st.caption("Add a scheduled quest to the selected day.")
+        selected_date = st.session_state["selected_date"]
+        default_start = time(9, 0)
+        default_end = time(10, 0)
+
+        with st.container(border=True):
+            title = st.text_input("Title", placeholder="Quest title")
+
+            category_col, difficulty_col = st.columns([1.15, 0.85])
+            with category_col:
+                category_name = st.selectbox("Category", list(category_options.keys()))
+            with difficulty_col:
+                difficulty = st.selectbox("Difficulty", list(QUEST_DIFFICULTIES))
+
+            start_col, end_col = st.columns(2)
+            with start_col:
+                start_time = st.time_input("Start Time", value=default_start, step=300)
+            with end_col:
+                end_time = st.time_input("End Time", value=default_end, step=300)
+
+            estimated_minutes = _calculate_duration_minutes(start_time, end_time)
+            notes = st.text_area("Notes", height=64, placeholder="Optional notes")
+            active_goals = list_active_goals()
+            selected_goal_id = None
+            if active_goals:
+                goal_options = [None] + [goal.id for goal in active_goals]
+                goal_labels = {None: "None"} | {goal.id: goal.title for goal in active_goals}
+                selected_goal_id = st.selectbox(
+                    "Link to Goal / Project",
+                    goal_options,
+                    format_func=lambda goal_id: goal_labels[goal_id],
+                )
+
+            if estimated_minutes is None:
+                st.error("End time must be after start time.")
+
+            submitted = st.button("Add Quest", type="primary", use_container_width=True)
+            if submitted:
+                if not title.strip():
+                    st.error("Every quest needs a title.")
+                elif estimated_minutes is None:
+                    st.error("End time must be after start time.")
+                else:
+                    try:
+                        create_scheduled_quest(
+                            title=title,
+                            description=notes,
+                            category_id=category_options[category_name],
+                            difficulty=difficulty,
+                            planned_date=selected_date,
+                            start_time=start_time,
+                            end_time=end_time,
+                            estimated_minutes=estimated_minutes,
+                            goal_id=selected_goal_id,
+                        )
+                    except ValueError as error:
+                        st.error(str(error))
+                    else:
+                        st.success("Quest scheduled.")
+                        st.rerun()
+
+
+def render_goals_projects_tab(category_options: dict[str, int]) -> None:
+    st.caption("Create long-term goals, add planned sessions, and monitor linked quest progress.")
+    render_section_title(
+        "Goal Progress",
+        "Track active long-term goals through linked one-time quest sessions.",
+    )
+    with st.container(border=True):
+        render_goal_progress_section(category_options)
+        render_goal_creation_form(category_options)
+        render_goal_management(category_options)
+
+
+def render_recurring_habits_tab(category_options: dict[str, int]) -> None:
+    st.caption("Manage recurring templates and generate planned quest days for the selected checklist month.")
+    render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
+    with st.container(border=True):
+        render_recurring_habits(category_options)
+
+
+def render_monthly_checklist_tab() -> None:
+    st.caption("Resolve scheduled quest days while preserving check-in XP idempotency.")
+    render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
+    with st.container(border=True):
+        render_monthly_checklist()
+
+
 apply_theme()
 render_page_header(
     "Quest Planning",
@@ -1285,108 +1403,23 @@ pending_selected_date = st.session_state.pop("pending_selected_date", None)
 if pending_selected_date is not None:
     st.session_state["selected_date"] = pending_selected_date
 
-calendar_events = get_quests_for_calendar()
-
-render_section_title("Quest Calendar", "Review planned quests and select a day to build its schedule.")
-with st.container(border=True):
-    render_calendar(calendar_events, st.session_state["selected_date"])
-
-selected_day_quests = get_quests_for_day(st.session_state["selected_date"])
-
-render_section_title("Selected Day Board")
-with st.container(border=True):
-    header_left, header_right = st.columns([0.68, 0.32], vertical_alignment="center")
-    with header_left:
-        st.subheader(_format_selected_date(st.session_state["selected_date"]))
-        st.caption("Daily quest plan for the selected calendar date.")
-    with header_right:
-        st.date_input("Selected date", key="selected_date")
-
-    render_day_summary(selected_day_quests)
-
-    schedule_col, planner_col = st.columns([0.6, 0.4], gap="large")
-
-with schedule_col:
-    st.write("**Day Schedule**")
-    st.caption("Planned quests ordered by start time.")
-    render_schedule_list(selected_day_quests)
-
-with planner_col:
-    st.write("**New Quest**")
-    st.caption("Add a scheduled quest to the selected day.")
-    selected_date = st.session_state["selected_date"]
-    default_start = time(9, 0)
-    default_end = time(10, 0)
-
-    with st.container(border=True):
-        title = st.text_input("Title", placeholder="Quest title")
-
-        category_col, difficulty_col = st.columns([1.15, 0.85])
-        with category_col:
-            category_name = st.selectbox("Category", list(category_options.keys()))
-        with difficulty_col:
-            difficulty = st.selectbox("Difficulty", list(QUEST_DIFFICULTIES))
-
-        start_col, end_col = st.columns(2)
-        with start_col:
-            start_time = st.time_input("Start Time", value=default_start, step=300)
-        with end_col:
-            end_time = st.time_input("End Time", value=default_end, step=300)
-
-        estimated_minutes = _calculate_duration_minutes(start_time, end_time)
-        notes = st.text_area("Notes", height=64, placeholder="Optional notes")
-        active_goals = list_active_goals()
-        selected_goal_id = None
-        if active_goals:
-            goal_options = [None] + [goal.id for goal in active_goals]
-            goal_labels = {None: "None"} | {goal.id: goal.title for goal in active_goals}
-            selected_goal_id = st.selectbox(
-                "Link to Goal / Project",
-                goal_options,
-                format_func=lambda goal_id: goal_labels[goal_id],
-            )
-
-        if estimated_minutes is None:
-            st.error("End time must be after start time.")
-
-        submitted = st.button("Add Quest", type="primary", use_container_width=True)
-        if submitted:
-            if not title.strip():
-                st.error("Every quest needs a title.")
-            elif estimated_minutes is None:
-                st.error("End time must be after start time.")
-            else:
-                try:
-                    create_scheduled_quest(
-                        title=title,
-                        description=notes,
-                        category_id=category_options[category_name],
-                        difficulty=difficulty,
-                        planned_date=selected_date,
-                        start_time=start_time,
-                        end_time=end_time,
-                        estimated_minutes=estimated_minutes,
-                        goal_id=selected_goal_id,
-                    )
-                except ValueError as error:
-                    st.error(str(error))
-                else:
-                    st.success("Quest scheduled.")
-                    st.rerun()
-
-render_section_title(
-    "Goal Progress",
-    "Track active long-term goals through linked one-time quest sessions.",
+calendar_tab, goals_tab, recurring_tab, checklist_tab = st.tabs(
+    [
+        "Calendar & Day Plan",
+        "Goals / Projects",
+        "Recurring Habits",
+        "Monthly Checklist",
+    ]
 )
-with st.container(border=True):
-    render_goal_progress_section(category_options)
-    render_goal_creation_form(category_options)
-    render_goal_management(category_options)
 
-render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
-with st.container(border=True):
-    render_recurring_habits(category_options)
+with calendar_tab:
+    render_calendar_day_plan_tab(category_options)
 
-render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
-with st.container(border=True):
-    render_monthly_checklist()
+with goals_tab:
+    render_goals_projects_tab(category_options)
+
+with recurring_tab:
+    render_recurring_habits_tab(category_options)
+
+with checklist_tab:
+    render_monthly_checklist_tab()
