@@ -24,29 +24,27 @@ def apply_home_base_styles() -> None:
         """
         <style>
         .home-hero {
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 72%),
-                linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
-            border: 1px solid var(--hq-accent-border);
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
             border-radius: 8px;
             box-shadow: var(--hq-shadow);
             margin: 0.25rem 0 1.1rem;
-            padding: 1.25rem 1.35rem;
+            padding: 1.1rem 1.2rem;
         }
 
         .home-hero-label {
             color: var(--hq-accent);
             font-size: 0.74rem;
-            font-weight: 800;
-            letter-spacing: 0.08em;
+            font-weight: 760;
+            letter-spacing: 0.06em;
             margin-bottom: 0.35rem;
             text-transform: uppercase;
         }
 
         .home-hero-title {
             color: var(--hq-text-primary);
-            font-size: 1.65rem;
-            font-weight: 850;
+            font-size: 1.32rem;
+            font-weight: 760;
             line-height: 1.2;
             margin-bottom: 0.4rem;
         }
@@ -66,20 +64,18 @@ def apply_home_base_styles() -> None:
         }
 
         .home-step-card {
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 86%),
-                linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: 8px;
             box-shadow: var(--hq-shadow);
-            min-height: 156px;
+            min-height: 132px;
             padding: 0.95rem;
         }
 
         .home-step-number {
             align-items: center;
             background: var(--hq-accent-soft);
-            border: 1px solid var(--hq-accent-border);
+            border: 0;
             border-radius: 999px;
             color: var(--hq-accent);
             display: inline-flex;
@@ -94,7 +90,7 @@ def apply_home_base_styles() -> None:
         .home-step-title {
             color: var(--hq-text-primary);
             font-size: 0.96rem;
-            font-weight: 750;
+            font-weight: 720;
             line-height: 1.25;
             margin-bottom: 0.35rem;
         }
@@ -177,17 +173,17 @@ def render_home_base() -> None:
     render_page_header(
         "Home Base",
         "Home Base",
-        "Plan quests, build habits, earn XP, and review your progress.",
+        "A focused workspace for planning quests, reviewing progress, and keeping daily work visible.",
     )
 
     st.markdown(
         """
         <div class="home-hero">
-            <div class="home-hero-label">Habit Quest Analytics</div>
-            <div class="home-hero-title">Habit Quest Analytics</div>
+            <div class="home-hero-label">Workspace overview</div>
+            <div class="home-hero-title">Plan the day, complete scheduled work, and review progress from one local app.</div>
             <div class="home-hero-copy">
-                An RPG-inspired habit planner that turns daily tasks into quests and tracks progress through XP,
-                analytics, and character growth.
+                Habit Quest Analytics combines calendar planning, recurring habits, checklist status, XP, analytics,
+                and character progress without changing the underlying local-first workflow.
             </div>
         </div>
         """,
@@ -196,29 +192,29 @@ def render_home_base() -> None:
 
     render_section_title(
         "Mission Briefing",
-        "A simple app loop for planning work, reviewing today's mission, and understanding progress over time.",
+        "The core workflow stays intentionally small and repeatable.",
     )
     st.markdown(
         """
         <div class="home-step-grid">
             <div class="home-step-card">
                 <div class="home-step-number">1</div>
-                <div class="home-step-title">Plan your quests</div>
-                <div class="home-step-body">Use Quest Planner to schedule tasks and habits on the calendar.</div>
+                <div class="home-step-title">Plan</div>
+                <div class="home-step-body">Schedule one-time quests, recurring habits, and goal sessions.</div>
             </div>
             <div class="home-step-card">
                 <div class="home-step-number">2</div>
-                <div class="home-step-title">Review today's mission</div>
-                <div class="home-step-body">Use Command Center to see today's focus and attention items.</div>
+                <div class="home-step-title">Focus</div>
+                <div class="home-step-body">Use Command Center to see today's work and attention items.</div>
             </div>
             <div class="home-step-card">
                 <div class="home-step-number">3</div>
-                <div class="home-step-title">Analyze your patterns</div>
-                <div class="home-step-body">Use Habit Analytics to review trends, categories, and consistency.</div>
+                <div class="home-step-title">Review</div>
+                <div class="home-step-body">Use Analytics to inspect XP, completion, categories, and consistency.</div>
             </div>
             <div class="home-step-card">
                 <div class="home-step-number">4</div>
-                <div class="home-step-title">Track your character</div>
+                <div class="home-step-title">Progress</div>
                 <div class="home-step-body">Use Character Profile to view XP, level, avatar, and RPG stats.</div>
             </div>
         </div>

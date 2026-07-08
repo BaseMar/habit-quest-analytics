@@ -91,10 +91,10 @@ def apply_character_profile_styles() -> None:
 
         .hq-level-badge {
             align-items: center;
-            background: linear-gradient(135deg, var(--hq-accent), var(--hq-info));
+            background: var(--hq-accent-soft);
             border: 1px solid var(--hq-accent-border);
-            border-radius: 8px;
-            box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
+            border-radius: 6px;
+            box-shadow: none;
             color: #ffffff;
             display: inline-flex;
             font-size: 0.78rem;
@@ -143,6 +143,118 @@ def apply_character_profile_styles() -> None:
             margin-top: 0.15rem;
         }
 
+        .hq-hero-quick-stats {
+            display: grid;
+            gap: 0.45rem;
+            grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+        }
+
+        .hq-hero-chip,
+        .hq-xp-metric,
+        .snapshot-tile {
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: 7px;
+            box-sizing: border-box;
+        }
+
+        .hq-hero-chip {
+            min-height: 48px;
+            padding: 0.45rem 0.52rem;
+        }
+
+        .hq-hero-chip-label,
+        .hq-xp-label,
+        .snapshot-label {
+            color: var(--hq-text-secondary);
+            font-size: 0.64rem;
+            font-weight: 760;
+            letter-spacing: 0.05em;
+            line-height: 1.18;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .hq-hero-chip-value,
+        .hq-xp-value,
+        .snapshot-value {
+            color: var(--hq-text-primary);
+            font-weight: 800;
+            line-height: 1.18;
+            margin-top: 0.18rem;
+            overflow-wrap: anywhere;
+        }
+
+        .hq-hero-chip-value {
+            font-size: 0.88rem;
+        }
+
+        .hq-xp-panel {
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: 8px;
+            box-sizing: border-box;
+            min-height: 134px;
+            padding: 0.85rem 1rem 0.8rem;
+            width: 100%;
+        }
+
+        .hq-xp-row {
+            display: grid;
+            gap: 0.65rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .hq-xp-metric {
+            min-height: 52px;
+            padding: 0.5rem 0.56rem;
+        }
+
+        .hq-xp-value {
+            font-size: 1.1rem;
+        }
+
+        .hq-xp-track {
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: 999px;
+            height: 0.62rem;
+            margin-top: 0.72rem;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .hq-xp-fill {
+            background: var(--hq-accent);
+            border-radius: inherit;
+            height: 100%;
+        }
+
+        .hq-xp-caption {
+            color: var(--hq-text-secondary);
+            font-size: 0.72rem;
+            line-height: 1.2;
+            margin-top: 0.38rem;
+        }
+
+        .snapshot-grid {
+            display: grid;
+            gap: 0.5rem;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            width: 100%;
+        }
+
+        .snapshot-tile {
+            min-height: 58px;
+            padding: 0.52rem 0.58rem;
+        }
+
+        .snapshot-value {
+            font-size: 0.94rem;
+        }
+
         div[data-testid="stFileUploader"] button {
             display: none;
         }
@@ -159,6 +271,10 @@ def apply_character_profile_styles() -> None:
 
             .hq-xp-row {
                 grid-template-columns: 1fr;
+            }
+
+            .snapshot-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
         </style>
@@ -204,7 +320,6 @@ def render_avatar_controls(profile: dict) -> None:
 
 
 def render_character_hero(profile: dict) -> None:
-    tokens = get_theme_tokens()
     progress_percent = int(profile["level_progress"] * 100)
     quest_days = _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)
     completion_rate = _activity_value(profile, ["Completion Rate"], default="0.0%")
@@ -217,195 +332,44 @@ def render_character_hero(profile: dict) -> None:
             render_avatar_controls(profile)
 
         with identity_col:
-            components.html(
+            st.markdown(
                 f"""
-                <style>
-                    body {{
-                        background: transparent;
-                        margin: 0;
-                        overflow: hidden;
-                    }}
-
-                    .hero-identity {{
-                        box-sizing: border-box;
-                        padding: 1px 0 0;
-                        width: 100%;
-                    }}
-
-                    .character-name {{
-                        color: {tokens["text_primary"]};
-                        font: 850 25px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        margin: 0 0 2px;
-                    }}
-
-                    .character-title {{
-                        color: {tokens["accent"]};
-                        font: 750 14px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        margin-bottom: 7px;
-                    }}
-
-                    .level-badge {{
-                        align-items: center;
-                        background: linear-gradient(135deg, {tokens["accent"]}, {tokens["info"]});
-                        border: 1px solid {tokens["accent_border"]};
-                        border-radius: 8px;
-                        box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
-                        color: #ffffff;
-                        display: inline-flex;
-                        font: 850 12px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        letter-spacing: 0.07em;
-                        margin: 0 0 9px;
-                        padding: 7px 10px;
-                        text-transform: uppercase;
-                    }}
-
-                    .hero-quick-stats {{
-                        display: grid;
-                        gap: 7px;
-                        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-                    }}
-
-                    .hero-chip {{
-                        background: {tokens["muted_surface"]};
-                        border: 1px solid {tokens["border"]};
-                        border-radius: 7px;
-                        box-sizing: border-box;
-                        min-height: 48px;
-                        padding: 7px 8px;
-                    }}
-
-                    .hero-chip-label {{
-                        color: {tokens["text_secondary"]};
-                        font: 760 9.5px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        letter-spacing: 0.05em;
-                        overflow-wrap: anywhere;
-                        text-transform: uppercase;
-                    }}
-
-                    .hero-chip-value {{
-                        color: {tokens["text_primary"]};
-                        font: 850 14px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        margin-top: 2px;
-                        overflow-wrap: anywhere;
-                    }}
-                </style>
-                <div class="hero-identity">
-                    <div class="character-name">{escape(str(profile["character_name"]))}</div>
-                    <div class="character-title">{escape(str(profile["character_title"]))}</div>
-                    <div class="level-badge">Level {int(profile["current_level"])}</div>
-                    <div class="hero-quick-stats">
+                <div class="hq-hero-identity">
+                    <div class="hq-character-name">{escape(str(profile["character_name"]))}</div>
+                    <div class="hq-character-title">{escape(str(profile["character_title"]))}</div>
+                    <div class="hq-level-badge">Level {int(profile["current_level"])}</div>
+                    <div class="hq-hero-quick-stats">
                         {_hero_chip("Quest Days", quest_days)}
                         {_hero_chip("Completion", completion_rate)}
                         {_hero_chip("Weekly XP", weekly_xp)}
                     </div>
                 </div>
                 """,
-                height=144,
+                unsafe_allow_html=True,
             )
 
         with xp_col:
             progress_width = max(0, min(100, progress_percent))
-            components.html(
+            st.markdown(
                 f"""
-                <style>
-                    body {{
-                        background: transparent;
-                        margin: 0;
-                        overflow: hidden;
-                    }}
-
-                    .xp-shell {{
-                        align-items: center;
-                        box-sizing: border-box;
-                        display: flex;
-                        height: 100%;
-                        justify-content: flex-end;
-                        width: 100%;
-                    }}
-
-                    .xp-panel {{
-                        background: {tokens["muted_surface"]};
-                        border: 1px solid {tokens["border"]};
-                        border-radius: 8px;
-                        box-sizing: border-box;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                        max-width: 390px;
-                        min-height: 134px;
-                        padding: 14px 16px 13px;
-                        width: 100%;
-                    }}
-
-                    .xp-row {{
-                        display: grid;
-                        gap: 10px;
-                        grid-template-columns: repeat(2, minmax(0, 1fr));
-                    }}
-
-                    .xp-metric {{
-                        background: {tokens["surface"]};
-                        border: 1px solid {tokens["border"]};
-                        border-radius: 7px;
-                        box-sizing: border-box;
-                        min-height: 52px;
-                        padding: 8px 9px;
-                    }}
-
-                    .xp-label {{
-                        color: {tokens["text_secondary"]};
-                        font: 780 10.5px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        letter-spacing: 0.06em;
-                        text-transform: uppercase;
-                    }}
-
-                    .xp-value {{
-                        color: {tokens["text_primary"]};
-                        font: 860 18px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        margin-top: 3px;
-                    }}
-
-                    .xp-track {{
-                        background: {tokens["muted_surface"]};
-                        border: 1px solid {tokens["border"]};
-                        border-radius: 999px;
-                        height: 10px;
-                        margin-top: 11px;
-                        overflow: hidden;
-                        width: 100%;
-                    }}
-
-                    .xp-fill {{
-                        background: linear-gradient(90deg, {tokens["info"]}, {tokens["accent"]});
-                        border-radius: inherit;
-                        height: 100%;
-                        width: {progress_width}%;
-                    }}
-
-                    .xp-caption {{
-                        color: {tokens["text_secondary"]};
-                        font: 650 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                        margin-top: 6px;
-                    }}
-                </style>
-                <div class="xp-shell">
-                    <div class="xp-panel">
-                        <div class="xp-row">
-                            <div class="xp-metric">
-                                <div class="xp-label">Total XP</div>
-                                <div class="xp-value">{int(profile["total_xp"])}</div>
-                            </div>
-                            <div class="xp-metric">
-                                <div class="xp-label">Next Level</div>
-                                <div class="xp-value">{int(profile["xp_to_next_level"])}</div>
-                            </div>
+                <div class="hq-xp-panel">
+                    <div class="hq-xp-row">
+                        <div class="hq-xp-metric">
+                            <div class="hq-xp-label">Total XP</div>
+                            <div class="hq-xp-value">{int(profile["total_xp"])}</div>
                         </div>
-                        <div class="xp-track"><div class="xp-fill"></div></div>
-                        <div class="xp-caption">{progress_percent}% progress toward the next level</div>
+                        <div class="hq-xp-metric">
+                            <div class="hq-xp-label">Next Level</div>
+                            <div class="hq-xp-value">{int(profile["xp_to_next_level"])}</div>
+                        </div>
                     </div>
+                    <div class="hq-xp-track">
+                        <div class="hq-xp-fill" style="width: {progress_width}%"></div>
+                    </div>
+                    <div class="hq-xp-caption">{progress_percent}% progress toward the next level</div>
                 </div>
                 """,
-                height=144,
+                unsafe_allow_html=True,
             )
 
     if not profile["has_completed_quests"]:
@@ -512,9 +476,9 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .stat-fill {{
-                background: linear-gradient(90deg, {tokens["info"]} 0%, {tokens["accent"]} 100%);
+                background: {tokens["accent"]};
                 border-radius: inherit;
-                box-shadow: 0 0 12px {tokens["accent_soft"]};
+                box-shadow: none;
                 height: 100%;
                 min-width: 3px;
             }}
@@ -651,7 +615,6 @@ def _render_stat_row(row: dict) -> str:
 
 
 def render_activity_snapshot(profile: dict) -> None:
-    tokens = get_theme_tokens()
     tiles = [
         ("Quest Days", _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)),
         ("Avg XP / Day", _activity_value(profile, ["Average XP / Quest Day", "Average XP / Completed Quest"], default=0)),
@@ -665,59 +628,7 @@ def render_activity_snapshot(profile: dict) -> None:
     tile_markup = "".join(_activity_tile(label, value) for label, value in tiles)
 
     render_section_title("Activity Snapshot", "Compact activity metrics for the current character sheet.")
-    components.html(
-        f"""
-        <style>
-            body {{
-                background: transparent;
-                margin: 0;
-                overflow: hidden;
-            }}
-
-            .snapshot-grid {{
-                box-sizing: border-box;
-                display: grid;
-                gap: 8px;
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-                width: 100%;
-            }}
-
-            .snapshot-tile {{
-                background: linear-gradient(180deg, {tokens["surface"]}, {tokens["surface_elevated"]});
-                border: 1px solid {tokens["border"]};
-                border-radius: 8px;
-                box-sizing: border-box;
-                min-height: 58px;
-                padding: 8px 9px;
-            }}
-
-            .snapshot-label {{
-                color: {tokens["text_secondary"]};
-                font: 760 10px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                letter-spacing: 0.05em;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                text-transform: uppercase;
-                white-space: nowrap;
-            }}
-
-            .snapshot-value {{
-                color: {tokens["text_primary"]};
-                font: 850 15px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 5px;
-                overflow-wrap: anywhere;
-            }}
-
-            @media (max-width: 900px) {{
-                .snapshot-grid {{
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                }}
-            }}
-        </style>
-        <div class="snapshot-grid">{tile_markup}</div>
-        """,
-        height=136,
-    )
+    st.markdown(f'<div class="snapshot-grid">{tile_markup}</div>', unsafe_allow_html=True)
 
 
 def render_how_stats_are_calculated() -> None:
@@ -751,21 +662,17 @@ def _activity_value(profile: dict, labels: list[str], default):
 
 
 def _hero_chip(label: str, value) -> str:
-    return f"""
-    <div class="hero-chip">
-        <div class="hero-chip-label">{escape(label)}</div>
-        <div class="hero-chip-value">{escape(str(value))}</div>
-    </div>
-    """
+    return (
+        f'<div class="hq-hero-chip"><div class="hq-hero-chip-label">{escape(label)}</div>'
+        f'<div class="hq-hero-chip-value">{escape(str(value))}</div></div>'
+    )
 
 
 def _activity_tile(label: str, value) -> str:
-    return f"""
-    <div class="snapshot-tile">
-        <div class="snapshot-label">{escape(label)}</div>
-        <div class="snapshot-value">{escape(str(value))}</div>
-    </div>
-    """
+    return (
+        f'<div class="snapshot-tile"><div class="snapshot-label">{escape(label)}</div>'
+        f'<div class="snapshot-value">{escape(str(value))}</div></div>'
+    )
 
 
 apply_theme()

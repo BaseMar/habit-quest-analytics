@@ -1,10 +1,10 @@
 from calendar import month_name
 from datetime import date, datetime, time
 import hashlib
+from html import escape
 import sys
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
 try:
@@ -153,12 +153,10 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             border-color: var(--hq-border);
         }
         .fc-theme-standard .fc-scrollgrid {
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 78%),
-                var(--hq-surface);
+            background: var(--hq-surface);
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
         }
         .fc .fc-col-header-cell {
             background: var(--hq-surface-elevated);
@@ -173,17 +171,17 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         }
         .fc .fc-toolbar-title {
             color: var(--hq-text-primary);
-            font-size: 1.28rem;
-            font-weight: 850;
+            font-size: 1.15rem;
+            font-weight: 740;
         }
         .fc .fc-toolbar {
             gap: 0.75rem;
             margin-bottom: 0.85rem;
         }
         .fc .fc-button-primary {
-            background: var(--hq-accent-soft);
-            border-color: var(--hq-accent-border);
-            border-radius: 5px;
+            background: var(--hq-surface);
+            border-color: var(--hq-border);
+            border-radius: 6px;
             box-shadow: none;
             color: var(--hq-text-primary);
             font-size: 0.82rem;
@@ -193,8 +191,8 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         }
         .fc .fc-button-primary:hover {
             background: var(--hq-surface-elevated);
-            border-color: var(--hq-accent);
-            transform: translateY(-1px);
+            border-color: var(--hq-accent-border);
+            transform: none;
         }
         .fc .fc-button-primary:not(:disabled).fc-button-active,
         .fc .fc-button-primary:not(:disabled):active {
@@ -223,8 +221,8 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             border-top-color: transparent;
         }
         .fc .fc-event {
-            border-radius: 5px;
-            box-shadow: 0 8px 18px rgba(2, 6, 23, 0.24);
+            border-radius: 6px;
+            box-shadow: none;
             padding: 0.12rem 0.18rem;
         }
         .fc .fc-timegrid-event {
@@ -299,16 +297,22 @@ def render_schedule_list(quests: list) -> None:
         st.info("No quests planned for this day.")
         return
 
-    for quest in quests:
-        with st.container(border=True):
-            time_col, detail_col, xp_col = st.columns([0.26, 0.56, 0.18], vertical_alignment="center")
-            with time_col:
-                st.write(f"**{_format_time_range(quest)}**")
-            with detail_col:
-                st.write(f"**{quest.title}**")
-                st.caption(f"{_category_name(quest)} | {quest.difficulty} | {_display_status(quest)}")
-            with xp_col:
-                st.write(f"**{quest.xp_reward or 0} XP**")
+    rows = "\n".join(
+        f"""
+        <div class="hq-list-row">
+            <div class="hq-list-time">{escape(_format_time_range(quest))}</div>
+            <div>
+                <div class="hq-list-title">{escape(str(quest.title))}</div>
+                <div class="hq-list-meta">
+                    {escape(_category_name(quest))} / {escape(str(quest.difficulty))} / {escape(_display_status(quest))}
+                </div>
+            </div>
+            <div class="hq-list-value">{int(quest.xp_reward or 0)} XP</div>
+        </div>
+        """
+        for quest in quests
+    )
+    st.markdown(f'<div class="hq-list-panel">{rows}</div>', unsafe_allow_html=True)
 
 
 def render_day_summary(quests: list) -> None:
@@ -344,33 +348,47 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
         progress = get_goal_progress(goal.id)
         progress_percent = float(progress["progress_percent"])
         progress_label = _format_percent(progress_percent)
+        progress_width = max(0, min(100, progress_percent))
         category = category_names_by_id.get(goal.category_id, "Uncategorized")
         target = goal.target_end_date.isoformat() if goal.target_end_date else "No target date"
         skipped_failed = progress["skipped_sessions_count"] + progress["failed_sessions_count"]
 
-        with st.container(border=True):
-            header_col, progress_col, xp_col = st.columns([0.48, 0.3, 0.22], vertical_alignment="center")
-            with header_col:
-                st.write(f"**{goal.title}**")
-                st.caption(f"{goal.status} | {category} | Target: {target}")
-            with progress_col:
-                st.write(
-                    f"**{_format_minutes(progress['completed_minutes'])} / "
-                    f"{_format_minutes(progress['planned_total_minutes'])}**"
-                )
-                st.caption(f"{progress_label} complete")
-            with xp_col:
-                st.write(f"**{progress['earned_xp']} / {progress['expected_total_xp']} XP**")
-                st.caption("earned")
-
-            st.progress(min(max(progress_percent / 100, 0), 1))
-            st.caption(
-                "Sessions: "
-                f"{progress['completed_sessions_count']} completed | "
-                f"{progress['planned_sessions_count']} planned | "
-                f"{skipped_failed} skipped/failed"
-            )
-            render_goal_session_form(goal)
+        st.markdown(
+            f"""
+            <div class="hq-progress-card">
+                <div class="hq-progress-card-header">
+                    <div>
+                        <div class="hq-progress-title">{escape(str(goal.title))}</div>
+                        <div class="hq-progress-meta">
+                            {escape(str(goal.status))} / {escape(str(category))} / Target: {escape(str(target))}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="hq-progress-value">
+                            {_format_minutes(progress['completed_minutes'])}
+                            / {_format_minutes(progress['planned_total_minutes'])}
+                        </div>
+                        <div class="hq-progress-caption">{progress_label} complete</div>
+                    </div>
+                </div>
+                <div class="hq-progress-track">
+                    <div class="hq-progress-fill" style="width: {progress_width:.2f}%"></div>
+                </div>
+                <div class="hq-progress-footer">
+                    <div class="hq-progress-caption">
+                        {int(progress['earned_xp'])} / {int(progress['expected_total_xp'])} XP earned
+                    </div>
+                    <div>
+                        <span class="hq-progress-pill">{int(progress['completed_sessions_count'])} completed</span>
+                        <span class="hq-progress-pill">{int(progress['planned_sessions_count'])} planned</span>
+                        <span class="hq-progress-pill">{int(skipped_failed)} skipped/failed</span>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        render_goal_session_form(goal)
 
 
 def render_goal_session_form(goal) -> None:
@@ -530,14 +548,21 @@ def render_goal_management(category_options: dict[str, int]) -> None:
         for goal in goals:
             history = get_goal_history_summary(goal.id)
             category = category_names_by_id.get(goal.category_id, "Uncategorized")
-            with st.container(border=True):
+            with st.container():
                 detail_col, action_col = st.columns([0.58, 0.42], vertical_alignment="center")
                 with detail_col:
-                    st.write(f"**{goal.title}**")
-                    st.caption(
-                        f"{goal.status} | {category} | "
-                        f"{history['linked_quests_count']} linked sessions | "
-                        f"{history['earned_xp']} XP earned"
+                    st.markdown(
+                        f"""
+                        <div class="hq-management-item">
+                            <div class="hq-management-title">{escape(str(goal.title))}</div>
+                            <div class="hq-management-meta">
+                                {escape(str(goal.status))} / {escape(str(category))} /
+                                {int(history['linked_quests_count'])} linked sessions /
+                                {int(history['earned_xp'])} XP earned
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
                     )
 
                 with action_col:
@@ -765,12 +790,7 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
                 "Create one to generate planned quest days for the selected month.",
             )
         else:
-            st.dataframe(
-                _build_recurring_habits_dataframe(habits, category_names_by_id),
-                width="stretch",
-                hide_index=True,
-                height=min(360, 92 + (len(habits) * 35)),
-            )
+            render_recurring_habit_template_list(habits, category_names_by_id)
 
             st.divider()
             selected_habit = st.selectbox(
@@ -780,12 +800,17 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
                 key="recurring_habit_manage",
             )
             history_summary = get_recurring_habit_history_summary(selected_habit.id)
-            st.caption(
-                f"{history_summary['generated_instances_count']} generated days | "
-                f"{history_summary['planned_count']} planned | "
-                f"{history_summary['completed_count']} completed | "
-                f"{history_summary['skipped_count']} skipped | "
-                f"{history_summary['failed_count']} failed"
+            st.markdown(
+                f"""
+                <div class="hq-meta-pills">
+                    <span class="hq-meta-pill"><strong>{int(history_summary['generated_instances_count'])}</strong> generated</span>
+                    <span class="hq-meta-pill"><strong>{int(history_summary['planned_count'])}</strong> planned</span>
+                    <span class="hq-meta-pill"><strong>{int(history_summary['completed_count'])}</strong> completed</span>
+                    <span class="hq-meta-pill"><strong>{int(history_summary['skipped_count'])}</strong> skipped</span>
+                    <span class="hq-meta-pill"><strong>{int(history_summary['failed_count'])}</strong> failed</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
 
             if history_summary["generated_instances_count"] == 0:
@@ -924,13 +949,7 @@ def render_monthly_checklist() -> None:
         )
         return
 
-    checklist_df = _build_checklist_dataframe(checklist)
-    st.dataframe(
-        checklist_df,
-        width="stretch",
-        hide_index=True,
-        height=min(420, 92 + (len(checklist_df) * 35)),
-    )
+    _render_checklist_table(checklist)
 
     st.divider()
     st.write("**Update Daily Status**")
@@ -975,7 +994,15 @@ def render_monthly_checklist() -> None:
     with status_col:
         marker = CHECKLIST_STATUS_MARKERS.get(selected_cell["status"], "")
         status_prefix = f"{marker} - " if marker and cell_is_editable else ""
-        st.info(f"Current: {status_prefix}{current_status}")
+        st.markdown(
+            f"""
+            <div class="hq-status-panel">
+                <div class="hq-status-label">Current status</div>
+                <div class="hq-status-value">{escape(status_prefix + current_status)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         if not cell_is_editable:
             st.warning("This quest is not scheduled for the selected date.")
 
@@ -1005,15 +1032,66 @@ def render_monthly_checklist() -> None:
 
 def _render_checklist_legend() -> None:
     legend_items = (
-        ("blank", "Not scheduled / locked"),
+        ("-", "Not scheduled / locked"),
         ("P", "Planned"),
         ("C", "Completed"),
         ("S", "Skipped"),
         ("F", "Failed"),
     )
-    legend_cols = st.columns(len(legend_items))
-    for column, (marker, label) in zip(legend_cols, legend_items):
-        column.caption(f"{marker} = {label}")
+    legend_html = "".join(
+        f'<span class="hq-legend-item"><span class="hq-legend-marker">{escape(marker)}</span>{escape(label)}</span>'
+        for marker, label in legend_items
+    )
+    st.markdown(f'<div class="hq-legend-row">{legend_html}</div>', unsafe_allow_html=True)
+
+
+def _render_checklist_table(checklist: dict) -> None:
+    headers = ["Quest", "Category", "Difficulty"] + [str(day.day) for day in checklist["days"]]
+    header_html = "".join(
+        f'<th class="{"hq-table-sticky" if index == 0 else "hq-table-day" if index >= 3 else ""}">'
+        f"{escape(header)}</th>"
+        for index, header in enumerate(headers)
+    )
+    row_html = "\n".join(_render_checklist_table_row(row, checklist["days"]) for row in checklist["rows"])
+    st.markdown(
+        f"""
+        <div class="hq-table-scroll">
+            <table class="hq-data-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{row_html}</tbody>
+            </table>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_checklist_table_row(row: dict, days: list[date]) -> str:
+    day_cells = "".join(
+        f'<td class="hq-table-day">{_status_marker_html(row["cells"][day]["status"])}</td>'
+        for day in days
+    )
+    return (
+        "<tr>"
+        f'<td class="hq-table-sticky">{escape(str(row["title"]))}</td>'
+        f'<td>{escape(str(row["category"] or "Uncategorized"))}</td>'
+        f'<td>{escape(str(row["difficulty"]))}</td>'
+        f"{day_cells}"
+        "</tr>"
+    )
+
+
+def _status_marker_html(status: str | None) -> str:
+    marker = CHECKLIST_STATUS_MARKERS.get(status, "")
+    if not marker:
+        return ""
+    status_class = {
+        "Planned": "hq-status-planned",
+        "Completed": "hq-status-completed",
+        "Skipped": "hq-status-skipped",
+        "Failed": "hq-status-failed",
+    }.get(status, "hq-status-planned")
+    return f'<span class="hq-status-marker {status_class}">{escape(marker)}</span>'
 
 
 def _render_checklist_delete_action(row: dict, cell: dict, selected_date: date, cell_is_editable: bool) -> None:
@@ -1078,20 +1156,6 @@ def _is_unresolved_planned_cell(cell: dict) -> bool:
     )
 
 
-def _build_checklist_dataframe(checklist: dict) -> pd.DataFrame:
-    rows = []
-    for row in checklist["rows"]:
-        table_row = {
-            "Quest": row["title"],
-            "Category": row["category"] or "Uncategorized",
-            "Difficulty": row["difficulty"],
-        }
-        for day in checklist["days"]:
-            table_row[str(day.day)] = CHECKLIST_STATUS_MARKERS.get(row["cells"][day]["status"], "")
-        rows.append(table_row)
-    return pd.DataFrame(rows)
-
-
 def _checklist_row_id(row: dict) -> str:
     return row.get("row_id") or f"quest:{row['quest_id']}"
 
@@ -1132,22 +1196,33 @@ def _preferred_checklist_date(row: dict, days: list[date]) -> date:
     return days[0]
 
 
-def _build_recurring_habits_dataframe(habits: list, category_names_by_id: dict[int, str]) -> pd.DataFrame:
-    rows = [
-        {
-            "Habit": habit.title,
-            "Category": category_names_by_id.get(habit.category_id, "Uncategorized"),
-            "Difficulty": habit.difficulty,
-            "Pattern": _format_habit_pattern(habit),
-            "Minutes": habit.estimated_minutes,
-            "Time": _format_habit_time_window(habit),
-            "Start": habit.start_date.isoformat(),
-            "End": habit.end_date.isoformat() if habit.end_date else "",
-            "Active": _active_label(habit),
-        }
-        for habit in habits
-    ]
-    return pd.DataFrame(rows)
+def render_recurring_habit_template_list(habits: list, category_names_by_id: dict[int, str]) -> None:
+    rows = []
+    for habit in habits:
+        category = category_names_by_id.get(habit.category_id, "Uncategorized")
+        end_date = habit.end_date.isoformat() if habit.end_date else "No end"
+        rows.append(
+            f"""
+            <div class="hq-list-row">
+                <div class="hq-list-time">{escape(_active_label(habit))}</div>
+                <div>
+                    <div class="hq-list-title">{escape(str(habit.title))}</div>
+                    <div class="hq-list-meta">
+                        {escape(category)} | {escape(str(habit.difficulty))} | {escape(_format_habit_pattern(habit))}
+                    </div>
+                    <div class="hq-list-meta">
+                        {escape(_format_habit_time_window(habit))} | {habit.start_date.isoformat()} to {end_date}
+                    </div>
+                </div>
+                <div class="hq-list-value">{int(habit.estimated_minutes)} min</div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f'<div class="hq-list-panel">{"".join(rows)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _format_habit_pattern(habit) -> str:
@@ -1382,24 +1457,21 @@ def render_goals_projects_tab(category_options: dict[str, int]) -> None:
         "Goal Progress",
         "Track active long-term goals through linked one-time quest sessions.",
     )
-    with st.container(border=True):
-        render_goal_progress_section(category_options)
-        render_goal_creation_form(category_options)
-        render_goal_management(category_options)
+    render_goal_progress_section(category_options)
+    render_goal_creation_form(category_options)
+    render_goal_management(category_options)
 
 
 def render_recurring_habits_tab(category_options: dict[str, int]) -> None:
     st.caption("Manage recurring templates and generate planned quest days for the selected checklist month.")
     render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
-    with st.container(border=True):
-        render_recurring_habits(category_options)
+    render_recurring_habits(category_options)
 
 
 def render_monthly_checklist_tab() -> None:
     st.caption("Resolve scheduled quest days while preserving check-in XP idempotency.")
     render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
-    with st.container(border=True):
-        render_monthly_checklist()
+    render_monthly_checklist()
 
 
 apply_theme()

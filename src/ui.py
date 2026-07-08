@@ -66,38 +66,38 @@ ACCENT_PRESETS = {
 
 BASE_TOKENS = {
     "Dark": {
-        "background": "#0F172A",
+        "background": "#0B1020",
         "background_alt": "#111827",
-        "surface": "#172033",
-        "surface_elevated": "#1F2937",
-        "border": "rgba(148, 163, 184, 0.22)",
+        "surface": "#151C2B",
+        "surface_elevated": "#1B2535",
+        "border": "rgba(148, 163, 184, 0.18)",
         "text_primary": "#F8FAFC",
-        "text_secondary": "#A7B0BF",
+        "text_secondary": "#A5AFBF",
         "success": "#22C55E",
         "warning": "#F59E0B",
         "danger": "#EF4444",
         "info": "#38BDF8",
-        "shadow": "0 18px 44px rgba(2, 6, 23, 0.32)",
-        "input_background": "rgba(15, 23, 42, 0.72)",
-        "muted_surface": "rgba(15, 23, 42, 0.62)",
-        "chart_grid": "rgba(148, 163, 184, 0.18)",
+        "shadow": "0 10px 26px rgba(2, 6, 23, 0.22)",
+        "input_background": "rgba(15, 23, 42, 0.66)",
+        "muted_surface": "rgba(148, 163, 184, 0.08)",
+        "chart_grid": "rgba(148, 163, 184, 0.14)",
     },
     "Light": {
-        "background": "#F4F7FB",
-        "background_alt": "#E9EEF6",
+        "background": "#F7F8FA",
+        "background_alt": "#EEF2F6",
         "surface": "#FFFFFF",
         "surface_elevated": "#F8FAFC",
-        "border": "rgba(100, 116, 139, 0.22)",
+        "border": "rgba(100, 116, 139, 0.16)",
         "text_primary": "#111827",
         "text_secondary": "#5B6472",
         "success": "#15803D",
         "warning": "#B45309",
         "danger": "#DC2626",
         "info": "#0369A1",
-        "shadow": "0 16px 38px rgba(15, 23, 42, 0.1)",
-        "input_background": "rgba(255, 255, 255, 0.88)",
-        "muted_surface": "rgba(241, 245, 249, 0.88)",
-        "chart_grid": "rgba(100, 116, 139, 0.2)",
+        "shadow": "0 8px 22px rgba(15, 23, 42, 0.07)",
+        "input_background": "#FFFFFF",
+        "muted_surface": "rgba(15, 23, 42, 0.035)",
+        "chart_grid": "rgba(100, 116, 139, 0.16)",
     },
 }
 
@@ -176,23 +176,17 @@ def apply_global_styles() -> None:
     is_dark = tokens["mode"] == "Dark"
     if is_dark:
         app_background = (
-            f"radial-gradient(circle at 8% 0%, {tokens['accent_soft']}, transparent 30rem), "
-            "radial-gradient(circle at 92% 12%, rgba(56, 189, 248, 0.11), transparent 28rem), "
-            "radial-gradient(circle at 72% 88%, rgba(34, 197, 94, 0.08), transparent 30rem), "
-            "linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px), "
-            f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 48%, #0B1120 100%)"
+            f"radial-gradient(circle at 8% 0%, {tokens['accent_soft']}, transparent 28rem), "
+            "linear-gradient(135deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px), "
+            f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 100%)"
         )
     else:
         app_background = (
-            f"radial-gradient(circle at 7% 0%, {tokens['accent_soft']}, transparent 30rem), "
-            "radial-gradient(circle at 92% 10%, rgba(14, 165, 233, 0.13), transparent 27rem), "
-            "radial-gradient(circle at 72% 88%, rgba(16, 185, 129, 0.1), transparent 31rem), "
-            "linear-gradient(135deg, rgba(15, 23, 42, 0.045) 0 1px, transparent 1px), "
-            f"linear-gradient(180deg, {tokens['background']} 0%, #EEF4FB 50%, {tokens['background_alt']} 100%)"
+            f"radial-gradient(circle at 8% 0%, {tokens['accent_soft']}, transparent 26rem), "
+            "linear-gradient(135deg, rgba(15, 23, 42, 0.028) 0 1px, transparent 1px), "
+            f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 100%)"
         )
-    app_background_size = (
-        "auto, auto, auto, 38px 38px, auto"
-    )
+    app_background_size = "auto, 42px 42px, auto"
     sidebar_background = (
         f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 100%)"
         if is_dark
@@ -238,9 +232,8 @@ def apply_global_styles() -> None:
             position: fixed;
             z-index: 0;
             background:
-                linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent),
-                radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05), transparent 34rem);
-            opacity: {"0.55" if is_dark else "0.72"};
+                linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.025), transparent);
+            opacity: {"0.45" if is_dark else "0.34"};
         }}
 
         .stApp > header,
@@ -252,7 +245,7 @@ def apply_global_styles() -> None:
 
         .block-container {{
             max-width: 1480px;
-            padding: 2.35rem 2rem 3rem;
+            padding: 2rem 2rem 3rem;
         }}
 
         @media (max-width: 768px) {{
@@ -280,6 +273,11 @@ def apply_global_styles() -> None:
             color: var(--hq-text-secondary) !important;
         }}
 
+        hr {{
+            border-color: var(--hq-border) !important;
+            margin: 1rem 0 !important;
+        }}
+
         section[data-testid="stSidebar"] {{
             background: {sidebar_background} !important;
             border-right: 1px solid var(--hq-border);
@@ -290,21 +288,19 @@ def apply_global_styles() -> None:
         }}
 
         .hq-sidebar-brand {{
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 78%),
-                var(--hq-surface);
-            border: 1px solid var(--hq-border);
-            border-left: 4px solid var(--hq-accent);
-            border-radius: 3px;
-            box-shadow: var(--hq-shadow);
+            background: transparent;
+            border: 0;
+            border-bottom: 1px solid var(--hq-border);
+            border-radius: 0;
+            box-shadow: none;
             margin: 0.2rem 0 1rem;
-            padding: 0.85rem 0.9rem;
+            padding: 0.45rem 0.15rem 0.9rem;
         }}
 
         .hq-sidebar-brand-title {{
             color: var(--hq-text-primary);
-            font-size: 1rem;
-            font-weight: 850;
+            font-size: 1.02rem;
+            font-weight: 780;
             line-height: 1.12;
         }}
 
@@ -312,8 +308,8 @@ def apply_global_styles() -> None:
         .hq-sidebar-section-title {{
             color: var(--hq-accent);
             font-size: 0.74rem;
-            font-weight: 800;
-            letter-spacing: 0.08em;
+            font-weight: 760;
+            letter-spacing: 0.06em;
             margin-top: 0.14rem;
             text-transform: uppercase;
         }}
@@ -339,12 +335,12 @@ def apply_global_styles() -> None:
         section[data-testid="stSidebar"] a[href^="/"] {{
             align-items: center;
             background: var(--hq-muted-surface);
-            border: 1px solid var(--hq-border);
-            border-left: 4px solid var(--hq-border);
-            border-radius: 3px !important;
+            border: 0;
+            border-left: 3px solid transparent;
+            border-radius: 6px !important;
             color: var(--hq-text-secondary) !important;
-            min-height: 46px;
-            padding: 0.78rem 0.85rem !important;
+            min-height: 42px;
+            padding: 0.68rem 0.78rem !important;
             text-decoration: none;
             transition:
                 background-color 160ms ease,
@@ -359,11 +355,10 @@ def apply_global_styles() -> None:
         section[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover,
         section[data-testid="stSidebar"] a[href^="/"]:hover {{
             background: var(--hq-surface-elevated);
-            border-color: var(--hq-accent-border);
             border-left-color: var(--hq-accent);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             color: var(--hq-text-primary) !important;
-            transform: translateX(3px);
+            transform: none;
         }}
 
         section[data-testid="stSidebar"] nav a[aria-current="page"],
@@ -372,11 +367,10 @@ def apply_global_styles() -> None:
         section[data-testid="stSidebar"] a[aria-current="page"],
         section[data-testid="stSidebar"] a[data-active="true"] {{
             background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 78%),
-                var(--hq-surface-elevated);
-            border-color: var(--hq-accent-border);
+                linear-gradient(90deg, var(--hq-accent-soft), transparent 82%),
+                var(--hq-muted-surface);
             border-left-color: var(--hq-accent);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             color: var(--hq-text-primary) !important;
             font-weight: 750;
         }}
@@ -397,9 +391,9 @@ def apply_global_styles() -> None:
         h1,
         .hq-page-title {{
             color: var(--hq-text-primary) !important;
-            font-size: 2.18rem !important;
-            font-weight: 850 !important;
-            line-height: 1.15 !important;
+            font-size: 2rem !important;
+            font-weight: 760 !important;
+            line-height: 1.18 !important;
             margin-bottom: 0.35rem !important;
             letter-spacing: 0;
         }}
@@ -419,8 +413,8 @@ def apply_global_styles() -> None:
         .hq-page-kicker {{
             color: var(--hq-accent);
             font-size: 0.76rem;
-            font-weight: 800;
-            letter-spacing: 0.08em;
+            font-weight: 760;
+            letter-spacing: 0.06em;
             line-height: 1.35;
             margin-bottom: 0.3rem;
             text-transform: uppercase;
@@ -437,7 +431,7 @@ def apply_global_styles() -> None:
         .hq-section-title {{
             color: var(--hq-text-primary);
             font-size: 1.12rem;
-            font-weight: 780;
+            font-weight: 720;
             margin-top: 1.6rem;
             margin-bottom: 0.25rem;
         }}
@@ -450,11 +444,8 @@ def apply_global_styles() -> None:
         }}
 
         div[data-testid="stMetric"] {{
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 76%),
-                linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            background: var(--hq-surface);
             border: 1px solid var(--hq-border);
-            border-left: 4px solid var(--hq-accent);
             border-radius: var(--hq-radius);
             box-shadow: var(--hq-shadow);
             padding: 1rem 1.05rem;
@@ -480,9 +471,8 @@ def apply_global_styles() -> None:
         div[data-testid="stAlert"] {{
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
-            border-left: 4px solid var(--hq-accent);
             border-radius: var(--hq-radius);
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            box-shadow: none;
             color: var(--hq-text-primary);
         }}
 
@@ -490,58 +480,188 @@ def apply_global_styles() -> None:
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
             overflow: hidden;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            box-shadow: none;
+            background: var(--hq-surface);
+        }}
+
+        div[data-testid="stDataFrame"] div[role="grid"] {{
+            border-color: var(--hq-border) !important;
+        }}
+
+        .hq-table-scroll {{
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            box-shadow: var(--hq-shadow);
+            margin: 0.35rem 0 1rem;
+            max-height: 430px;
+            overflow: auto;
+            width: 100%;
+        }}
+
+        .hq-data-table {{
+            border-collapse: separate;
+            border-spacing: 0;
+            color: var(--hq-text-primary);
+            font-size: 0.82rem;
+            min-width: 100%;
+            width: max-content;
+        }}
+
+        .hq-data-table th {{
+            background: var(--hq-surface-elevated);
+            border-bottom: 1px solid var(--hq-border);
+            color: var(--hq-text-secondary);
+            font-size: 0.74rem;
+            font-weight: 760;
+            letter-spacing: 0.03em;
+            padding: 0.55rem 0.65rem;
+            position: sticky;
+            text-align: left;
+            text-transform: uppercase;
+            top: 0;
+            z-index: 2;
+        }}
+
+        .hq-data-table td {{
+            background: var(--hq-surface);
+            border-bottom: 1px solid var(--hq-border);
+            color: var(--hq-text-primary);
+            padding: 0.5rem 0.65rem;
+            vertical-align: middle;
+        }}
+
+        .hq-data-table tr:last-child td {{
+            border-bottom: 0;
+        }}
+
+        .hq-data-table .hq-table-sticky {{
+            left: 0;
+            position: sticky;
+            z-index: 3;
+        }}
+
+        .hq-data-table td.hq-table-sticky {{
+            background: var(--hq-surface);
+            font-weight: 700;
+        }}
+
+        .hq-data-table th.hq-table-sticky {{
+            background: var(--hq-surface-elevated);
+        }}
+
+        .hq-data-table .hq-table-day {{
+            min-width: 2.4rem;
+            text-align: center;
+        }}
+
+        .hq-status-marker {{
+            align-items: center;
+            border-radius: 999px;
+            display: inline-flex;
+            font-size: 0.74rem;
+            font-weight: 760;
+            height: 1.45rem;
+            justify-content: center;
+            min-width: 1.45rem;
+            padding: 0 0.32rem;
+        }}
+
+        .hq-status-planned {{
+            background: var(--hq-muted-surface);
+            color: var(--hq-text-secondary);
+        }}
+
+        .hq-status-completed {{
+            background: rgba(34, 197, 94, 0.14);
+            color: var(--hq-success);
+        }}
+
+        .hq-status-skipped {{
+            background: rgba(245, 158, 11, 0.14);
+            color: var(--hq-warning);
+        }}
+
+        .hq-status-failed {{
+            background: rgba(239, 68, 68, 0.13);
+            color: var(--hq-danger);
         }}
 
         div[data-testid="stForm"],
         div[data-testid="stVerticalBlockBorderWrapper"] {{
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 84%),
-                var(--hq-surface);
+            background: var(--hq-surface);
             border-color: var(--hq-border) !important;
             border-radius: var(--hq-radius);
+            box-shadow: none;
+        }}
+
+        div[data-testid="stVerticalBlockBorderWrapper"] {{
             box-shadow: var(--hq-shadow);
+        }}
+
+        div[data-testid="stVerticalBlockBorderWrapper"] > div {{
+            border-radius: var(--hq-radius);
+        }}
+
+        div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] {{
+            gap: 0.65rem;
         }}
 
         div[data-testid="stExpander"] details {{
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            box-shadow: none;
         }}
 
         div[data-testid="stExpander"] summary {{
             color: var(--hq-text-primary);
-            font-weight: 750;
+            font-weight: 720;
+            min-height: 42px;
+        }}
+
+        div[data-testid="stExpander"] details > div {{
+            border-top-color: var(--hq-border) !important;
         }}
 
         .stTabs [data-baseweb="tab-list"] {{
             gap: 0.45rem;
-            background: var(--hq-muted-surface);
-            border: 1px solid var(--hq-border);
-            border-radius: var(--hq-radius);
-            padding: 0.35rem;
+            background: transparent;
+            border: 0;
+            border-bottom: 1px solid var(--hq-border);
+            border-radius: 0;
+            padding: 0;
         }}
 
         .stTabs [data-baseweb="tab"] {{
-            border-radius: 6px;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
             color: var(--hq-text-secondary);
             font-weight: 750;
             min-height: 42px;
-            padding: 0.5rem 0.85rem;
+            padding: 0.5rem 0.9rem 0.7rem;
+            position: relative;
+            transition:
+                color 160ms ease;
+        }}
+
+        .stTabs [data-baseweb="tab"]:hover {{
+            color: var(--hq-text-primary);
         }}
 
         .stTabs [aria-selected="true"] {{
-            background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 75%),
-                var(--hq-surface-elevated);
-            border: 1px solid var(--hq-accent-border);
+            background: transparent;
             color: var(--hq-text-primary) !important;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+            box-shadow:
+                inset 0 -3px 0 var(--hq-accent),
+                inset 0 -12px 16px -18px var(--hq-accent);
         }}
 
         .stTabs [data-baseweb="tab-highlight"] {{
             background-color: var(--hq-accent);
+            height: 3px;
+            box-shadow: 0 -2px 14px var(--hq-accent);
         }}
 
         button[kind="primary"],
@@ -549,7 +669,7 @@ def apply_global_styles() -> None:
             background: var(--hq-accent) !important;
             border: 1px solid var(--hq-accent-border) !important;
             border-radius: 7px !important;
-            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
+            box-shadow: none;
             color: white !important;
             font-weight: 750 !important;
         }}
@@ -566,7 +686,7 @@ def apply_global_styles() -> None:
         button[kind="secondary"]:hover,
         div[data-testid="stFormSubmitButton"] button:hover {{
             border-color: var(--hq-accent-border) !important;
-            transform: translateY(-1px);
+            transform: none;
         }}
 
         div[data-baseweb="select"] > div,
@@ -607,7 +727,6 @@ def apply_global_styles() -> None:
         .hq-empty-state,
         .hq-metric-card {{
             background:
-                linear-gradient(135deg, var(--hq-accent-soft), transparent 82%),
                 linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
@@ -648,7 +767,6 @@ def apply_global_styles() -> None:
         }}
 
         .hq-metric-card {{
-            border-left: 4px solid var(--hq-accent);
             padding: 1rem;
         }}
 
@@ -668,18 +786,282 @@ def apply_global_styles() -> None:
             margin-top: 0.25rem;
         }}
 
+        .hq-metric-card::before {{
+            background: var(--hq-accent);
+            border-radius: 999px;
+            content: "";
+            display: block;
+            height: 0.2rem;
+            margin-bottom: 0.65rem;
+            width: 2rem;
+        }}
+
         .hq-metric-caption {{
             color: var(--hq-text-secondary);
             font-size: 0.82rem;
             margin-top: 0.25rem;
         }}
 
-        [data-testid="stPlotlyChart"] {{
+        .hq-list-panel {{
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-            padding: 0.25rem;
+            box-shadow: var(--hq-shadow);
+            overflow: hidden;
+        }}
+
+        .hq-chart-panel {{
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            box-shadow: var(--hq-shadow);
+            margin-bottom: 0.9rem;
+            padding: 0.65rem 0.75rem 0.35rem;
+        }}
+
+        .hq-progress-card {{
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            box-shadow: var(--hq-shadow);
+            margin: 0.75rem 0;
+            padding: 0.95rem 1rem;
+        }}
+
+        .hq-progress-card-header {{
+            align-items: start;
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: minmax(0, 1fr) minmax(150px, 0.26fr);
+        }}
+
+        .hq-progress-title {{
+            color: var(--hq-text-primary);
+            font-size: 1rem;
+            font-weight: 740;
+            line-height: 1.25;
+            margin-bottom: 0.22rem;
+        }}
+
+        .hq-progress-meta,
+        .hq-progress-caption {{
+            color: var(--hq-text-secondary);
+            font-size: 0.84rem;
+            line-height: 1.35;
+        }}
+
+        .hq-progress-value {{
+            color: var(--hq-text-primary);
+            font-size: 0.96rem;
+            font-weight: 740;
+            line-height: 1.25;
+            text-align: right;
+        }}
+
+        .hq-progress-track {{
+            background: var(--hq-muted-surface);
+            border-radius: 999px;
+            height: 0.55rem;
+            margin: 0.85rem 0 0.48rem;
+            overflow: hidden;
+            width: 100%;
+        }}
+
+        .hq-progress-fill {{
+            background: var(--hq-accent);
+            border-radius: inherit;
+            height: 100%;
+            min-width: 0;
+        }}
+
+        .hq-progress-footer {{
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 0.9rem;
+            justify-content: space-between;
+        }}
+
+        .hq-progress-pill {{
+            background: var(--hq-muted-surface);
+            border-radius: 999px;
+            color: var(--hq-text-secondary);
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 680;
+            line-height: 1;
+            padding: 0.35rem 0.55rem;
+        }}
+
+        .hq-management-item {{
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            box-shadow: var(--hq-shadow);
+            margin: 0.7rem 0;
+            padding: 0.85rem 0.9rem;
+        }}
+
+        .hq-management-title {{
+            color: var(--hq-text-primary);
+            font-size: 0.96rem;
+            font-weight: 720;
+            line-height: 1.25;
+            margin-bottom: 0.18rem;
+        }}
+
+        .hq-management-meta {{
+            color: var(--hq-text-secondary);
+            font-size: 0.83rem;
+            line-height: 1.35;
+        }}
+
+        .hq-meta-pills {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin: 0.6rem 0 0.75rem;
+        }}
+
+        .hq-meta-pill {{
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: 999px;
+            color: var(--hq-text-secondary);
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 680;
+            line-height: 1;
+            padding: 0.4rem 0.58rem;
+        }}
+
+        .hq-meta-pill strong {{
+            color: var(--hq-text-primary);
+            font-weight: 740;
+            margin-right: 0.25rem;
+        }}
+
+        .hq-status-panel {{
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            box-shadow: var(--hq-shadow);
+            margin: 0.45rem 0 0.9rem;
+            padding: 0.85rem 0.95rem;
+        }}
+
+        .hq-status-label {{
+            color: var(--hq-text-secondary);
+            font-size: 0.74rem;
+            font-weight: 720;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }}
+
+        .hq-status-value {{
+            color: var(--hq-text-primary);
+            font-size: 1rem;
+            font-weight: 740;
+            line-height: 1.35;
+        }}
+
+        .hq-legend-row {{
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin: 0.45rem 0 0.75rem;
+        }}
+
+        .hq-legend-item {{
+            align-items: center;
+            background: var(--hq-muted-surface);
+            border-radius: 999px;
+            color: var(--hq-text-secondary);
+            display: inline-flex;
+            font-size: 0.78rem;
+            gap: 0.34rem;
+            line-height: 1;
+            padding: 0.36rem 0.54rem;
+        }}
+
+        .hq-legend-marker {{
+            color: var(--hq-text-primary);
+            font-weight: 760;
+            min-width: 1rem;
+            text-align: center;
+        }}
+
+        @media (max-width: 720px) {{
+            .hq-progress-card-header {{
+                grid-template-columns: 1fr;
+            }}
+
+            .hq-progress-value {{
+                text-align: left;
+            }}
+        }}
+
+        .hq-list-row {{
+            align-items: center;
+            display: grid;
+            gap: 0.85rem;
+            grid-template-columns: minmax(92px, 0.22fr) minmax(0, 1fr) minmax(72px, 0.16fr);
+            min-height: 62px;
+            padding: 0.72rem 0.9rem;
+        }}
+
+        .hq-list-row + .hq-list-row {{
+            border-top: 1px solid var(--hq-border);
+        }}
+
+        .hq-list-time,
+        .hq-list-meta {{
+            color: var(--hq-text-secondary);
+            font-size: 0.84rem;
+            line-height: 1.25;
+        }}
+
+        .hq-list-time,
+        .hq-list-value {{
+            font-weight: 720;
+        }}
+
+        .hq-list-title {{
+            color: var(--hq-text-primary);
+            font-size: 0.94rem;
+            font-weight: 720;
+            line-height: 1.25;
+        }}
+
+        .hq-list-meta {{
+            margin-top: 0.15rem;
+        }}
+
+        .hq-list-value {{
+            color: var(--hq-text-primary);
+            font-size: 0.9rem;
+            text-align: right;
+            white-space: nowrap;
+        }}
+
+        @media (max-width: 720px) {{
+            .hq-list-row {{
+                grid-template-columns: 1fr;
+            }}
+
+            .hq-list-value {{
+                text-align: left;
+            }}
+        }}
+
+        [data-testid="stPlotlyChart"] {{
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 0;
         }}
         </style>
         """,

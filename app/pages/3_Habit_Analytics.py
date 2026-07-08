@@ -14,6 +14,7 @@ from src.ui import (
     apply_theme,
     get_theme_tokens,
     render_empty_state,
+    render_metric_card,
     render_page_header,
     render_section_title,
     style_chart,
@@ -30,7 +31,7 @@ def render_weekly_pulse(weekly_pulse: dict) -> None:
     )
     for column, (label, value) in zip(metric_cols, metrics):
         with column:
-            st.metric(label, value)
+            render_metric_card(label, value)
 
 
 def render_xp_by_day(xp_by_day) -> None:
@@ -150,7 +151,7 @@ def render_insights(analytics: dict) -> None:
     insight_cols = st.columns(len(insights))
     for column, (label, value) in zip(insight_cols, insights):
         with column:
-            st.metric(label, value)
+            render_metric_card(label, value)
 
 
 def _format_date_labels(dataframe):
