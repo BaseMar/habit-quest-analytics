@@ -55,7 +55,7 @@ from src.services.recurring_habit_service import (
     remove_future_planned_recurring_instances,
     set_recurring_habit_active,
 )
-from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
+from src.ui import apply_theme, get_theme_tokens, render_empty_state, render_page_header, render_section_title
 
 
 CHECKLIST_STATUS_LABELS = {
@@ -92,6 +92,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         st.info("Calendar component unavailable. Use the selected date field below to plan quests.")
         return
 
+    tokens = get_theme_tokens()
     calendar_options = {
         "initialView": "timeGridWeek",
         "initialDate": selected_date.isoformat(),
@@ -125,11 +126,11 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
     }
     custom_css = """
         .fc {
-            --fc-page-bg-color: rgba(15, 23, 42, 0);
-            --fc-neutral-bg-color: rgba(15, 23, 42, 0.78);
-            --fc-border-color: rgba(148, 163, 184, 0.18);
-            --fc-today-bg-color: rgba(56, 189, 248, 0.08);
-            color: #e5e7eb;
+            --fc-page-bg-color: transparent;
+            --fc-neutral-bg-color: var(--hq-muted-surface);
+            --fc-border-color: var(--hq-border);
+            --fc-today-bg-color: var(--hq-accent-soft);
+            color: var(--hq-text-primary);
             min-height: 760px;
             width: 100%;
         }
@@ -138,7 +139,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         }
         .fc .fc-scroller,
         .fc .fc-scroller-liquid {
-            scrollbar-color: rgba(139, 92, 246, 0.55) rgba(15, 23, 42, 0.42);
+            scrollbar-color: var(--hq-accent) var(--hq-muted-surface);
             scrollbar-width: thin;
         }
         .fc .fc-timegrid-body,
@@ -149,26 +150,29 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         .fc-theme-standard .fc-scrollgrid,
         .fc-theme-standard td,
         .fc-theme-standard th {
-            border-color: rgba(148, 163, 184, 0.18);
+            border-color: var(--hq-border);
         }
         .fc-theme-standard .fc-scrollgrid {
+            background:
+                linear-gradient(135deg, var(--hq-accent-soft), transparent 78%),
+                var(--hq-surface);
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
         }
         .fc .fc-col-header-cell {
-            background: rgba(15, 23, 42, 0.9);
+            background: var(--hq-surface-elevated);
         }
         .fc .fc-col-header-cell-cushion,
         .fc .fc-timegrid-axis-cushion,
         .fc .fc-timegrid-slot-label-cushion {
-            color: #cbd5e1;
+            color: var(--hq-text-secondary);
             font-size: 0.78rem;
             font-weight: 700;
             text-decoration: none;
         }
         .fc .fc-toolbar-title {
-            color: #f8fafc;
+            color: var(--hq-text-primary);
             font-size: 1.28rem;
             font-weight: 850;
         }
@@ -177,38 +181,44 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             margin-bottom: 0.85rem;
         }
         .fc .fc-button-primary {
-            background: rgba(56, 189, 248, 0.18);
-            border-color: rgba(56, 189, 248, 0.38);
+            background: var(--hq-accent-soft);
+            border-color: var(--hq-accent-border);
             border-radius: 5px;
             box-shadow: none;
-            color: #f8fafc;
+            color: var(--hq-text-primary);
             font-size: 0.82rem;
             font-weight: 750;
             padding: 0.42rem 0.62rem;
             transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
         }
         .fc .fc-button-primary:hover {
-            background: rgba(56, 189, 248, 0.28);
-            border-color: rgba(125, 211, 252, 0.58);
+            background: var(--hq-surface-elevated);
+            border-color: var(--hq-accent);
             transform: translateY(-1px);
         }
         .fc .fc-button-primary:not(:disabled).fc-button-active,
         .fc .fc-button-primary:not(:disabled):active {
-            background: rgba(139, 92, 246, 0.48);
-            border-color: rgba(196, 181, 253, 0.62);
+            background: var(--hq-accent);
+            border-color: var(--hq-accent-border);
+            color: white;
         }
         .fc .fc-timegrid-slot {
             height: 2.15rem;
+            background: var(--hq-surface);
+        }
+        .fc .fc-daygrid-day,
+        .fc .fc-timegrid-col {
+            background: var(--hq-surface);
         }
         .fc .fc-daygrid-day.fc-day-today,
         .fc .fc-timegrid-col.fc-day-today {
-            background: rgba(56, 189, 248, 0.08);
+            background: var(--hq-accent-soft);
         }
         .fc .fc-timegrid-now-indicator-line {
-            border-color: #f59e0b;
+            border-color: var(--hq-warning);
         }
         .fc .fc-timegrid-now-indicator-arrow {
-            border-color: #f59e0b;
+            border-color: var(--hq-warning);
             border-bottom-color: transparent;
             border-top-color: transparent;
         }
@@ -221,12 +231,12 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             min-height: 26px;
         }
         .fc .fc-event-main {
-            color: #f8fafc;
+            color: white;
             overflow: hidden;
             padding: 0.12rem 0.2rem;
         }
         .fc .fc-event-time {
-            color: rgba(248, 250, 252, 0.78);
+            color: rgba(255, 255, 255, 0.78);
             font-size: 0.72rem;
             font-weight: 700;
             line-height: 1.15;
@@ -234,7 +244,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             white-space: nowrap;
         }
         .fc .fc-event-title {
-            color: #ffffff;
+            color: white;
             font-size: 0.78rem;
             font-weight: 800;
             line-height: 1.18;
@@ -248,12 +258,24 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         }
         .fc .fc-list,
         .fc .fc-list-day-cushion {
-            background: rgba(15, 23, 42, 0.72);
+            background: var(--hq-surface);
         }
         .fc .fc-list-event:hover td {
-            background: rgba(30, 41, 59, 0.92);
+            background: var(--hq-surface-elevated);
         }
     """
+    custom_css = (
+        custom_css.replace("var(--hq-muted-surface)", tokens["muted_surface"])
+        .replace("var(--hq-accent-soft)", tokens["accent_soft"])
+        .replace("var(--hq-border)", tokens["border"])
+        .replace("var(--hq-text-primary)", tokens["text_primary"])
+        .replace("var(--hq-text-secondary)", tokens["text_secondary"])
+        .replace("var(--hq-accent-border)", tokens["accent_border"])
+        .replace("var(--hq-surface-elevated)", tokens["surface_elevated"])
+        .replace("var(--hq-surface)", tokens["surface"])
+        .replace("var(--hq-accent)", tokens["accent"])
+        .replace("var(--hq-warning)", tokens["warning"])
+    )
 
     try:
         calendar_state = calendar(

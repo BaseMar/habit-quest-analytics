@@ -83,37 +83,39 @@ def render_status_kpis(command_center: dict) -> None:
                 gap: 0.75rem;
                 min-height: 54px;
                 padding: 0.65rem 0.85rem;
-                border: 1px solid rgba(148, 163, 184, 0.22);
+                border: 1px solid var(--hq-border);
                 border-left-width: 4px;
                 border-radius: 8px;
-                background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.62));
-                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+                background:
+                    linear-gradient(135deg, var(--hq-accent-soft), transparent 86%),
+                    var(--hq-surface);
+                box-shadow: var(--hq-shadow);
             }}
 
             .command-status-card.warning {{
-                border-left-color: #f59e0b;
+                border-left-color: var(--hq-warning);
             }}
 
             .command-status-card.danger {{
-                border-left-color: #ef4444;
+                border-left-color: var(--hq-danger);
             }}
 
             .command-status-card.info {{
-                border-left-color: #38bdf8;
+                border-left-color: var(--hq-info);
             }}
 
             .command-status-card.success {{
-                border-left-color: #22c55e;
+                border-left-color: var(--hq-success);
             }}
 
             .command-status-label {{
-                color: rgba(226, 232, 240, 0.68);
+                color: var(--hq-text-secondary);
                 font-size: 0.82rem;
                 line-height: 1.15;
             }}
 
             .command-status-value {{
-                color: #f8fafc;
+                color: var(--hq-text-primary);
                 font-size: 1.18rem;
                 font-weight: 800;
                 line-height: 1;

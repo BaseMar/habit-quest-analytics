@@ -10,7 +10,14 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.database.db import init_db
 from src.services.analytics_service import get_habit_analytics_data
-from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title, style_chart
+from src.ui import (
+    apply_theme,
+    get_theme_tokens,
+    render_empty_state,
+    render_page_header,
+    render_section_title,
+    style_chart,
+)
 
 
 def render_weekly_pulse(weekly_pulse: dict) -> None:
@@ -31,6 +38,7 @@ def render_xp_by_day(xp_by_day) -> None:
         render_empty_state("No completed quest days yet", "Complete quest days to see XP trends by day.")
         return
 
+    tokens = get_theme_tokens()
     chart_data = _format_date_labels(xp_by_day)
     fig = px.line(
         chart_data,
@@ -38,7 +46,7 @@ def render_xp_by_day(xp_by_day) -> None:
         y="XP",
         title="XP Trend by Day",
         markers=True,
-        color_discrete_sequence=["#8B5CF6"],
+        color_discrete_sequence=[tokens["accent"]],
     )
     fig.update_layout(xaxis_title="Check-in Date", yaxis_title="XP Earned", showlegend=False, height=360)
     fig.update_xaxes(type="category")
@@ -51,13 +59,14 @@ def render_status_chart(quests_by_status) -> None:
         render_empty_state("No status data", "Update quest days to see the status breakdown.")
         return
 
+    tokens = get_theme_tokens()
     fig = px.bar(
         quests_by_status,
         x="Status",
         y="Count",
         title="Check-ins by Status",
         category_orders={"Status": quests_by_status["Status"].tolist()},
-        color_discrete_sequence=["#38BDF8"],
+        color_discrete_sequence=[tokens["info"]],
     )
     fig.update_layout(xaxis_title="Check-in Status", yaxis_title="Check-in Count", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
@@ -68,12 +77,13 @@ def render_category_chart(quests_by_category) -> None:
         render_empty_state("No category data", "Add categorized quest days to see category balance.")
         return
 
+    tokens = get_theme_tokens()
     fig = px.bar(
         quests_by_category,
         x="Category",
         y="Count",
         title="Check-ins by Category",
-        color_discrete_sequence=["#22C55E"],
+        color_discrete_sequence=[tokens["success"]],
     )
     fig.update_layout(xaxis_title="Category", yaxis_title="Check-in Count", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
@@ -83,6 +93,7 @@ def render_weekday_chart(completion_rate_by_weekday) -> None:
     if completion_rate_by_weekday.empty:
         render_empty_state("No resolved quest days found", "Complete or fail quest days to see weekday consistency.")
         return
+    tokens = get_theme_tokens()
     hover_columns = [
         column
         for column in ("Completed Quest Days", "Resolved Quest Days", "Completed Quests", "Total Quests")
@@ -95,7 +106,7 @@ def render_weekday_chart(completion_rate_by_weekday) -> None:
         y="Completion Rate",
         title="Completion Rate by Weekday",
         hover_data=hover_columns,
-        color_discrete_sequence=["#F59E0B"],
+        color_discrete_sequence=[tokens["warning"]],
         category_orders={
             "Weekday": [
                 "Monday",
@@ -118,12 +129,13 @@ def render_estimated_minutes_chart(estimated_minutes_by_category) -> None:
         render_empty_state("No estimated time recorded", "Schedule quests with duration to compare planned effort.")
         return
 
+    tokens = get_theme_tokens()
     fig = px.bar(
         estimated_minutes_by_category,
         x="Category",
         y=minutes_column,
         title="Planned Minutes by Category",
-        color_discrete_sequence=["#8B5CF6"],
+        color_discrete_sequence=[tokens["accent"]],
     )
     fig.update_layout(xaxis_title="Category", yaxis_title="Planned Minutes", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")

@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.database.db import init_db
 from src.services.analytics_service import get_character_profile_data
 from src.services.profile_service import remove_avatar, resolve_avatar_path, save_avatar
-from src.ui import apply_theme, render_page_header, render_section_title
+from src.ui import apply_theme, get_theme_tokens, render_page_header, render_section_title
 
 
 def apply_character_profile_styles() -> None:
@@ -42,11 +42,11 @@ def apply_character_profile_styles() -> None:
             align-items: center;
             aspect-ratio: 1;
             background:
-                linear-gradient(135deg, rgba(31, 41, 55, 0.96), rgba(15, 23, 42, 0.96)),
-                radial-gradient(circle at center, rgba(139, 92, 246, 0.22), transparent 60%);
-            border: 1px dashed rgba(196, 181, 253, 0.42);
+                linear-gradient(135deg, var(--hq-surface), var(--hq-surface-elevated)),
+                radial-gradient(circle at center, var(--hq-accent-soft), transparent 60%);
+            border: 1px dashed var(--hq-accent-border);
             border-radius: 8px;
-            color: #d1d5db;
+            color: var(--hq-text-secondary);
             display: flex;
             flex-direction: column;
             font-size: 0.8rem;
@@ -58,14 +58,14 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-hero-avatar-icon {
-            color: #c4b5fd;
+            color: var(--hq-accent);
             font-size: 1.8rem;
             line-height: 1;
             margin-bottom: 0.32rem;
         }
 
         .hq-hero-avatar-title {
-            color: #f9fafb;
+            color: var(--hq-text-primary);
             font-weight: 760;
         }
 
@@ -74,7 +74,7 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-character-name {
-            color: #f9fafb;
+            color: var(--hq-text-primary);
             font-size: 1.58rem;
             font-weight: 850;
             line-height: 1.12;
@@ -82,7 +82,7 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-character-title {
-            color: #c4b5fd;
+            color: var(--hq-accent);
             font-size: 0.92rem;
             font-weight: 750;
             line-height: 1.25;
@@ -91,8 +91,8 @@ def apply_character_profile_styles() -> None:
 
         .hq-level-badge {
             align-items: center;
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(56, 189, 248, 0.75));
-            border: 1px solid rgba(221, 214, 254, 0.34);
+            background: linear-gradient(135deg, var(--hq-accent), var(--hq-info));
+            border: 1px solid var(--hq-accent-border);
             border-radius: 8px;
             box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
             color: #ffffff;
@@ -106,10 +106,10 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-empty-compact {
-            background: rgba(31, 41, 55, 0.58);
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
             border-radius: 8px;
-            color: #d1d5db;
+            color: var(--hq-text-secondary);
             font-size: 0.9rem;
             line-height: 1.35;
             margin-top: 0.7rem;
@@ -117,11 +117,11 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-empty-compact strong {
-            color: #f9fafb;
+            color: var(--hq-text-primary);
         }
 
         .hq-radar-caption {
-            color: #9ca3af;
+            color: var(--hq-text-secondary);
             font-size: 0.78rem;
             line-height: 1.25;
             margin-top: -0.45rem;
@@ -129,16 +129,16 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-explainer {
-            background: linear-gradient(180deg, rgba(31, 41, 55, 0.88), rgba(17, 24, 39, 0.88));
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            border: 1px solid var(--hq-border);
             border-radius: 8px;
-            color: #d1d5db;
+            color: var(--hq-text-secondary);
             line-height: 1.5;
             padding: 0.82rem 0.95rem;
         }
 
         .hq-achievements-note {
-            color: #9ca3af;
+            color: var(--hq-text-secondary);
             font-size: 0.88rem;
             margin-top: 0.15rem;
         }
@@ -204,6 +204,7 @@ def render_avatar_controls(profile: dict) -> None:
 
 
 def render_character_hero(profile: dict) -> None:
+    tokens = get_theme_tokens()
     progress_percent = int(profile["level_progress"] * 100)
     quest_days = _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)
     completion_rate = _activity_value(profile, ["Completion Rate"], default="0.0%")
@@ -232,21 +233,21 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .character-name {{
-                        color: #f9fafb;
+                        color: {tokens["text_primary"]};
                         font: 850 25px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         margin: 0 0 2px;
                     }}
 
                     .character-title {{
-                        color: #c4b5fd;
+                        color: {tokens["accent"]};
                         font: 750 14px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         margin-bottom: 7px;
                     }}
 
                     .level-badge {{
                         align-items: center;
-                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(56, 189, 248, 0.75));
-                        border: 1px solid rgba(221, 214, 254, 0.34);
+                        background: linear-gradient(135deg, {tokens["accent"]}, {tokens["info"]});
+                        border: 1px solid {tokens["accent_border"]};
                         border-radius: 8px;
                         box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
                         color: #ffffff;
@@ -265,8 +266,8 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .hero-chip {{
-                        background: rgba(15, 23, 42, 0.5);
-                        border: 1px solid rgba(148, 163, 184, 0.16);
+                        background: {tokens["muted_surface"]};
+                        border: 1px solid {tokens["border"]};
                         border-radius: 7px;
                         box-sizing: border-box;
                         min-height: 48px;
@@ -274,7 +275,7 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .hero-chip-label {{
-                        color: #9ca3af;
+                        color: {tokens["text_secondary"]};
                         font: 760 9.5px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         letter-spacing: 0.05em;
                         overflow-wrap: anywhere;
@@ -282,7 +283,7 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .hero-chip-value {{
-                        color: #f9fafb;
+                        color: {tokens["text_primary"]};
                         font: 850 14px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         margin-top: 2px;
                         overflow-wrap: anywhere;
@@ -323,8 +324,8 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .xp-panel {{
-                        background: rgba(15, 23, 42, 0.5);
-                        border: 1px solid rgba(148, 163, 184, 0.16);
+                        background: {tokens["muted_surface"]};
+                        border: 1px solid {tokens["border"]};
                         border-radius: 8px;
                         box-sizing: border-box;
                         display: flex;
@@ -343,8 +344,8 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .xp-metric {{
-                        background: rgba(2, 6, 23, 0.28);
-                        border: 1px solid rgba(148, 163, 184, 0.12);
+                        background: {tokens["surface"]};
+                        border: 1px solid {tokens["border"]};
                         border-radius: 7px;
                         box-sizing: border-box;
                         min-height: 52px;
@@ -352,21 +353,21 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .xp-label {{
-                        color: #9ca3af;
+                        color: {tokens["text_secondary"]};
                         font: 780 10.5px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         letter-spacing: 0.06em;
                         text-transform: uppercase;
                     }}
 
                     .xp-value {{
-                        color: #f9fafb;
+                        color: {tokens["text_primary"]};
                         font: 860 18px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         margin-top: 3px;
                     }}
 
                     .xp-track {{
-                        background: rgba(2, 6, 23, 0.76);
-                        border: 1px solid rgba(148, 163, 184, 0.22);
+                        background: {tokens["muted_surface"]};
+                        border: 1px solid {tokens["border"]};
                         border-radius: 999px;
                         height: 10px;
                         margin-top: 11px;
@@ -375,14 +376,14 @@ def render_character_hero(profile: dict) -> None:
                     }}
 
                     .xp-fill {{
-                        background: linear-gradient(90deg, #38bdf8, #a78bfa);
+                        background: linear-gradient(90deg, {tokens["info"]}, {tokens["accent"]});
                         border-radius: inherit;
                         height: 100%;
                         width: {progress_width}%;
                     }}
 
                     .xp-caption {{
-                        color: #9ca3af;
+                        color: {tokens["text_secondary"]};
                         font: 650 11px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                         margin-top: 6px;
                     }}
@@ -420,6 +421,7 @@ def render_character_hero(profile: dict) -> None:
 
 
 def render_rpg_stats_section(profile: dict) -> None:
+    tokens = get_theme_tokens()
     render_section_title("RPG Stats", "Stat levels from completed quest-day XP by category.")
     rows = "".join(_render_stat_row(row) for row in profile["stat_profile"])
     radar_html = _build_radar_figure(profile, height=260).to_html(
@@ -446,8 +448,8 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .rpg-card {{
-                background: rgba(17, 24, 39, 0.72);
-                border: 1px solid rgba(148, 163, 184, 0.22);
+                background: {tokens["surface"]};
+                border: 1px solid {tokens["border"]};
                 border-radius: 8px;
                 box-sizing: border-box;
                 display: flex;
@@ -458,7 +460,7 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .rpg-card-title {{
-                color: #f9fafb;
+                color: {tokens["text_primary"]};
                 font: 800 15px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 margin: 0 0 8px;
             }}
@@ -475,8 +477,8 @@ def render_rpg_stats_section(profile: dict) -> None:
 
             .stat-row {{
                 align-items: center;
-                background: rgba(15, 23, 42, 0.46);
-                border: 1px solid rgba(148, 163, 184, 0.14);
+                background: {tokens["muted_surface"]};
+                border: 1px solid {tokens["border"]};
                 border-radius: 7px;
                 box-sizing: border-box;
                 display: grid;
@@ -488,20 +490,20 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .stat-name {{
-                color: #f9fafb;
+                color: {tokens["text_primary"]};
                 font: 800 13px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 overflow-wrap: anywhere;
             }}
 
             .stat-category {{
-                color: #9ca3af;
+                color: {tokens["text_secondary"]};
                 font: 650 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 margin-top: 1px;
             }}
 
             .stat-track {{
-                background: rgba(2, 6, 23, 0.76);
-                border: 1px solid rgba(148, 163, 184, 0.24);
+                background: {tokens["muted_surface"]};
+                border: 1px solid {tokens["border"]};
                 border-radius: 999px;
                 box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.38);
                 height: 10px;
@@ -510,9 +512,9 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .stat-fill {{
-                background: linear-gradient(90deg, #38bdf8 0%, #a78bfa 72%, #c4b5fd 100%);
+                background: linear-gradient(90deg, {tokens["info"]} 0%, {tokens["accent"]} 100%);
                 border-radius: inherit;
-                box-shadow: 0 0 12px rgba(56, 189, 248, 0.28);
+                box-shadow: 0 0 12px {tokens["accent_soft"]};
                 height: 100%;
                 min-width: 3px;
             }}
@@ -522,14 +524,14 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .stat-help {{
-                color: #9ca3af;
+                color: {tokens["text_secondary"]};
                 font: 600 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 margin-top: 3px;
                 white-space: nowrap;
             }}
 
             .stat-level {{
-                color: #c4b5fd;
+                color: {tokens["accent"]};
                 font: 850 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 text-align: right;
                 white-space: nowrap;
@@ -549,7 +551,7 @@ def render_rpg_stats_section(profile: dict) -> None:
             }}
 
             .radar-caption {{
-                color: #9ca3af;
+                color: {tokens["text_secondary"]};
                 font: 650 11px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 margin-top: 2px;
                 text-align: center;
@@ -579,6 +581,7 @@ def render_rpg_stats_section(profile: dict) -> None:
 
 
 def _build_radar_figure(profile: dict, height: int) -> go.Figure:
+    tokens = get_theme_tokens()
     stat_profile = profile["stat_profile"]
     stats = [row["stat"] for row in stat_profile]
     values = [int(row["level"]) for row in stat_profile]
@@ -590,9 +593,9 @@ def _build_radar_figure(profile: dict, height: int) -> go.Figure:
                 r=values + values[:1],
                 theta=stats + stats[:1],
                 fill="toself",
-                fillcolor="rgba(139, 92, 246, 0.28)",
-                line={"color": "#A78BFA", "width": 3},
-                marker={"color": "#38BDF8", "size": 7},
+                fillcolor=tokens["accent_soft"],
+                line={"color": tokens["accent"], "width": 3},
+                marker={"color": tokens["info"], "size": 7},
                 name="Stat Levels",
             )
         ]
@@ -601,23 +604,23 @@ def _build_radar_figure(profile: dict, height: int) -> go.Figure:
         title={"text": ""},
         autosize=True,
         height=height,
-        paper_bgcolor="rgba(17, 24, 39, 0)",
-        plot_bgcolor="rgba(17, 24, 39, 0)",
-        font={"color": "#F9FAFB"},
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+        font={"color": tokens["text_primary"]},
         margin={"l": 24, "r": 24, "t": 0, "b": 8},
         polar={
-            "bgcolor": "rgba(17, 24, 39, 0)",
+            "bgcolor": "rgba(0, 0, 0, 0)",
             "domain": {"x": [0.08, 0.92], "y": [0.07, 0.95]},
             "radialaxis": {
-                "gridcolor": "rgba(148, 163, 184, 0.22)",
+                "gridcolor": tokens["chart_grid"],
                 "range": [0, max_value],
-                "tickfont": {"color": "#9CA3AF", "size": 9},
+                "tickfont": {"color": tokens["text_secondary"], "size": 9},
                 "showline": False,
                 "dtick": 1,
             },
             "angularaxis": {
-                "gridcolor": "rgba(148, 163, 184, 0.18)",
-                "tickfont": {"color": "#F9FAFB", "size": 10},
+                "gridcolor": tokens["chart_grid"],
+                "tickfont": {"color": tokens["text_primary"], "size": 10},
             },
         },
         showlegend=False,
@@ -648,6 +651,7 @@ def _render_stat_row(row: dict) -> str:
 
 
 def render_activity_snapshot(profile: dict) -> None:
+    tokens = get_theme_tokens()
     tiles = [
         ("Quest Days", _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)),
         ("Avg XP / Day", _activity_value(profile, ["Average XP / Quest Day", "Average XP / Completed Quest"], default=0)),
@@ -679,8 +683,8 @@ def render_activity_snapshot(profile: dict) -> None:
             }}
 
             .snapshot-tile {{
-                background: linear-gradient(180deg, rgba(31, 41, 55, 0.86), rgba(17, 24, 39, 0.86));
-                border: 1px solid rgba(148, 163, 184, 0.16);
+                background: linear-gradient(180deg, {tokens["surface"]}, {tokens["surface_elevated"]});
+                border: 1px solid {tokens["border"]};
                 border-radius: 8px;
                 box-sizing: border-box;
                 min-height: 58px;
@@ -688,7 +692,7 @@ def render_activity_snapshot(profile: dict) -> None:
             }}
 
             .snapshot-label {{
-                color: #9ca3af;
+                color: {tokens["text_secondary"]};
                 font: 760 10px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 letter-spacing: 0.05em;
                 overflow: hidden;
@@ -698,7 +702,7 @@ def render_activity_snapshot(profile: dict) -> None:
             }}
 
             .snapshot-value {{
-                color: #f9fafb;
+                color: {tokens["text_primary"]};
                 font: 850 15px/1.18 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 margin-top: 5px;
                 overflow-wrap: anywhere;

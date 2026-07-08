@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.ui import apply_theme, render_page_header, render_section_title
+from src.ui import apply_theme, render_appearance_controls, render_page_header, render_section_title
 from src.database.db import init_db
 from src.database.seed import ensure_default_categories
 
@@ -25,17 +25,17 @@ def apply_home_base_styles() -> None:
         <style>
         .home-hero {
             background:
-                linear-gradient(135deg, rgba(139, 92, 246, 0.24), rgba(56, 189, 248, 0.08)),
-                linear-gradient(180deg, rgba(31, 41, 55, 0.96), rgba(17, 24, 39, 0.96));
-            border: 1px solid rgba(167, 139, 250, 0.28);
+                linear-gradient(135deg, var(--hq-accent-soft), transparent 72%),
+                linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            border: 1px solid var(--hq-accent-border);
             border-radius: 8px;
-            box-shadow: 0 18px 38px rgba(2, 6, 23, 0.3);
+            box-shadow: var(--hq-shadow);
             margin: 0.25rem 0 1.1rem;
             padding: 1.25rem 1.35rem;
         }
 
         .home-hero-label {
-            color: #a78bfa;
+            color: var(--hq-accent);
             font-size: 0.74rem;
             font-weight: 800;
             letter-spacing: 0.08em;
@@ -44,7 +44,7 @@ def apply_home_base_styles() -> None:
         }
 
         .home-hero-title {
-            color: #f9fafb;
+            color: var(--hq-text-primary);
             font-size: 1.65rem;
             font-weight: 850;
             line-height: 1.2;
@@ -52,7 +52,7 @@ def apply_home_base_styles() -> None:
         }
 
         .home-hero-copy {
-            color: #d1d5db;
+            color: var(--hq-text-secondary);
             font-size: 0.98rem;
             line-height: 1.55;
             max-width: 880px;
@@ -66,20 +66,22 @@ def apply_home_base_styles() -> None:
         }
 
         .home-step-card {
-            background: linear-gradient(180deg, rgba(31, 41, 55, 0.92), rgba(17, 24, 39, 0.96));
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            background:
+                linear-gradient(135deg, var(--hq-accent-soft), transparent 86%),
+                linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            border: 1px solid var(--hq-border);
             border-radius: 8px;
-            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.22);
+            box-shadow: var(--hq-shadow);
             min-height: 156px;
             padding: 0.95rem;
         }
 
         .home-step-number {
             align-items: center;
-            background: rgba(139, 92, 246, 0.18);
-            border: 1px solid rgba(167, 139, 250, 0.28);
+            background: var(--hq-accent-soft);
+            border: 1px solid var(--hq-accent-border);
             border-radius: 999px;
-            color: #ddd6fe;
+            color: var(--hq-accent);
             display: inline-flex;
             font-size: 0.78rem;
             font-weight: 800;
@@ -90,7 +92,7 @@ def apply_home_base_styles() -> None:
         }
 
         .home-step-title {
-            color: #f9fafb;
+            color: var(--hq-text-primary);
             font-size: 0.96rem;
             font-weight: 750;
             line-height: 1.25;
@@ -98,7 +100,7 @@ def apply_home_base_styles() -> None:
         }
 
         .home-step-body {
-            color: #9ca3af;
+            color: var(--hq-text-secondary);
             font-size: 0.88rem;
             line-height: 1.45;
         }
@@ -112,10 +114,10 @@ def apply_home_base_styles() -> None:
         }
 
         .home-loop-item {
-            background: rgba(15, 23, 42, 0.68);
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
             border-radius: 8px;
-            color: #f9fafb;
+            color: var(--hq-text-primary);
             font-size: 0.9rem;
             font-weight: 750;
             padding: 0.75rem 0.85rem;
@@ -123,10 +125,10 @@ def apply_home_base_styles() -> None:
         }
 
         .home-note {
-            background: rgba(15, 23, 42, 0.52);
-            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
             border-radius: 8px;
-            color: #9ca3af;
+            color: var(--hq-text-secondary);
             font-size: 0.82rem;
             line-height: 1.45;
             margin-top: 1.5rem;
@@ -147,135 +149,6 @@ def apply_home_base_styles() -> None:
             .home-step-card {
                 min-height: auto;
             }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def apply_sidebar_styles() -> None:
-    st.markdown(
-        """
-        <style>
-        section[data-testid="stSidebar"] {
-            background:
-                linear-gradient(180deg, rgba(15, 23, 42, 1), rgba(17, 24, 39, 0.98)) !important;
-            border-right: 1px solid rgba(148, 163, 184, 0.16);
-        }
-
-        section[data-testid="stSidebar"] > div {
-            padding-top: 1.15rem;
-        }
-
-        .hq-sidebar-brand {
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-left: 4px solid #8b5cf6;
-            border-radius: 3px;
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(56, 189, 248, 0.08));
-            box-shadow: 0 12px 26px rgba(2, 6, 23, 0.22);
-            margin: 0.2rem 0 1rem;
-            padding: 0.85rem 0.9rem;
-        }
-
-        .hq-sidebar-brand-title {
-            color: #f9fafb;
-            font-size: 1rem;
-            font-weight: 850;
-            line-height: 1.12;
-        }
-
-        .hq-sidebar-brand-subtitle {
-            color: #a78bfa;
-            font-size: 0.74rem;
-            font-weight: 800;
-            letter-spacing: 0.08em;
-            margin-top: 0.14rem;
-            text-transform: uppercase;
-        }
-
-        .hq-sidebar-brand-caption {
-            color: #9ca3af;
-            font-size: 0.78rem;
-            line-height: 1.35;
-            margin-top: 0.42rem;
-        }
-
-        section[data-testid="stSidebar"] nav ul {
-            gap: 0.35rem;
-        }
-
-        section[data-testid="stSidebar"] nav a,
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a,
-        section[data-testid="stSidebar"] [data-testid="stPageLink"] a,
-        section[data-testid="stSidebar"] a[href^="/"] {
-            align-items: center;
-            background: rgba(15, 23, 42, 0.55);
-            border: 1px solid rgba(148, 163, 184, 0.14);
-            border-left: 4px solid rgba(148, 163, 184, 0.24);
-            border-radius: 2px !important;
-            color: #cbd5e1 !important;
-            min-height: 46px;
-            padding: 0.78rem 0.85rem !important;
-            text-decoration: none;
-            transition:
-                background-color 160ms ease,
-                border-color 160ms ease,
-                box-shadow 160ms ease,
-                color 160ms ease,
-                transform 160ms ease;
-        }
-
-        section[data-testid="stSidebar"] nav a:hover,
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover,
-        section[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover,
-        section[data-testid="stSidebar"] a[href^="/"]:hover {
-            background: rgba(30, 41, 59, 0.95);
-            border-color: rgba(56, 189, 248, 0.38);
-            border-left-color: #38bdf8;
-            box-shadow: 0 10px 24px rgba(2, 6, 23, 0.26);
-            color: #f8fafc !important;
-            transform: translateX(3px);
-        }
-
-        section[data-testid="stSidebar"] nav a:focus-visible,
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:focus-visible,
-        section[data-testid="stSidebar"] [data-testid="stPageLink"] a:focus-visible,
-        section[data-testid="stSidebar"] a[href^="/"]:focus-visible {
-            outline: 2px solid rgba(56, 189, 248, 0.75);
-            outline-offset: 2px;
-        }
-
-        section[data-testid="stSidebar"] nav a:active,
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:active,
-        section[data-testid="stSidebar"] [data-testid="stPageLink"] a:active,
-        section[data-testid="stSidebar"] a[href^="/"]:active {
-            background: rgba(139, 92, 246, 0.24);
-            border-left-color: #8b5cf6;
-            transform: translateX(1px);
-        }
-
-        section[data-testid="stSidebar"] nav a[aria-current="page"],
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"],
-        section[data-testid="stSidebar"] [data-testid="stPageLink"] a[aria-current="page"],
-        section[data-testid="stSidebar"] a[aria-current="page"],
-        section[data-testid="stSidebar"] a[data-active="true"] {
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.32), rgba(56, 189, 248, 0.14));
-            border-color: rgba(167, 139, 250, 0.42);
-            border-left-color: #8b5cf6;
-            box-shadow:
-                inset 0 1px 0 rgba(255, 255, 255, 0.05),
-                0 12px 26px rgba(2, 6, 23, 0.24);
-            color: #ffffff !important;
-            font-weight: 750;
-        }
-
-        section[data-testid="stSidebar"] nav a span,
-        section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a span,
-        section[data-testid="stSidebar"] [data-testid="stPageLink"] a span {
-            color: inherit !important;
-            font-size: 0.94rem;
-            font-weight: inherit;
         }
         </style>
         """,
@@ -416,8 +289,8 @@ def render_home_base() -> None:
 
 
 apply_theme()
-apply_sidebar_styles()
 render_sidebar_brand()
+render_appearance_controls()
 
 pages = [
     st.Page(render_home_base, title="Home Base", icon=":material/home:", default=True),
