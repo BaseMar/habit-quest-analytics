@@ -1,5 +1,7 @@
 from datetime import date
 
+from sqlalchemy.orm import joinedload
+
 from src.database.db import get_session
 from src.database.models import Goal, Quest, QuestCheckin, utc_now
 from src.services.xp_service import calculate_time_based_xp
@@ -54,7 +56,7 @@ def list_goals(status: str | None = None, session=None) -> list[Goal]:
     owns_session = session is None
     session = session or get_session()
     try:
-        query = session.query(Goal)
+        query = session.query(Goal).options(joinedload(Goal.category))
         if normalized_status is not None:
             query = query.filter(Goal.status == normalized_status)
         return (

@@ -90,7 +90,8 @@ Implemented:
   date.
 - Safe deletion for unresolved one-time planned quests.
 - Long-term Goals / Projects backend foundation with a `Goal` model, service
-  layer, one-time quest linking, and progress derived from linked check-ins.
+  layer, one-time quest linking, and Quest Planner progress cards derived from
+  linked check-ins.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
 - Nonlinear character leveling and RPG stat leveling.
 - Command Center operational metrics powered by check-ins.
@@ -104,7 +105,7 @@ Implemented:
 Still evolving:
 
 - Recurring habit editing and true N-times-per-week scheduling.
-- Long-term Goals / Projects UI and analytics.
+- Long-term Goals / Projects creation UI, full dashboard, and analytics.
 - Production persistence.
 - Authentication and user-specific data.
 - External calendar sync.
@@ -503,7 +504,8 @@ Current limitations:
   recurring habit editing and true N-times-per-week auto-scheduling are not
   implemented yet.
 - Long-term Goals / Projects full dashboard, goal creation UI, and goal
-  analytics are not implemented yet; the design is documented in
+  analytics are not implemented yet; Quest Planner includes read-only active
+  goal progress cards. The design is documented in
   [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
@@ -518,7 +520,7 @@ Current limitations:
 
 Suggested future order:
 
-1. Long-term Goals / Projects UI and analytics
+1. Long-term Goals / Projects creation UI, full dashboard, and analytics
 2. Recurring habit editing and N-times-per-week scheduling
 3. PostgreSQL / production persistence
 4. Authentication

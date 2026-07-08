@@ -24,7 +24,7 @@ from src.services.checklist_service import (
     is_checklist_cell_editable,
     update_checklist_cell_status,
 )
-from src.services.goal_service import list_active_goals
+from src.services.goal_service import get_goal_progress, list_active_goals
 from src.services.quest_service import (
     create_scheduled_quest,
     delete_one_time_quest_if_unresolved,
@@ -289,6 +289,47 @@ def render_day_summary(quests: list) -> None:
     time_col.metric("Planned Time", _format_minutes(planned_minutes))
     xp_col.metric("Planned XP", f"{planned_xp} XP")
     complete_col.metric("Completed", completed_count)
+
+
+def render_goal_progress_section() -> None:
+    active_goals = list_active_goals()
+    if not active_goals:
+        render_empty_state(
+            "No active goals yet",
+            "Create goals from the backend/service foundation for now; goal creation UI will be added later.",
+        )
+        return
+
+    for goal in active_goals:
+        progress = get_goal_progress(goal.id)
+        progress_percent = float(progress["progress_percent"])
+        progress_label = _format_percent(progress_percent)
+        category = goal.category.name if goal.category else "Uncategorized"
+        target = goal.target_end_date.isoformat() if goal.target_end_date else "No target date"
+        skipped_failed = progress["skipped_sessions_count"] + progress["failed_sessions_count"]
+
+        with st.container(border=True):
+            header_col, progress_col, xp_col = st.columns([0.48, 0.3, 0.22], vertical_alignment="center")
+            with header_col:
+                st.write(f"**{goal.title}**")
+                st.caption(f"{goal.status} | {category} | Target: {target}")
+            with progress_col:
+                st.write(
+                    f"**{_format_minutes(progress['completed_minutes'])} / "
+                    f"{_format_minutes(progress['planned_total_minutes'])}**"
+                )
+                st.caption(f"{progress_label} complete")
+            with xp_col:
+                st.write(f"**{progress['earned_xp']} / {progress['expected_total_xp']} XP**")
+                st.caption("earned")
+
+            st.progress(min(max(progress_percent / 100, 0), 1))
+            st.caption(
+                "Sessions: "
+                f"{progress['completed_sessions_count']} completed | "
+                f"{progress['planned_sessions_count']} planned | "
+                f"{skipped_failed} skipped/failed"
+            )
 
 
 def _ensure_checklist_period_state() -> None:
@@ -952,6 +993,13 @@ def _format_minutes(minutes: int) -> str:
     return f"{remainder} min"
 
 
+def _format_percent(value: float) -> str:
+    rounded = round(value, 1)
+    if rounded.is_integer():
+        return f"{int(rounded)}%"
+    return f"{rounded}%"
+
+
 def _pluralize(word: str, count: int) -> str:
     return word if count == 1 else f"{word}s"
 
@@ -1067,6 +1115,13 @@ with planner_col:
                 else:
                     st.success("Quest scheduled.")
                     st.rerun()
+
+render_section_title(
+    "Goal Progress",
+    "Track active long-term goals through linked one-time quest sessions.",
+)
+with st.container(border=True):
+    render_goal_progress_section()
 
 render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
 with st.container(border=True):
