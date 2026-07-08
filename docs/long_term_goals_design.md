@@ -11,6 +11,8 @@ Current implementation status:
   `QuestCheckin.xp_awarded`.
 - Quest Planner includes a compact goal creation form.
 - Quest Planner includes read-only active goal progress cards.
+- Active goal cards include a compact Add Session flow for planned one-time
+  quest sessions linked to that goal.
 - Quest Planner includes compact lifecycle actions to archive, complete, reopen,
   and safely delete unused goals.
 - Recurring habits are not linked to goals.
@@ -150,6 +152,9 @@ Current backend/minimal UI behavior:
   Planner.
 - Goal progress cards show completed/planned effort, progress percentage,
   earned/expected XP, session counts, category, status, and target date.
+- Active goal cards can quick-add a normal one-time scheduled quest session for
+  that goal. The session creates a normal planned `QuestCheckin` and awards no
+  XP until completed.
 - A compact Manage Goals section supports Archive, Complete, Reopen, and Delete.
 - Delete is allowed only for goals with no linked quests; goals with linked
   quest sessions should be archived instead.
@@ -246,8 +251,9 @@ Rules:
 4. `feat: add goal progress UI in Quest Planner` - implemented.
 5. `feat: add goal creation UI in Quest Planner` - implemented.
 6. `feat: add goal lifecycle actions in Quest Planner` - implemented.
-7. `feat: add goal analytics`
-8. `docs: update long-term goals documentation`
+7. `feat: add goal session quick-add flow` - implemented.
+8. `feat: add goal analytics`
+9. `docs: update long-term goals documentation`
 
 ## Test Plan
 

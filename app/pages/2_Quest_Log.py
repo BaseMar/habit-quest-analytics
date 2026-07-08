@@ -348,6 +348,74 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
                 f"{progress['planned_sessions_count']} planned | "
                 f"{skipped_failed} skipped/failed"
             )
+            render_goal_session_form(goal)
+
+
+def render_goal_session_form(goal) -> None:
+    with st.expander("Add Session", expanded=False):
+        session_title = st.text_input(
+            "Session Title",
+            value=f"{goal.title} Session",
+            key=f"goal_session_title_{goal.id}",
+        )
+        session_date = st.date_input(
+            "Planned Date",
+            value=st.session_state.get("selected_date", date.today()),
+            key=f"goal_session_date_{goal.id}",
+        )
+
+        start_col, end_col = st.columns(2)
+        with start_col:
+            session_start_time = st.time_input(
+                "Start Time",
+                value=time(9, 0),
+                step=300,
+                key=f"goal_session_start_{goal.id}",
+            )
+        with end_col:
+            session_end_time = st.time_input(
+                "End Time",
+                value=time(10, 0),
+                step=300,
+                key=f"goal_session_end_{goal.id}",
+            )
+
+        session_notes = st.text_area(
+            "Notes",
+            height=64,
+            placeholder="Optional notes",
+            key=f"goal_session_notes_{goal.id}",
+        )
+        estimated_minutes = _calculate_duration_minutes_for_date(
+            session_date,
+            session_start_time,
+            session_end_time,
+        )
+        if estimated_minutes is None:
+            st.error("End time must be after start time.")
+
+        if st.button("Add Session", type="primary", use_container_width=True, key=f"goal_add_session_{goal.id}"):
+            if not session_title.strip():
+                st.error("Session title is required.")
+            elif estimated_minutes is None:
+                st.error("End time must be after start time.")
+            else:
+                try:
+                    create_scheduled_quest(
+                        title=session_title,
+                        description=session_notes,
+                        category_id=goal.category_id,
+                        goal_id=goal.id,
+                        planned_date=session_date,
+                        start_time=session_start_time,
+                        end_time=session_end_time,
+                        estimated_minutes=estimated_minutes,
+                    )
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.session_state["goal_status_message"] = "Goal session planned."
+                    st.rerun()
 
 
 def render_goal_creation_form(category_options: dict[str, int]) -> None:
@@ -1128,6 +1196,18 @@ def _calculate_duration_minutes(start_time: time, end_time: time) -> int | None:
     try:
         planned_start_at, planned_end_at = validate_schedule_times(
             st.session_state["selected_date"],
+            start_time,
+            end_time,
+        )
+    except ValueError:
+        return None
+    return int((planned_end_at - planned_start_at).total_seconds() // 60)
+
+
+def _calculate_duration_minutes_for_date(planned_date: date, start_time: time, end_time: time) -> int | None:
+    try:
+        planned_start_at, planned_end_at = validate_schedule_times(
+            planned_date,
             start_time,
             end_time,
         )
