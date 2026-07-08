@@ -607,17 +607,33 @@ def apply_global_styles() -> None:
             gap: 0.65rem;
         }}
 
+        div[data-testid="stSegmentedControl"] {{
+            margin: 0.15rem 0 0.75rem;
+        }}
+
+        div[data-testid="stSegmentedControl"] label {{
+            color: var(--hq-text-secondary) !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] button {{
+            border-radius: 7px !important;
+            font-weight: 720 !important;
+        }}
+
         div[data-testid="stExpander"] details {{
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
             box-shadow: none;
+            margin-bottom: 0.75rem;
         }}
 
         div[data-testid="stExpander"] summary {{
             color: var(--hq-text-primary);
             font-weight: 720;
-            min-height: 42px;
+            min-height: 40px;
+            padding-bottom: 0.42rem !important;
+            padding-top: 0.42rem !important;
         }}
 
         div[data-testid="stExpander"] details > div {{
@@ -625,12 +641,13 @@ def apply_global_styles() -> None:
         }}
 
         .stTabs [data-baseweb="tab-list"] {{
-            gap: 0.45rem;
+            gap: 0.25rem;
             background: transparent;
             border: 0;
             border-bottom: 1px solid var(--hq-border);
             border-radius: 0;
-            padding: 0;
+            margin-bottom: 0.85rem;
+            padding: 0 0.15rem;
         }}
 
         .stTabs [data-baseweb="tab"] {{
@@ -639,29 +656,51 @@ def apply_global_styles() -> None:
             border-radius: 0;
             color: var(--hq-text-secondary);
             font-weight: 750;
-            min-height: 42px;
-            padding: 0.5rem 0.9rem 0.7rem;
+            min-height: 44px;
+            padding: 0.55rem 1rem 0.82rem;
             position: relative;
             transition:
-                color 160ms ease;
+                color 160ms ease,
+                background-color 160ms ease;
+        }}
+
+        .stTabs [data-baseweb="tab"]::after {{
+            background: transparent;
+            border-radius: 999px 999px 0 0;
+            bottom: 0;
+            content: "";
+            height: 3px;
+            left: 0.8rem;
+            position: absolute;
+            right: 0.8rem;
+            transition:
+                background-color 160ms ease,
+                box-shadow 160ms ease;
         }}
 
         .stTabs [data-baseweb="tab"]:hover {{
             color: var(--hq-text-primary);
         }}
 
+        .stTabs [data-baseweb="tab"]:hover::after {{
+            background: var(--hq-accent-soft);
+        }}
+
         .stTabs [aria-selected="true"] {{
             background: transparent;
             color: var(--hq-text-primary) !important;
-            box-shadow:
-                inset 0 -3px 0 var(--hq-accent),
-                inset 0 -12px 16px -18px var(--hq-accent);
+            box-shadow: none;
+        }}
+
+        .stTabs [aria-selected="true"]::after {{
+            background: var(--hq-accent);
+            box-shadow: 0 -2px 14px var(--hq-accent);
         }}
 
         .stTabs [data-baseweb="tab-highlight"] {{
-            background-color: var(--hq-accent);
-            height: 3px;
-            box-shadow: 0 -2px 14px var(--hq-accent);
+            background-color: transparent;
+            height: 0;
+            box-shadow: none;
         }}
 
         button[kind="primary"],
@@ -755,6 +794,31 @@ def apply_global_styles() -> None:
             margin: 0.65rem 0 0.9rem;
         }}
 
+        .hq-empty-state .hq-empty-body {{
+            max-width: 58ch;
+        }}
+
+        .hq-empty-compact {{
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            color: var(--hq-text-secondary);
+            display: grid;
+            gap: 0.18rem;
+            margin: 0.45rem 0 0.25rem;
+            padding: 0.72rem 0.85rem;
+        }}
+
+        .hq-empty-compact strong {{
+            color: var(--hq-text-primary);
+            font-size: 0.9rem;
+        }}
+
+        .hq-empty-compact span {{
+            font-size: 0.84rem;
+            line-height: 1.35;
+        }}
+
         .hq-empty-title {{
             color: var(--hq-text-primary);
             font-weight: 780;
@@ -824,8 +888,8 @@ def apply_global_styles() -> None:
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
             box-shadow: var(--hq-shadow);
-            margin: 0.75rem 0;
-            padding: 0.95rem 1rem;
+            margin: 0.65rem 0;
+            padding: 0.9rem 1rem;
         }}
 
         .hq-progress-card-header {{
@@ -897,9 +961,9 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
-            margin: 0.7rem 0;
-            padding: 0.85rem 0.9rem;
+            box-shadow: none;
+            margin: 0.45rem 0;
+            padding: 0.72rem 0.82rem;
         }}
 
         .hq-management-title {{
@@ -914,6 +978,52 @@ def apply_global_styles() -> None:
             color: var(--hq-text-secondary);
             font-size: 0.83rem;
             line-height: 1.35;
+        }}
+
+        .hq-compact-intro {{
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            margin: 0 0 0.75rem;
+            padding: 0.7rem 0.82rem;
+        }}
+
+        .hq-compact-title {{
+            color: var(--hq-text-primary);
+            font-size: 0.98rem;
+            font-weight: 780;
+            line-height: 1.25;
+        }}
+
+        .hq-compact-body {{
+            color: var(--hq-text-secondary);
+            font-size: 0.84rem;
+            line-height: 1.35;
+            margin-top: 0.18rem;
+        }}
+
+        .hq-side-note {{
+            background:
+                linear-gradient(180deg, var(--hq-accent-soft), transparent 135%),
+                var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: var(--hq-radius);
+            color: var(--hq-text-secondary);
+            display: grid;
+            gap: 0.25rem;
+            margin-top: 0;
+            padding: 0.82rem 0.9rem;
+        }}
+
+        .hq-side-note strong {{
+            color: var(--hq-text-primary);
+            font-size: 0.9rem;
+            line-height: 1.25;
+        }}
+
+        .hq-side-note span {{
+            font-size: 0.83rem;
+            line-height: 1.4;
         }}
 
         .hq-meta-pills {{

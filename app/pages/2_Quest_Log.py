@@ -84,6 +84,12 @@ RECURRENCE_PRESETS = {
     "Every day": [0, 1, 2, 3, 4, 5, 6],
     "Weekdays": [0, 1, 2, 3, 4],
 }
+CALENDAR_VIEW_OPTIONS = {
+    "Month": {"view": "dayGridMonth", "height": 650, "content_height": 590},
+    "Week": {"view": "timeGridWeek", "height": 760, "content_height": 700},
+    "Day": {"view": "timeGridDay", "height": 720, "content_height": 660},
+    "List": {"view": "listWeek", "height": 420, "content_height": 360},
+}
 
 
 def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
@@ -92,20 +98,41 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         return
 
     tokens = get_theme_tokens()
+    if "quest_calendar_view" not in st.session_state:
+        st.session_state["quest_calendar_view"] = "Week"
+
+    if hasattr(st, "segmented_control"):
+        selected_view_label = st.segmented_control(
+            "Calendar view",
+            list(CALENDAR_VIEW_OPTIONS.keys()),
+            key="quest_calendar_view",
+            label_visibility="collapsed",
+        )
+    else:
+        selected_view_label = st.radio(
+            "Calendar view",
+            list(CALENDAR_VIEW_OPTIONS.keys()),
+            horizontal=True,
+            key="quest_calendar_view",
+            label_visibility="collapsed",
+        )
+    selected_view_label = selected_view_label or "Week"
+    view_config = CALENDAR_VIEW_OPTIONS[selected_view_label]
     calendar_options = {
-        "initialView": "timeGridWeek",
+        "initialView": view_config["view"],
         "initialDate": selected_date.isoformat(),
         "selectable": True,
         "editable": False,
         "eventResizableFromStart": False,
-        "height": "auto",
-        "contentHeight": "auto",
-        "expandRows": True,
+        "height": view_config["height"],
+        "contentHeight": view_config["content_height"],
+        "expandRows": False,
+        "handleWindowResize": True,
         "stickyHeaderDates": True,
         "headerToolbar": {
             "left": "prev,next today",
             "center": "title",
-            "right": "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+            "right": "",
         },
         "nowIndicator": True,
         "slotMinTime": "06:00:00",
@@ -124,20 +151,32 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         },
     }
     custom_css = """
+        html,
+        body,
+        #root {
+            background: var(--hq-surface) !important;
+            min-height: 0 !important;
+        }
         .fc {
             --fc-page-bg-color: transparent;
             --fc-neutral-bg-color: var(--hq-muted-surface);
             --fc-border-color: var(--hq-border);
             --fc-today-bg-color: var(--hq-accent-soft);
+            background: var(--hq-surface);
             color: var(--hq-text-primary);
-            min-height: 760px;
+            height: var(--hq-calendar-height) !important;
+            min-height: 0 !important;
+            overflow: hidden;
             width: 100%;
         }
         .fc .fc-view-harness {
-            min-height: 660px;
+            background: var(--hq-surface);
+            height: var(--hq-calendar-content-height) !important;
+            min-height: 0 !important;
         }
         .fc .fc-scroller,
         .fc .fc-scroller-liquid {
+            background: var(--hq-surface);
             scrollbar-color: var(--hq-accent) var(--hq-muted-surface);
             scrollbar-width: thin;
         }
@@ -156,6 +195,10 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        }
+        .fc .fc-scrollgrid-section > td,
+        .fc .fc-scrollgrid-section-liquid > td {
+            background: var(--hq-surface);
         }
         .fc .fc-col-header-cell {
             background: var(--hq-surface-elevated);
@@ -200,7 +243,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             color: white;
         }
         .fc .fc-timegrid-slot {
-            height: 2.15rem;
+            height: 2rem;
             background: var(--hq-surface);
         }
         .fc .fc-daygrid-day,
@@ -251,18 +294,24 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             padding: 0.14rem 0.3rem;
         }
         .fc .fc-daygrid-day-frame {
-            min-height: 112px;
+            min-height: 88px;
         }
         .fc .fc-list,
         .fc .fc-list-day-cushion {
             background: var(--hq-surface);
+        }
+        .fc .fc-list-empty {
+            background: var(--hq-surface);
+            color: var(--hq-text-secondary);
         }
         .fc .fc-list-event:hover td {
             background: var(--hq-surface-elevated);
         }
     """
     custom_css = (
-        custom_css.replace("var(--hq-muted-surface)", tokens["muted_surface"])
+        custom_css.replace("var(--hq-calendar-height)", f"{view_config['height']}px")
+        .replace("var(--hq-calendar-content-height)", f"{view_config['content_height']}px")
+        .replace("var(--hq-muted-surface)", tokens["muted_surface"])
         .replace("var(--hq-accent-soft)", tokens["accent_soft"])
         .replace("var(--hq-border)", tokens["border"])
         .replace("var(--hq-text-primary)", tokens["text_primary"])
@@ -279,7 +328,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             events=calendar_events,
             options=calendar_options,
             custom_css=custom_css,
-            key=f"quest_calendar_{_calendar_events_signature(calendar_events)}",
+            key=f"quest_calendar_{selected_view_label}_{_calendar_events_signature(calendar_events)}",
         )
     except Exception as error:
         st.warning(f"Calendar component could not render. Use the selected date field below. Details: {error}")
@@ -459,91 +508,123 @@ def render_goal_session_form(goal) -> None:
 
 def render_goal_creation_form(category_options: dict[str, int]) -> None:
     with st.expander("Create Goal / Project", expanded=False):
-        title = st.text_input("Goal Title", placeholder="Portfolio Project", key="new_goal_title")
-        description = st.text_area(
-            "Description / Notes",
-            height=72,
-            placeholder="Optional goal notes",
-            key="new_goal_description",
+        st.markdown(
+            """
+            <div class="hq-compact-intro">
+                <div class="hq-compact-title">New long-term goal</div>
+                <div class="hq-compact-body">Create the project container first, then add one-time sessions to track progress.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        hours_col, minutes_col = st.columns(2)
-        with hours_col:
-            planned_hours = st.number_input(
-                "Planned Hours",
-                min_value=0,
-                value=20,
-                step=1,
-                key="new_goal_planned_hours",
-            )
-        with minutes_col:
-            planned_minutes_remainder = st.number_input(
-                "Planned Minutes",
-                min_value=0,
-                max_value=59,
-                value=0,
-                step=5,
-                key="new_goal_planned_minutes",
+        form_col, spacer_col = st.columns([0.68, 0.32], gap="large")
+        with form_col:
+            title = st.text_input("Goal Title", placeholder="Portfolio Project", key="new_goal_title")
+            description = st.text_area(
+                "Description / Notes",
+                height=64,
+                placeholder="Optional goal notes",
+                key="new_goal_description",
             )
 
-        category_labels = ["No category"] + list(category_options.keys())
-        selected_category_label = st.selectbox(
-            "Category",
-            category_labels,
-            key="new_goal_category",
-        )
-        selected_category_id = (
-            None
-            if selected_category_label == "No category"
-            else category_options[selected_category_label]
-        )
+            hours_col, minutes_col = st.columns(2)
+            with hours_col:
+                planned_hours = st.number_input(
+                    "Planned Hours",
+                    min_value=0,
+                    value=20,
+                    step=1,
+                    key="new_goal_planned_hours",
+                )
+            with minutes_col:
+                planned_minutes_remainder = st.number_input(
+                    "Planned Minutes",
+                    min_value=0,
+                    max_value=59,
+                    value=0,
+                    step=5,
+                    key="new_goal_planned_minutes",
+                )
 
-        date_col, target_col = st.columns(2)
-        with date_col:
-            use_start_date = st.checkbox("Set start date", value=True, key="new_goal_use_start")
-            start_date = (
-                st.date_input("Start Date", value=date.today(), key="new_goal_start_date")
-                if use_start_date
-                else None
+            category_labels = ["No category"] + list(category_options.keys())
+            selected_category_label = st.selectbox(
+                "Category",
+                category_labels,
+                key="new_goal_category",
             )
-        with target_col:
-            use_target_date = st.checkbox("Set target date", value=False, key="new_goal_use_target")
-            target_end_date = (
-                st.date_input("Target End Date", value=date.today(), key="new_goal_target_date")
-                if use_target_date
-                else None
+            selected_category_id = (
+                None
+                if selected_category_label == "No category"
+                else category_options[selected_category_label]
             )
 
-        if st.button("Create Goal", type="primary", use_container_width=True, key="create_goal_button"):
-            planned_total_minutes = int(planned_hours) * 60 + int(planned_minutes_remainder)
-            if not title.strip():
-                st.error("Goal title is required.")
-            elif planned_total_minutes <= 0:
-                st.error("Planned total time must be greater than 0.")
-            else:
-                try:
-                    create_goal(
-                        title=title,
-                        description=description,
-                        category_id=selected_category_id,
-                        planned_total_minutes=planned_total_minutes,
-                        start_date=start_date,
-                        target_end_date=target_end_date,
-                    )
-                except ValueError as error:
-                    st.error(str(error))
+            date_col, target_col = st.columns(2)
+            with date_col:
+                use_start_date = st.checkbox("Set start date", value=True, key="new_goal_use_start")
+                start_date = (
+                    st.date_input("Start Date", value=date.today(), key="new_goal_start_date")
+                    if use_start_date
+                    else None
+                )
+            with target_col:
+                use_target_date = st.checkbox("Set target date", value=False, key="new_goal_use_target")
+                target_end_date = (
+                    st.date_input("Target End Date", value=date.today(), key="new_goal_target_date")
+                    if use_target_date
+                    else None
+                )
+
+            if st.button("Create Goal", type="primary", use_container_width=True, key="create_goal_button"):
+                planned_total_minutes = int(planned_hours) * 60 + int(planned_minutes_remainder)
+                if not title.strip():
+                    st.error("Goal title is required.")
+                elif planned_total_minutes <= 0:
+                    st.error("Planned total time must be greater than 0.")
                 else:
-                    st.success("Goal created.")
-                    st.rerun()
+                    try:
+                        create_goal(
+                            title=title,
+                            description=description,
+                            category_id=selected_category_id,
+                            planned_total_minutes=planned_total_minutes,
+                            start_date=start_date,
+                            target_end_date=target_end_date,
+                        )
+                    except ValueError as error:
+                        st.error(str(error))
+                    else:
+                        st.success("Goal created.")
+                        st.rerun()
+        with spacer_col:
+            st.markdown(
+                """
+                <div class="hq-side-note">
+                    <strong>Progress source</strong>
+                    <span>Linked one-time quest sessions update this goal. XP is still awarded only by completed check-ins.</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def render_goal_management(category_options: dict[str, int]) -> None:
     goals = list_goals()
-    if not goals:
-        return
 
     category_names_by_id = {category_id: name for name, category_id in category_options.items()}
     with st.expander("Manage Goals", expanded=False):
+        if not goals:
+            st.markdown(
+                """
+                <div class="hq-empty-compact">
+                    <strong>No goals to manage yet.</strong>
+                    <span>Create a goal first, then lifecycle actions will appear here.</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            return
+
         for goal in goals:
             history = get_goal_history_summary(goal.id)
             category = category_names_by_id.get(goal.category_id, "Uncategorized")
@@ -650,7 +731,7 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
     if status_message:
         st.success(status_message)
 
-    form_col, list_col = st.columns([0.42, 0.58], gap="large")
+    form_col, list_col = st.columns([0.4, 0.6], gap="medium")
 
     with form_col:
         st.write("**Create Recurring Habit**")
