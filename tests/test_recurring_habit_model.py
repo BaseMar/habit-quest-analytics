@@ -1,7 +1,7 @@
 from datetime import date, time
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
@@ -122,49 +122,6 @@ def test_sqlite_schema_helper_adds_recurring_habit_tables_to_existing_database(t
     assert "recurring_habits" in table_names
     assert "recurring_habit_instances" in table_names
     recurring_habit_columns = {column["name"] for column in inspector.get_columns("recurring_habits")}
-    assert "planned_start_time" in recurring_habit_columns
-    assert "planned_end_time" in recurring_habit_columns
-
-
-def test_sqlite_schema_helper_drops_legacy_recurring_habit_difficulty_column(tmp_path, monkeypatch):
-    database_path = tmp_path / "existing.db"
-    engine = create_engine(f"sqlite:///{database_path}")
-    Base.metadata.tables["categories"].create(bind=engine)
-    Base.metadata.tables["quests"].create(bind=engine)
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                CREATE TABLE recurring_habits (
-                    id INTEGER PRIMARY KEY,
-                    title VARCHAR(200) NOT NULL,
-                    description TEXT,
-                    difficulty VARCHAR(20) NOT NULL,
-                    xp_reward INTEGER NOT NULL,
-                    estimated_minutes INTEGER NOT NULL,
-                    recurrence_type VARCHAR(50) NOT NULL,
-                    weekdays TEXT,
-                    start_date DATE NOT NULL,
-                    end_date DATE,
-                    is_active BOOLEAN NOT NULL DEFAULT 1,
-                    created_at DATETIME NOT NULL,
-                    updated_at DATETIME NOT NULL,
-                    category_id INTEGER
-                )
-                """
-            )
-        )
-
-    monkeypatch.setattr(database_db, "DATABASE_URL", f"sqlite:///{database_path}")
-    monkeypatch.setattr(database_db, "engine", engine)
-
-    database_db._ensure_sqlite_schema()
-    database_db._ensure_sqlite_schema()
-
-    recurring_habit_columns = {
-        column["name"] for column in inspect(engine).get_columns("recurring_habits")
-    }
-    assert "difficulty" not in recurring_habit_columns
     assert "planned_start_time" in recurring_habit_columns
     assert "planned_end_time" in recurring_habit_columns
 

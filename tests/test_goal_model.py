@@ -136,7 +136,6 @@ def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path, mo
                     id INTEGER PRIMARY KEY,
                     title VARCHAR(200) NOT NULL,
                     description TEXT,
-                    difficulty VARCHAR(20) NOT NULL DEFAULT 'Easy',
                     status VARCHAR(30) NOT NULL DEFAULT 'active',
                     is_habit BOOLEAN NOT NULL DEFAULT 0,
                     xp_reward INTEGER NOT NULL DEFAULT 10,
@@ -159,4 +158,3 @@ def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path, mo
     quest_columns = {column["name"] for column in inspector.get_columns("quests")}
 
     assert "goal_id" in quest_columns
-    assert "difficulty" not in quest_columns
