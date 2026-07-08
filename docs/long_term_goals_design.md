@@ -1,8 +1,14 @@
 # Long-term Goals / Projects Design
 
-This document designs a future Long-term Goals / Projects feature for Habit
-Quest Analytics. It is a planning document only; the feature is not implemented
-yet.
+This document designs the Long-term Goals / Projects feature for Habit Quest
+Analytics.
+
+Current implementation status:
+
+- `Goal` model and service-layer foundation are implemented.
+- Quest-to-goal linking is not implemented yet.
+- Goal progress from linked sessions is not implemented yet.
+- No UI is implemented yet.
 
 ## Problem
 
@@ -25,7 +31,7 @@ The app should eventually understand:
 
 ## Core Concept
 
-Add a future entity named `Goal` or `Project`.
+The backend foundation adds an entity named `Goal`.
 
 Suggested fields:
 
@@ -41,13 +47,13 @@ Suggested fields:
 - `updated_at`
 
 A goal/project should not award XP directly by default. XP should be earned
-through completed linked quest sessions.
+through completed linked quest sessions once quest linking is implemented.
 
 ## Quest / Session Relationship
 
-A quest can optionally belong to a goal/project.
+A quest can eventually belong to a goal/project.
 
-Suggested future field:
+Suggested future field, not implemented in the model yet:
 
 - `Quest.goal_id`, nullable foreign key
 
@@ -215,8 +221,8 @@ Rules:
 
 ## Implementation Phases
 
-1. `docs: add long-term goals design`
-2. `feat: add goal/project model and service layer`
+1. `docs: add long-term goals design` - implemented.
+2. `feat: add goal/project model and service layer` - implemented.
 3. `feat: link one-time quests to goals`
 4. `feat: add goal progress UI in Quest Planner`
 5. `feat: add goal analytics`

@@ -4,7 +4,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, QuestCheckin, RecurringHabit, RecurringHabitInstance
+from src.database.models import Base, Goal, QuestCheckin, RecurringHabit, RecurringHabitInstance
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +42,9 @@ def _ensure_sqlite_schema() -> None:
 
     if "quest_checkins" not in table_names:
         QuestCheckin.__table__.create(bind=engine, checkfirst=True)
+    if "goals" not in table_names:
+        Goal.__table__.create(bind=engine, checkfirst=True)
+        table_names.append("goals")
     recurring_habits_created = False
     if "recurring_habits" not in table_names:
         RecurringHabit.__table__.create(bind=engine, checkfirst=True)

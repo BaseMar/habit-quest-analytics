@@ -27,6 +27,32 @@ Relationships:
 
 - One category can have many quests.
 - One category can have many recurring habit templates.
+- One category can have many goals/projects.
+
+### goals
+
+Stores long-term goal/project definitions. This is the backend foundation only:
+quests are not linked to goals yet, and goal progress from linked sessions is
+future work.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key. |
+| `title` | Goal/project name shown to the user. |
+| `description` | Optional detail. |
+| `category_id` | Optional foreign key to `categories.id`. |
+| `planned_total_minutes` | Required positive total planned effort. |
+| `start_date` | Optional start date. |
+| `target_end_date` | Optional target completion date. |
+| `status` | Goal state: `Active`, `Completed`, or `Archived`. |
+| `created_at` | Timestamp set when the goal is created. |
+| `updated_at` | Timestamp updated when the goal changes. |
+
+Relationships:
+
+- Many goals can belong to one category.
+- Goals do not award XP directly.
+- Quest-to-goal linking is not implemented yet.
 
 ### quests
 
@@ -214,6 +240,7 @@ Relationships:
 erDiagram
     categories ||--o{ quests : groups
     categories ||--o{ recurring_habits : groups
+    categories ||--o{ goals : groups
     quests ||--o{ quest_checkins : tracks
     recurring_habits ||--o{ recurring_habit_instances : generates
     quests ||--o| recurring_habit_instances : generated_as
@@ -240,6 +267,19 @@ erDiagram
         int estimated_minutes
         datetime completed_at
         datetime created_at
+        int category_id FK
+    }
+
+    goals {
+        int id PK
+        string title
+        text description
+        int planned_total_minutes
+        date start_date
+        date target_end_date
+        string status
+        datetime created_at
+        datetime updated_at
         int category_id FK
     }
 
@@ -315,6 +355,7 @@ Startup can:
 
 - create missing tables through SQLAlchemy metadata,
 - create `quest_checkins` for existing local databases if the table is missing,
+- create `goals` for existing local databases if the table is missing,
 - create `recurring_habits` and `recurring_habit_instances` for existing local databases if the tables are missing,
 - add missing `estimated_minutes`, `planned_start_at`, and `planned_end_at` columns to `quests`,
 - add missing `avatar_path` to `player_profiles`.

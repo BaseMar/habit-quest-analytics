@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -32,6 +33,35 @@ class Category(Base):
 
     quests = relationship("Quest", back_populates="category")
     recurring_habits = relationship("RecurringHabit", back_populates="category")
+    goals = relationship("Goal", back_populates="category")
+
+
+class Goal(Base):
+    __tablename__ = "goals"
+    __table_args__ = (
+        CheckConstraint("planned_total_minutes > 0", name="ck_goal_planned_total_minutes_positive"),
+        CheckConstraint(
+            "status IN ('Active', 'Completed', 'Archived')",
+            name="ck_goal_status_valid",
+        ),
+        CheckConstraint(
+            "target_end_date IS NULL OR start_date IS NULL OR target_end_date >= start_date",
+            name="ck_goal_target_end_after_start",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    planned_total_minutes = Column(Integer, nullable=False)
+    start_date = Column(Date, nullable=True)
+    target_end_date = Column(Date, nullable=True)
+    status = Column(String(30), nullable=False, default="Active")
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    category = relationship("Category", back_populates="goals")
 
 
 class Quest(Base):

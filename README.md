@@ -89,6 +89,8 @@ Implemented:
 - Scheduled quest creation that creates a planned check-in for the scheduled
   date.
 - Safe deletion for unresolved one-time planned quests.
+- Long-term Goals / Projects backend foundation with a `Goal` model and service
+  layer; no UI or quest linking yet.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
 - Nonlinear character leveling and RPG stat leveling.
 - Command Center operational metrics powered by check-ins.
@@ -500,8 +502,9 @@ Current limitations:
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   recurring habit editing and true N-times-per-week auto-scheduling are not
   implemented yet.
-- Long-term Goals / Projects are not implemented; the future design is
-  documented in [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
+- Long-term Goals / Projects UI, quest/session linking, and progress from linked
+  sessions are not implemented yet; the design is documented in
+  [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
