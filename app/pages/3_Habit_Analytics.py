@@ -212,25 +212,25 @@ else:
     render_weekly_pulse(analytics["weekly_pulse"])
 
     render_section_title("Trend Overview", "Time-based progress from completed quest-day XP.")
-    with st.container(border=True):
+    with st.container():
         render_xp_by_day(analytics["xp_by_day"])
 
     render_section_title("Performance Breakdown", "How quest days are distributed by state and category.")
     status_col, category_col = st.columns(2, gap="large")
     with status_col:
-        with st.container(border=True):
+        with st.container():
             render_status_chart(analytics["quests_by_status"])
     with category_col:
-        with st.container(border=True):
+        with st.container():
             render_category_chart(analytics["quests_by_category"])
 
     render_section_title("Consistency & Time", "Checklist consistency and planned workload by category.")
     weekday_col, minutes_col = st.columns(2, gap="large")
     with weekday_col:
-        with st.container(border=True):
+        with st.container():
             render_weekday_chart(analytics["completion_rate_by_weekday"])
     with minutes_col:
-        with st.container(border=True):
+        with st.container():
             render_estimated_minutes_chart(analytics["estimated_minutes_by_category"])
 
     render_insights(analytics)

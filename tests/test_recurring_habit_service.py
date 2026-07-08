@@ -51,7 +51,6 @@ def _create_habit(
     weekdays: list[int] | None = None,
     start_date: date = date(2026, 7, 1),
     end_date: date | None = None,
-    difficulty: str = "Hard",
     estimated_minutes: int = 60,
     planned_start_time: time | None = None,
     planned_end_time: time | None = None,
@@ -59,7 +58,6 @@ def _create_habit(
     return create_recurring_habit(
         title=title,
         category_id=_category_id(session),
-        difficulty=difficulty,
         estimated_minutes=estimated_minutes,
         recurrence_type="selected_weekdays",
         weekdays=weekdays or [4, 0, 2],
@@ -80,7 +78,6 @@ def test_create_recurring_habit_creates_selected_weekdays_habit(session):
     assert habit.title == "Gym Workout"
     assert habit.description == "Strength training"
     assert habit.category_id == _category_id(session)
-    assert habit.difficulty == "Hard"
     assert habit.estimated_minutes == 60
     assert habit.recurrence_type == "selected_weekdays"
     assert habit.start_date == date(2026, 7, 1)
@@ -90,9 +87,8 @@ def test_create_recurring_habit_creates_selected_weekdays_habit(session):
 
 def test_create_recurring_habit_calculates_xp_from_estimated_minutes(session):
     habit = create_recurring_habit(
-        title="Boss Study",
+        title="Deep Study",
         category_id=_category_id(session),
-        difficulty="Boss",
         estimated_minutes=90,
         recurrence_type="selected_weekdays",
         weekdays=[1, 3],
@@ -101,32 +97,6 @@ def test_create_recurring_habit_calculates_xp_from_estimated_minutes(session):
     )
 
     assert habit.xp_reward == 30
-
-
-def test_create_recurring_habit_difficulty_does_not_change_xp_for_same_minutes(session):
-    easy = create_recurring_habit(
-        title="Easy Study",
-        category_id=_category_id(session),
-        difficulty="Easy",
-        estimated_minutes=60,
-        recurrence_type="selected_weekdays",
-        weekdays=[1],
-        start_date=date(2026, 7, 1),
-        session=session,
-    )
-    boss = create_recurring_habit(
-        title="Boss Study",
-        category_id=_category_id(session),
-        difficulty="Boss",
-        estimated_minutes=60,
-        recurrence_type="selected_weekdays",
-        weekdays=[1],
-        start_date=date(2026, 7, 1),
-        session=session,
-    )
-
-    assert easy.xp_reward == 20
-    assert boss.xp_reward == 20
 
 
 def test_create_recurring_habit_stores_weekdays_as_stable_json(session):
@@ -144,7 +114,6 @@ def test_create_recurring_habit_rejects_empty_title(session):
         create_recurring_habit(
             title=" ",
             category_id=_category_id(session),
-            difficulty="Hard",
             estimated_minutes=60,
             recurrence_type="selected_weekdays",
             weekdays=[0],
@@ -158,7 +127,6 @@ def test_create_recurring_habit_rejects_invalid_estimated_minutes(session):
         create_recurring_habit(
             title="Gym Workout",
             category_id=_category_id(session),
-            difficulty="Hard",
             estimated_minutes=0,
             recurrence_type="selected_weekdays",
             weekdays=[0],
@@ -172,7 +140,6 @@ def test_create_recurring_habit_rejects_end_date_before_start_date(session):
         create_recurring_habit(
             title="Gym Workout",
             category_id=_category_id(session),
-            difficulty="Hard",
             estimated_minutes=60,
             recurrence_type="selected_weekdays",
             weekdays=[0],
@@ -198,7 +165,6 @@ def test_selected_weekdays_requires_at_least_one_weekday(session):
         create_recurring_habit(
             title="Gym Workout",
             category_id=_category_id(session),
-            difficulty="Hard",
             estimated_minutes=60,
             recurrence_type="selected_weekdays",
             weekdays=[],
@@ -432,7 +398,6 @@ def test_generated_quest_has_expected_fields(session):
         session,
         title="SQL Study",
         weekdays=[2],
-        difficulty="Boss",
         estimated_minutes=45,
     )
 
@@ -442,7 +407,6 @@ def test_generated_quest_has_expected_fields(session):
     assert quest.title == "SQL Study"
     assert quest.description == "Strength training"
     assert quest.category_id == habit.category_id
-    assert quest.difficulty == "Boss"
     assert quest.xp_reward == 15
     assert quest.estimated_minutes == 45
     assert quest.due_date == date(2026, 7, 1)

@@ -10,7 +10,6 @@ The current usable version includes:
 - daily quest completion through Monthly Checklist check-ins,
 - recurring habit templates with explicit planned-day generation,
 - categories for organizing work,
-- descriptive difficulty levels: Easy, Medium, Hard, Boss,
 - time-based XP for new scheduled quests and recurring habit templates,
 - XP rewards stored per completed check-in,
 - player profile with XP, nonlinear level, avatar, and RPG stat levels,
@@ -22,7 +21,6 @@ The current usable version includes:
 ## User Stories
 
 - As a user, I want to schedule a quest so I can plan a task or habit for a specific day.
-- As a user, I want quest difficulty labels so I can describe the expected challenge.
 - As a user, I want to mark a planned quest day as completed, skipped, failed, or planned.
 - As a user, I want completed quest days to award XP only once.
 - As a user, I want recurring habits to generate planned quest days for selected weekdays.
@@ -57,7 +55,7 @@ Status: implemented.
 Status: implemented for scheduled one-time quests and recurring habit templates.
 
 - Create scheduled quests from Quest Planner.
-- Store title, notes, category, difficulty, planned date, planned start/end times, estimated minutes, and XP reward.
+- Store title, notes, category, planned date, planned start/end times, estimated minutes, and XP reward.
 - Validate that end time is after start time.
 - Display quests on the calendar and selected day schedule.
 - Create recurring habit templates for selected weekdays.

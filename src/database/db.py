@@ -55,6 +55,9 @@ def _ensure_sqlite_schema() -> None:
         table_names.append("recurring_habit_instances")
 
     quest_columns = {column["name"] for column in inspector.get_columns("quests")}
+    if "difficulty" in quest_columns:
+        _drop_sqlite_column_if_exists("quests", "difficulty")
+        quest_columns.remove("difficulty")
     if "estimated_minutes" not in quest_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE quests ADD COLUMN estimated_minutes INTEGER"))
@@ -75,6 +78,9 @@ def _ensure_sqlite_schema() -> None:
         if "recurring_habits" in table_names
         else set()
     )
+    if "difficulty" in recurring_habit_columns:
+        _drop_sqlite_column_if_exists("recurring_habits", "difficulty")
+        recurring_habit_columns.remove("difficulty")
     if "planned_start_time" not in recurring_habit_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE recurring_habits ADD COLUMN planned_start_time TIME"))
@@ -89,3 +95,13 @@ def _ensure_sqlite_schema() -> None:
     if "avatar_path" not in profile_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE player_profiles ADD COLUMN avatar_path VARCHAR(255)"))
+
+
+def _drop_sqlite_column_if_exists(table_name: str, column_name: str) -> None:
+    """Drop a legacy SQLite column when the local SQLite version supports it."""
+    columns = {column["name"] for column in inspect(engine).get_columns(table_name)}
+    if column_name not in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text(f"ALTER TABLE {table_name} DROP COLUMN {column_name}"))

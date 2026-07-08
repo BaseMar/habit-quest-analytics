@@ -325,7 +325,7 @@ def render_character_hero(profile: dict) -> None:
     completion_rate = _activity_value(profile, ["Completion Rate"], default="0.0%")
     weekly_xp = _activity_value(profile, ["Weekly XP"], default=0)
 
-    with st.container(border=True):
+    with st.container():
         avatar_col, identity_col, xp_col = st.columns([0.16, 0.51, 0.33], gap="medium")
         with avatar_col:
             render_avatar(profile)
@@ -622,7 +622,6 @@ def render_activity_snapshot(profile: dict) -> None:
         ("Weekly XP", _activity_value(profile, ["Weekly XP"], default=0)),
         ("Most Active Category", _activity_value(profile, ["Most Active Category"], default="Not enough data")),
         ("Strongest Stat", _activity_value(profile, ["Strongest RPG Stat"], default="Not enough data")),
-        ("Boss Days", _activity_value(profile, ["Boss Quest Days", "Boss Quests Completed"], default=0)),
         ("Best Weekday", _activity_value(profile, ["Most Productive Weekday"], default="Not enough data")),
     ]
     tile_markup = "".join(_activity_tile(label, value) for label, value in tiles)

@@ -36,13 +36,13 @@ def session():
         session.close()
 
 
-def _create_quest(session, title: str = "Morning workout", xp_difficulty: str = "Hard"):
+def _create_quest(session, title: str = "Morning workout", estimated_minutes: int = 225):
     category = session.query(Category).one()
     return create_quest(
         title,
         category_id=category.id,
-        difficulty=xp_difficulty,
         planned_date=date(2026, 7, 1),
+        estimated_minutes=estimated_minutes,
         session=session,
     )
 
@@ -58,7 +58,6 @@ def _create_raw_quest(
     quest = Quest(
         title=title,
         category_id=category.id,
-        difficulty="Hard",
         status="Planned",
         xp_reward=75,
         due_date=due_date,
@@ -77,7 +76,6 @@ def _create_recurring_habit(session, weekdays: list[int] | None = None):
     return create_recurring_habit(
         title="Gym Workout",
         category_id=category.id,
-        difficulty="Hard",
         estimated_minutes=60,
         recurrence_type="selected_weekdays",
         weekdays=weekdays or [0, 2, 4],
@@ -223,7 +221,7 @@ def test_mark_stale_planned_checkins_failed_is_idempotent(session):
 
 
 def test_checkin_service_uses_quest_relationship_and_xp_reward(session):
-    quest = _create_quest(session, xp_difficulty="Boss")
+    quest = _create_quest(session, estimated_minutes=450)
 
     checkin = complete_checkin(quest.id, date(2026, 7, 1), session=session)
 
@@ -256,7 +254,6 @@ def test_get_month_checklist_includes_scheduled_quest_and_creates_planned_checki
     row = checklist["rows"][0]
     assert row["title"] == "Scheduled workout"
     assert row["category"] == "Health"
-    assert row["difficulty"] == "Hard"
     assert row["xp_reward"] == 75
     assert row["estimated_minutes"] == 60
 

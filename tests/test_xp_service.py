@@ -5,7 +5,6 @@ from src.services.xp_service import (
     calculate_stat_level,
     calculate_level,
     calculate_time_based_xp,
-    calculate_xp,
     get_character_level_progress,
     get_stat_level_progress,
     total_xp_for_stat_level,
@@ -13,20 +12,6 @@ from src.services.xp_service import (
     xp_to_next_stat_level,
     xp_to_next_level,
 )
-
-
-@pytest.mark.parametrize(
-    ("difficulty", "expected_xp"),
-    [
-        ("Easy", 10),
-        ("Medium", 30),
-        ("Hard", 75),
-        ("Boss", 150),
-        (" easy ", 10),
-    ],
-)
-def test_calculate_xp_by_difficulty(difficulty, expected_xp):
-    assert calculate_xp(difficulty) == expected_xp
 
 
 @pytest.mark.parametrize(
@@ -232,11 +217,6 @@ def test_calculate_stat_level(stat_xp, expected_level):
 )
 def test_get_stat_level_progress(stat_xp, expected_progress):
     assert get_stat_level_progress(stat_xp) == expected_progress
-
-
-def test_calculate_xp_rejects_unknown_difficulty():
-    with pytest.raises(ValueError):
-        calculate_xp("Legendary")
 
 
 def test_calculate_level_rejects_negative_xp():

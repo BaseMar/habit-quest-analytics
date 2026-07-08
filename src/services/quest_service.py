@@ -7,7 +7,7 @@ from src.database.db import get_session
 from src.database.models import Category, Goal, Quest, QuestCheckin, RecurringHabitInstance, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.checklist_service import ensure_checkin
-from src.services.xp_service import calculate_time_based_xp, calculate_xp
+from src.services.xp_service import calculate_time_based_xp
 
 
 VALID_QUEST_STATUSES = QUEST_STATUSES
@@ -18,17 +18,10 @@ STATUS_COLORS = {
     "Skipped": "#f59e0b",
 }
 
-
-def get_quest_xp_reward(difficulty: str) -> int:
-    """Return the XP reward for a quest difficulty."""
-    return calculate_xp(difficulty)
-
-
 def create_quest(
     title: str,
     description: str = "",
     category_id: int | None = None,
-    difficulty: str = "Easy",
     planned_date: date | None = None,
     estimated_minutes: int | None = None,
     goal_id: int | None = None,
@@ -36,11 +29,7 @@ def create_quest(
 ) -> Quest:
     """Create and persist a quest."""
     estimated_minutes = _normalize_estimated_minutes(estimated_minutes)
-    xp_reward = (
-        calculate_time_based_xp(estimated_minutes)
-        if estimated_minutes is not None
-        else calculate_xp(difficulty)
-    )
+    xp_reward = calculate_time_based_xp(estimated_minutes) if estimated_minutes is not None else 0
 
     owns_session = session is None
     session = session or get_session()
@@ -51,7 +40,6 @@ def create_quest(
             description=(description or "").strip() or None,
             category_id=category_id,
             goal_id=normalized_goal_id,
-            difficulty=difficulty.strip().title(),
             status="Planned",
             xp_reward=xp_reward,
             due_date=planned_date,
@@ -73,7 +61,6 @@ def create_scheduled_quest(
     title: str,
     description: str = "",
     category_id: int | None = None,
-    difficulty: str = "Easy",
     planned_date: date | None = None,
     start_time: time | None = None,
     end_time: time | None = None,
@@ -101,7 +88,6 @@ def create_scheduled_quest(
             description=(description or "").strip() or None,
             category_id=category_id,
             goal_id=normalized_goal_id,
-            difficulty=difficulty.strip().title(),
             status="Planned",
             xp_reward=calculate_time_based_xp(estimated_minutes),
             due_date=planned_date,
@@ -344,7 +330,6 @@ def quest_to_calendar_event(quest: Quest, status_override: str | None = None) ->
         "end": _format_calendar_datetime(end),
         "status": status,
         "category": category,
-        "difficulty": quest.difficulty,
         "xp_reward": quest.xp_reward or 0,
         "color": color,
         "backgroundColor": color,
@@ -352,7 +337,6 @@ def quest_to_calendar_event(quest: Quest, status_override: str | None = None) ->
         "extendedProps": {
             "status": status,
             "category": category,
-            "difficulty": quest.difficulty,
             "xp_reward": quest.xp_reward or 0,
         },
     }

@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 from src.database.db import get_session
 from src.database.models import Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance, utc_now
-from src.services.xp_service import calculate_time_based_xp, calculate_xp
+from src.services.xp_service import calculate_time_based_xp
 
 
 SUPPORTED_RECURRENCE_TYPES = ("selected_weekdays",)
@@ -13,7 +13,6 @@ SUPPORTED_RECURRENCE_TYPES = ("selected_weekdays",)
 def create_recurring_habit(
     title: str,
     category_id: int | None,
-    difficulty: str,
     estimated_minutes: int,
     recurrence_type: str,
     weekdays: list[int] | None,
@@ -27,7 +26,6 @@ def create_recurring_habit(
 ) -> RecurringHabit:
     """Create and persist a recurring habit template."""
     normalized_title = _normalize_title(title)
-    normalized_difficulty = _normalize_difficulty(difficulty)
     normalized_estimated_minutes = _normalize_estimated_minutes(estimated_minutes)
     normalized_recurrence_type = _normalize_recurrence_type(recurrence_type)
     _validate_dates(start_date, end_date)
@@ -45,7 +43,6 @@ def create_recurring_habit(
             title=normalized_title,
             description=(description or "").strip() or None,
             category_id=category_id,
-            difficulty=normalized_difficulty,
             xp_reward=calculate_time_based_xp(normalized_estimated_minutes),
             estimated_minutes=normalized_estimated_minutes,
             recurrence_type=normalized_recurrence_type,
@@ -410,7 +407,6 @@ def generate_recurring_habit_for_month(
                 title=habit.title,
                 description=habit.description,
                 category_id=habit.category_id,
-                difficulty=habit.difficulty,
                 status="Planned",
                 xp_reward=habit.xp_reward,
                 due_date=scheduled_date,
@@ -523,11 +519,6 @@ def _normalize_title(title: str) -> str:
     if not title or not title.strip():
         raise ValueError("Recurring habit title is required.")
     return title.strip()
-
-
-def _normalize_difficulty(difficulty: str) -> str:
-    calculate_xp(difficulty)
-    return difficulty.strip().title()
 
 
 def _normalize_estimated_minutes(estimated_minutes: int) -> int:

@@ -166,9 +166,8 @@ The app is designed to answer questions such as:
 ### Quest Planning
 
 - Calendar-based scheduled quest creation.
-- Title, category, difficulty, start time, end time, and notes.
+- Title, category, start time, end time, and notes.
 - XP reward calculation from planned time.
-- Difficulty remains descriptive metadata rather than the primary XP driver.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
 - Recurring Habit templates for Every day, Weekdays, and custom selected
@@ -301,7 +300,7 @@ habit-quest-analytics/
     analysis/                # Pure metric helpers
     database/                # SQLAlchemy models, SQLite engine, startup schema helpers, seed data
     services/                # Quest, checklist, analytics, profile, and XP business logic
-    constants.py             # Statuses, difficulties, categories, RPG stat mapping
+    constants.py             # Statuses, categories, RPG stat mapping
     ui.py                    # Shared Streamlit UI/style helpers
   docs/                      # Project, model, metrics, and design documentation
   tests/                     # Pytest coverage
@@ -314,8 +313,8 @@ Core entities:
 
 - `Category` - groups quests into areas such as Health, Work, Learning, Home,
   and Social.
-- `Quest` - scheduled task or habit plan with difficulty, XP reward, due date,
-  optional time window, and legacy status.
+- `Quest` - scheduled task or habit plan with XP reward, due date, optional
+  time window, and legacy status.
 - `QuestCheckin` - daily status record for one quest on one date.
 - `RecurringHabit` - reusable selected-weekday habit template.
 - `RecurringHabitInstance` - link from one generated habit date to one generated
@@ -356,7 +355,6 @@ erDiagram
         int id PK
         string title
         text description
-        string difficulty
         string status
         boolean is_habit
         int xp_reward
@@ -386,7 +384,6 @@ erDiagram
         int id PK
         string title
         text description
-        string difficulty
         int xp_reward
         int estimated_minutes
         string recurrence_type

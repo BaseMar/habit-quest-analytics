@@ -64,7 +64,6 @@ Stores scheduled task or habit plans represented as RPG quests.
 | `id` | Primary key. |
 | `title` | Quest name shown to the user. |
 | `description` | Optional quest notes. |
-| `difficulty` | Descriptive difficulty label retained for quest metadata. New scheduled quest XP is primarily time-based. |
 | `status` | Legacy quest-level status. Retained for compatibility/fallback, not the primary daily status source when check-ins exist. |
 | `is_habit` | Reserved habit flag. Recurring habit templates use `recurring_habits`; generated habit days can still be represented as normal quests. |
 | `xp_reward` | XP value assigned to this quest plan. |
@@ -131,7 +130,6 @@ check-ins.
 | `title` | Habit name shown to the user. |
 | `description` | Optional notes. |
 | `category_id` | Optional foreign key to `categories.id`, matching current quest category behavior. |
-| `difficulty` | Descriptive difficulty label copied to generated quests. |
 | `xp_reward` | Time-based XP value copied to generated quests. |
 | `estimated_minutes` | Planned duration copied to generated quests. |
 | `recurrence_type` | Recurrence type. v1 is designed around `selected_weekdays`. |
@@ -262,7 +260,6 @@ erDiagram
         int id PK
         string title
         text description
-        string difficulty
         string status
         boolean is_habit
         int xp_reward
@@ -306,7 +303,6 @@ erDiagram
         int id PK
         string title
         text description
-        string difficulty
         int xp_reward
         int estimated_minutes
         string recurrence_type

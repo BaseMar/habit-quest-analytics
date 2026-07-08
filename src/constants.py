@@ -1,5 +1,4 @@
 QUEST_STATUSES = ("Planned", "Completed", "Failed", "Skipped")
-QUEST_DIFFICULTIES = ("Easy", "Medium", "Hard", "Boss")
 
 DEFAULT_CATEGORIES = (
     ("Health", "Fitness, nutrition, sleep, and recovery quests."),

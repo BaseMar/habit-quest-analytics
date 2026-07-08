@@ -1,26 +1,7 @@
-DIFFICULTY_XP = {
-    "easy": 10,
-    "medium": 30,
-    "hard": 75,
-    "boss": 150,
-}
 CHARACTER_LEVEL_BASE_XP = 100
 CHARACTER_LEVEL_EXPONENT = 1.4
 STAT_LEVEL_BASE_XP = 60
 STAT_LEVEL_EXPONENT = 1.35
-
-
-def calculate_xp(difficulty: str) -> int:
-    """Return XP for a quest difficulty."""
-    if not difficulty:
-        raise ValueError("Difficulty is required.")
-
-    key = difficulty.strip().lower()
-    if key not in DIFFICULTY_XP:
-        valid = ", ".join(sorted(DIFFICULTY_XP))
-        raise ValueError(f"Unknown difficulty '{difficulty}'. Valid values: {valid}.")
-
-    return DIFFICULTY_XP[key]
 
 
 def calculate_time_based_xp(planned_minutes: int) -> int:

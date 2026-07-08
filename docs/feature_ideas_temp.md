@@ -79,7 +79,7 @@ Implementation note:
 
 What it adds:
 
-- Ability to edit an existing quest title, notes, category, difficulty, planned date, and estimated minutes.
+- Ability to edit an existing quest title, notes, category, planned date, and estimated minutes.
 
 Why it matters:
 
@@ -223,7 +223,7 @@ Implementation note:
 
 What it adds:
 
-- Basic unlock rules such as first quest completed, 500 XP reached, first Boss quest completed, or seven completed habit days.
+- Basic unlock rules such as first quest completed, 500 XP reached, first goal session completed, or seven completed habit days.
 
 Why it matters:
 
@@ -321,9 +321,7 @@ Positive value:
 
 What it adds:
 
-- Separate quest importance from quest difficulty:
-  - Difficulty: how much effort a quest costs.
-  - Priority: how important the quest is.
+- Optional quest importance independent of planned duration and XP.
 
 Possible values:
 
@@ -333,8 +331,8 @@ Possible values:
 
 Why it matters:
 
-- Difficulty and importance are different concepts.
-- A short walk can be Easy but High priority; a large refactor can be Hard but Medium priority.
+- Planned duration estimates effort, but importance is a separate planning signal.
+- A short walk can be high priority; a large refactor can be medium priority.
 
 Positive value:
 
@@ -346,22 +344,7 @@ Implementation note:
 - This requires a model change and UI updates.
 - Do not implement too early; first stabilize editing, status flow, and daily usage.
 
-## Priority 17. Quest Difficulty Review
-
-What it adds:
-
-- Small analytics section showing how many Easy, Medium, Hard, and Boss quests are completed.
-
-Why it matters:
-
-- Users may complete many low-effort quests but avoid harder ones.
-
-Positive value:
-
-- Helps evaluate challenge balance.
-- Supports better XP tuning later.
-
-## Priority 18. Character Profile Customization
+## Priority 17. Character Profile Customization
 
 What it adds:
 
@@ -377,7 +360,7 @@ Positive value:
 - Improves emotional connection to the dashboard.
 - Adds polish without changing the analytics engine.
 
-## Priority 19. Optional Design Patterns
+## Priority 18. Optional Design Patterns
 
 What it adds:
 

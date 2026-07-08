@@ -290,7 +290,6 @@ def _build_month_row(
         "recurring_habit_id": None,
         "title": quest.title,
         "category": quest.category.name if quest.category else None,
-        "difficulty": quest.difficulty,
         "xp_reward": quest.xp_reward,
         "estimated_minutes": quest.estimated_minutes,
         "cells": {
@@ -369,7 +368,6 @@ def _build_recurring_month_row(
         "recurring_habit_id": habit.id,
         "title": habit.title,
         "category": habit.category.name if habit.category else None,
-        "difficulty": habit.difficulty,
         "xp_reward": habit.xp_reward,
         "estimated_minutes": habit.estimated_minutes,
         "cells": {

@@ -48,7 +48,6 @@ def test_create_quest_persists_xp_reward_and_details(session):
         title="Morning workout",
         description="Complete strength training",
         category_id=category.id,
-        difficulty="Hard",
         planned_date=date(2026, 6, 26),
         estimated_minutes=45,
         session=session,
@@ -69,7 +68,6 @@ def test_create_scheduled_quest_sets_planned_datetimes_and_duration(session):
         title="Morning workout",
         description="Complete strength training",
         category_id=category.id,
-        difficulty="Medium",
         planned_date=date(2026, 6, 26),
         start_time=time(9, 0),
         end_time=time(11, 0),
@@ -90,7 +88,6 @@ def test_create_scheduled_quest_uses_time_based_xp_for_short_duration(session):
     quest = create_scheduled_quest(
         title="Short workout",
         category_id=category.id,
-        difficulty="Boss",
         planned_date=date(2026, 6, 26),
         start_time=time(9, 0),
         end_time=time(9, 30),
@@ -100,39 +97,12 @@ def test_create_scheduled_quest_uses_time_based_xp_for_short_duration(session):
     assert quest.xp_reward == 10
 
 
-def test_create_scheduled_quest_difficulty_does_not_change_xp_for_same_duration(session):
-    category = session.query(Category).one()
-
-    easy = create_scheduled_quest(
-        title="Easy block",
-        category_id=category.id,
-        difficulty="Easy",
-        planned_date=date(2026, 6, 26),
-        start_time=time(9, 0),
-        end_time=time(10, 0),
-        session=session,
-    )
-    boss = create_scheduled_quest(
-        title="Boss block",
-        category_id=category.id,
-        difficulty="Boss",
-        planned_date=date(2026, 6, 27),
-        start_time=time(9, 0),
-        end_time=time(10, 0),
-        session=session,
-    )
-
-    assert easy.xp_reward == 20
-    assert boss.xp_reward == 20
-
-
 def test_create_scheduled_quest_creates_planned_checkin(session):
     category = session.query(Category).one()
 
     quest = create_scheduled_quest(
         title="Morning workout",
         category_id=category.id,
-        difficulty="Hard",
         planned_date=date(2026, 6, 26),
         start_time=time(9, 0),
         end_time=time(10, 0),
@@ -330,7 +300,7 @@ def test_validate_schedule_times_rejects_end_before_start():
 
 def test_get_all_quests_returns_created_quests(session):
     category = session.query(Category).one()
-    create_quest("Read", category_id=category.id, difficulty="Easy", session=session)
+    create_quest("Read", category_id=category.id, session=session)
 
     quests = get_all_quests(session=session)
 
@@ -467,7 +437,6 @@ def test_get_quests_for_calendar_returns_event_dicts(session):
     create_scheduled_quest(
         "SQL study",
         category_id=category.id,
-        difficulty="Hard",
         planned_date=date(2026, 6, 26),
         start_time=time(11, 30),
         end_time=time(13, 0),
@@ -484,7 +453,6 @@ def test_get_quests_for_calendar_returns_event_dicts(session):
             "end": "2026-06-26T13:00:00",
             "status": "Planned",
             "category": "Health",
-            "difficulty": "Hard",
             "xp_reward": 30,
             "color": "#38bdf8",
             "backgroundColor": "#38bdf8",
@@ -492,7 +460,6 @@ def test_get_quests_for_calendar_returns_event_dicts(session):
             "extendedProps": {
                 "status": "Planned",
                 "category": "Health",
-                "difficulty": "Hard",
                 "xp_reward": 30,
             },
         }
@@ -504,7 +471,6 @@ def test_get_quests_for_calendar_uses_checkin_status_and_color(session):
     quest = create_scheduled_quest(
         "SQL study",
         category_id=category.id,
-        difficulty="Hard",
         planned_date=date(2026, 6, 26),
         start_time=time(11, 30),
         end_time=time(13, 0),
@@ -587,7 +553,7 @@ def test_update_quest_status_sets_completed_at_once(session):
     assert completed.status == "Completed"
     assert first_completed_at is not None
     assert completed_again.completed_at == first_completed_at
-    assert completed_again.xp_reward == 10
+    assert completed_again.xp_reward == 0
 
 
 def test_update_quest_status_rejects_unknown_status(session):

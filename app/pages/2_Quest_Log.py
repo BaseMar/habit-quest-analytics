@@ -16,7 +16,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.constants import QUEST_DIFFICULTIES
 from src.database.db import init_db
 from src.database.seed import ensure_default_categories
 from src.services.checklist_service import (
@@ -304,7 +303,7 @@ def render_schedule_list(quests: list) -> None:
             <div>
                 <div class="hq-list-title">{escape(str(quest.title))}</div>
                 <div class="hq-list-meta">
-                    {escape(_category_name(quest))} / {escape(str(quest.difficulty))} / {escape(_display_status(quest))}
+                    {escape(_category_name(quest))} / {escape(_display_status(quest))}
                 </div>
             </div>
             <div class="hq-list-value">{int(quest.xp_reward or 0)} XP</div>
@@ -656,25 +655,17 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
     with form_col:
         st.write("**Create Recurring Habit**")
         st.caption("Define a template, then generate planned days for the selected month.")
-        with st.container(border=True):
+        with st.container():
             habit_title = st.text_input(
                 "Title",
                 placeholder="Reading",
                 key="recurring_habit_title",
             )
-            category_col, difficulty_col = st.columns([1.15, 0.85])
-            with category_col:
-                habit_category_name = st.selectbox(
-                    "Category",
-                    list(category_options.keys()),
-                    key="recurring_habit_category",
-                )
-            with difficulty_col:
-                habit_difficulty = st.selectbox(
-                    "Difficulty",
-                    list(QUEST_DIFFICULTIES),
-                    key="recurring_habit_difficulty",
-                )
+            habit_category_name = st.selectbox(
+                "Category",
+                list(category_options.keys()),
+                key="recurring_habit_category",
+            )
 
             minutes_col, active_col = st.columns([0.58, 0.42])
             with minutes_col:
@@ -758,7 +749,6 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
                     create_recurring_habit(
                         title=habit_title,
                         category_id=category_options[habit_category_name],
-                        difficulty=habit_difficulty,
                         estimated_minutes=int(estimated_minutes),
                         recurrence_type="selected_weekdays",
                         weekdays=weekdays,
@@ -1046,9 +1036,9 @@ def _render_checklist_legend() -> None:
 
 
 def _render_checklist_table(checklist: dict) -> None:
-    headers = ["Quest", "Category", "Difficulty"] + [str(day.day) for day in checklist["days"]]
+    headers = ["Quest", "Category"] + [str(day.day) for day in checklist["days"]]
     header_html = "".join(
-        f'<th class="{"hq-table-sticky" if index == 0 else "hq-table-day" if index >= 3 else ""}">'
+        f'<th class="{"hq-table-sticky" if index == 0 else "hq-table-day" if index >= 2 else ""}">'
         f"{escape(header)}</th>"
         for index, header in enumerate(headers)
     )
@@ -1075,7 +1065,6 @@ def _render_checklist_table_row(row: dict, days: list[date]) -> str:
         "<tr>"
         f'<td class="hq-table-sticky">{escape(str(row["title"]))}</td>'
         f'<td>{escape(str(row["category"] or "Uncategorized"))}</td>'
-        f'<td>{escape(str(row["difficulty"]))}</td>'
         f"{day_cells}"
         "</tr>"
     )
@@ -1162,7 +1151,7 @@ def _checklist_row_id(row: dict) -> str:
 
 def _build_checklist_quest_labels(rows: list[dict]) -> dict[str, str]:
     base_labels = {
-        _checklist_row_id(row): f"{row['title']} | {row['category'] or 'Uncategorized'} | {row['difficulty']}"
+        _checklist_row_id(row): f"{row['title']} | {row['category'] or 'Uncategorized'}"
         for row in rows
     }
     label_counts: dict[str, int] = {}
@@ -1208,7 +1197,7 @@ def render_recurring_habit_template_list(habits: list, category_names_by_id: dic
                 <div>
                     <div class="hq-list-title">{escape(str(habit.title))}</div>
                     <div class="hq-list-meta">
-                        {escape(category)} | {escape(str(habit.difficulty))} | {escape(_format_habit_pattern(habit))}
+                        {escape(category)} | {escape(_format_habit_pattern(habit))}
                     </div>
                     <div class="hq-list-meta">
                         {escape(_format_habit_time_window(habit))} | {habit.start_date.isoformat()} to {end_date}
@@ -1364,13 +1353,13 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
     calendar_events = get_quests_for_calendar()
 
     render_section_title("Quest Calendar", "Review planned quests and select a day to build its schedule.")
-    with st.container(border=True):
+    with st.container():
         render_calendar(calendar_events, st.session_state["selected_date"])
 
     selected_day_quests = get_quests_for_day(st.session_state["selected_date"])
 
     render_section_title("Selected Day Board")
-    with st.container(border=True):
+    with st.container():
         header_left, header_right = st.columns([0.68, 0.32], vertical_alignment="center")
         with header_left:
             st.subheader(_format_selected_date(st.session_state["selected_date"]))
@@ -1394,14 +1383,10 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
         default_start = time(9, 0)
         default_end = time(10, 0)
 
-        with st.container(border=True):
+        with st.container():
             title = st.text_input("Title", placeholder="Quest title")
 
-            category_col, difficulty_col = st.columns([1.15, 0.85])
-            with category_col:
-                category_name = st.selectbox("Category", list(category_options.keys()))
-            with difficulty_col:
-                difficulty = st.selectbox("Difficulty", list(QUEST_DIFFICULTIES))
+            category_name = st.selectbox("Category", list(category_options.keys()))
 
             start_col, end_col = st.columns(2)
             with start_col:
@@ -1437,7 +1422,6 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
                             title=title,
                             description=notes,
                             category_id=category_options[category_name],
-                            difficulty=difficulty,
                             planned_date=selected_date,
                             start_time=start_time,
                             end_time=end_time,

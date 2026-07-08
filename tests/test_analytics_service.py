@@ -424,7 +424,6 @@ def test_command_center_today_focus_uses_checkin_status_and_parent_quest_metadat
         planned_end_at=datetime(2026, 6, 26, 11, 0),
         category=category,
     )
-    quest.difficulty = "Boss"
     _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=150)
 
     result = get_command_center_data(today=date(2026, 6, 26), session=session)
@@ -434,7 +433,6 @@ def test_command_center_today_focus_uses_checkin_status_and_parent_quest_metadat
             "Time": "09:00 - 11:00",
             "Title": "Ship report",
             "Category": "Work",
-            "Difficulty": "Boss",
             "Status": "Completed",
             "XP": "150 XP",
         }
@@ -629,7 +627,6 @@ def test_build_character_activity_stats_returns_compact_profile_metrics(session)
         Quest(
             title="Read",
             status="Completed",
-            difficulty="Easy",
             xp_reward=10,
             due_date=date(2026, 6, 22),
             category=learning,
@@ -637,7 +634,6 @@ def test_build_character_activity_stats_returns_compact_profile_metrics(session)
         Quest(
             title="Ship report",
             status="Completed",
-            difficulty="Boss",
             xp_reward=150,
             due_date=date(2026, 6, 23),
             category=work,
@@ -645,7 +641,6 @@ def test_build_character_activity_stats_returns_compact_profile_metrics(session)
         Quest(
             title="Deep work",
             status="Completed",
-            difficulty="Hard",
             xp_reward=75,
             due_date=date(2026, 6, 23),
             category=work,
@@ -664,7 +659,6 @@ def test_build_character_activity_stats_returns_compact_profile_metrics(session)
         {"label": "Completed Quests", "value": 3},
         {"label": "Completion Rate", "value": "80.0%"},
         {"label": "Weekly XP", "value": 225},
-        {"label": "Boss Quests Completed", "value": 1},
         {"label": "Average XP / Completed Quest", "value": 78.3},
         {"label": "Most Active Category", "value": "Work"},
         {"label": "Strongest RPG Stat", "value": "Discipline (225 XP)"},

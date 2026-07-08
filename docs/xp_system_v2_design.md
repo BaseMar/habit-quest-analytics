@@ -37,13 +37,8 @@ Still planned:
 
 ## Product Goal
 
-XP should primarily reward planned effort, not subjective difficulty.
-
-The previous difficulty-based model was simple, but it made short "Hard" tasks
-worth more than long focused work. XP System v2 makes planned time the
-main XP driver so the RPG progression better reflects invested effort.
-
-Difficulty remains a descriptive field. It is not the main XP driver in v2.
+XP rewards planned effort. XP System v2 makes planned time the main XP driver
+so the RPG progression reflects invested effort.
 
 ## Time-Based Quest XP
 
@@ -201,7 +196,6 @@ Radar chart behavior:
 - One-time scheduled quests receive XP based on planned duration.
 - XP reward should not be manually editable.
 - Duration/time planning becomes the main XP driver.
-- Difficulty can remain visible as descriptive metadata.
 
 ### Recurring Habits
 

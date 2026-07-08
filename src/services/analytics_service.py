@@ -474,7 +474,6 @@ def build_character_activity_stats(
         {"label": "Completed Quests", "value": completed_count},
         {"label": "Completion Rate", "value": f"{completion_rate}%"},
         {"label": "Weekly XP", "value": weekly_xp},
-        {"label": "Boss Quests Completed", "value": _count_boss_quests(completed_quests)},
         {"label": "Average XP / Completed Quest", "value": average_xp},
         {"label": "Most Active Category", "value": _most_active_category(completed_quests)},
         {"label": "Strongest RPG Stat", "value": _strongest_rpg_stat(rpg_stats)},
@@ -498,7 +497,6 @@ def build_character_checkin_activity_stats(
         {"label": "Completed Quest Days", "value": completed_count},
         {"label": "Completion Rate", "value": f"{completion_rate}%"},
         {"label": "Weekly XP", "value": weekly_xp},
-        {"label": "Boss Quest Days", "value": _count_boss_checkins(completed_checkins)},
         {"label": "Average XP / Quest Day", "value": average_xp},
         {"label": "Most Active Category", "value": _most_active_checkin_category(completed_checkins)},
         {"label": "Strongest RPG Stat", "value": _strongest_rpg_stat(rpg_stats)},
@@ -608,7 +606,6 @@ def build_today_focus_rows(checkins: list[QuestCheckin]) -> list[dict]:
             "Time": _quest_time_range(checkin.quest),
             "Title": checkin.quest.title,
             "Category": _category_name(checkin.quest),
-            "Difficulty": checkin.quest.difficulty or "Easy",
             "Status": _normalize_status(checkin.status),
             "XP": f"{_checkin_xp(checkin)} XP",
         }
@@ -849,18 +846,6 @@ def _category_for_stat(stat: str) -> str:
         if mapped_stat == stat:
             return category.title()
     return "Uncategorized"
-
-
-def _count_boss_quests(quests: list[Quest]) -> int:
-    return sum(1 for quest in quests if (quest.difficulty or "").strip().lower() == "boss")
-
-
-def _count_boss_checkins(checkins: list[QuestCheckin]) -> int:
-    return sum(
-        1
-        for checkin in checkins
-        if checkin.quest is not None and (checkin.quest.difficulty or "").strip().lower() == "boss"
-    )
 
 
 def _most_active_category(quests: list[Quest]) -> str:

@@ -59,7 +59,7 @@ def render_todays_focus(today_quests: list[dict]) -> None:
             <div class="command-focus-main">
                 <div class="command-focus-title">{escape(str(quest["Title"]))}</div>
                 <div class="command-focus-meta">
-                    {escape(str(quest["Category"]))} / {escape(str(quest["Difficulty"]))} / {escape(str(quest["Status"]))}
+                    {escape(str(quest["Category"]))} / {escape(str(quest["Status"]))}
                 </div>
             </div>
             <div class="command-focus-xp">{escape(str(quest["XP"]))}</div>

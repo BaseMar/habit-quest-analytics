@@ -27,7 +27,6 @@ Notes:
 
 - Scheduled quests use planned duration.
 - Recurring habit templates use `estimated_minutes`.
-- Difficulty remains descriptive metadata and is not the primary XP driver for new scheduled quests or recurring templates.
 - Existing stored quest/check-in XP is not retroactively recalculated.
 
 ## Total XP

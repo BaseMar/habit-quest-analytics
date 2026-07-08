@@ -60,7 +60,6 @@ Template fields:
 
 - habit title
 - category
-- difficulty
 - XP reward derived from estimated/planned minutes
 - estimated minutes
 - optional planned start/end time
@@ -118,7 +117,6 @@ Fields:
 | `title` | Habit name shown to the user. |
 | `description` | Optional notes. |
 | `category_id` | Optional foreign key to `categories.id`. |
-| `difficulty` | Descriptive difficulty label. |
 | `xp_reward` | Time-based XP value copied to generated quests. |
 | `estimated_minutes` | Planned minutes copied to generated quests. |
 | `recurrence_type` | Recurrence type, initially `selected_weekdays`. |
@@ -164,9 +162,9 @@ For each eligible recurring habit date, generation should create:
 - one planned `QuestCheckin` row,
 - one `RecurringHabitInstance` row linking the template/date to the generated quest.
 
-The generated `Quest` copies the template's title, description, category, difficulty,
-XP reward, estimated minutes, and optional time window. The generated quest is scheduled
-for the generated date.
+The generated `Quest` copies the template's title, description, category, XP
+reward, estimated minutes, and optional time window. The generated quest is
+scheduled for the generated date.
 
 Generated `QuestCheckin` records start with:
 
