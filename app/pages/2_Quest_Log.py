@@ -24,7 +24,7 @@ from src.services.checklist_service import (
     is_checklist_cell_editable,
     update_checklist_cell_status,
 )
-from src.services.goal_service import get_goal_progress, list_active_goals
+from src.services.goal_service import create_goal, get_goal_progress, list_active_goals
 from src.services.quest_service import (
     create_scheduled_quest,
     delete_one_time_quest_if_unresolved,
@@ -291,20 +291,21 @@ def render_day_summary(quests: list) -> None:
     complete_col.metric("Completed", completed_count)
 
 
-def render_goal_progress_section() -> None:
+def render_goal_progress_section(category_options: dict[str, int]) -> None:
     active_goals = list_active_goals()
     if not active_goals:
         render_empty_state(
             "No active goals yet",
-            "Create goals from the backend/service foundation for now; goal creation UI will be added later.",
+            "Create a long-term goal below, then link one-time quest sessions to track progress.",
         )
         return
 
+    category_names_by_id = {category_id: name for name, category_id in category_options.items()}
     for goal in active_goals:
         progress = get_goal_progress(goal.id)
         progress_percent = float(progress["progress_percent"])
         progress_label = _format_percent(progress_percent)
-        category = goal.category.name if goal.category else "Uncategorized"
+        category = category_names_by_id.get(goal.category_id, "Uncategorized")
         target = goal.target_end_date.isoformat() if goal.target_end_date else "No target date"
         skipped_failed = progress["skipped_sessions_count"] + progress["failed_sessions_count"]
 
@@ -330,6 +331,86 @@ def render_goal_progress_section() -> None:
                 f"{progress['planned_sessions_count']} planned | "
                 f"{skipped_failed} skipped/failed"
             )
+
+
+def render_goal_creation_form(category_options: dict[str, int]) -> None:
+    with st.expander("Create Goal / Project", expanded=False):
+        title = st.text_input("Goal Title", placeholder="Portfolio Project", key="new_goal_title")
+        description = st.text_area(
+            "Description / Notes",
+            height=72,
+            placeholder="Optional goal notes",
+            key="new_goal_description",
+        )
+
+        hours_col, minutes_col = st.columns(2)
+        with hours_col:
+            planned_hours = st.number_input(
+                "Planned Hours",
+                min_value=0,
+                value=20,
+                step=1,
+                key="new_goal_planned_hours",
+            )
+        with minutes_col:
+            planned_minutes_remainder = st.number_input(
+                "Planned Minutes",
+                min_value=0,
+                max_value=59,
+                value=0,
+                step=5,
+                key="new_goal_planned_minutes",
+            )
+
+        category_labels = ["No category"] + list(category_options.keys())
+        selected_category_label = st.selectbox(
+            "Category",
+            category_labels,
+            key="new_goal_category",
+        )
+        selected_category_id = (
+            None
+            if selected_category_label == "No category"
+            else category_options[selected_category_label]
+        )
+
+        date_col, target_col = st.columns(2)
+        with date_col:
+            use_start_date = st.checkbox("Set start date", value=True, key="new_goal_use_start")
+            start_date = (
+                st.date_input("Start Date", value=date.today(), key="new_goal_start_date")
+                if use_start_date
+                else None
+            )
+        with target_col:
+            use_target_date = st.checkbox("Set target date", value=False, key="new_goal_use_target")
+            target_end_date = (
+                st.date_input("Target End Date", value=date.today(), key="new_goal_target_date")
+                if use_target_date
+                else None
+            )
+
+        if st.button("Create Goal", type="primary", use_container_width=True, key="create_goal_button"):
+            planned_total_minutes = int(planned_hours) * 60 + int(planned_minutes_remainder)
+            if not title.strip():
+                st.error("Goal title is required.")
+            elif planned_total_minutes <= 0:
+                st.error("Planned total time must be greater than 0.")
+            else:
+                try:
+                    create_goal(
+                        title=title,
+                        description=description,
+                        category_id=selected_category_id,
+                        planned_total_minutes=planned_total_minutes,
+                        start_date=start_date,
+                        target_end_date=target_end_date,
+                    )
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.success("Goal created.")
+                    st.rerun()
 
 
 def _ensure_checklist_period_state() -> None:
@@ -1121,7 +1202,8 @@ render_section_title(
     "Track active long-term goals through linked one-time quest sessions.",
 )
 with st.container(border=True):
-    render_goal_progress_section()
+    render_goal_progress_section(category_options)
+    render_goal_creation_form(category_options)
 
 render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
 with st.container(border=True):

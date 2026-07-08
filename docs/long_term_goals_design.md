@@ -9,6 +9,7 @@ Current implementation status:
 - One-time scheduled quests can link to active goals through `Quest.goal_id`.
 - Goal progress is derived from linked quest sessions and
   `QuestCheckin.xp_awarded`.
+- Quest Planner includes a compact goal creation form.
 - Quest Planner includes read-only active goal progress cards.
 - Recurring habits are not linked to goals.
 - Full Goal Dashboard / Project Board UI is not implemented yet.
@@ -139,6 +140,8 @@ Rules:
 
 Current backend/minimal UI behavior:
 
+- Goals can be created in Quest Planner with title, planned total time, optional
+  notes, category, start date, and target date.
 - A one-time scheduled quest can optionally be linked to an active goal/project
   at creation time.
 - Active goals are shown in a compact read-only Goal Progress section in Quest
@@ -150,7 +153,6 @@ Current backend/minimal UI behavior:
 
 Future Quest Planner capabilities:
 
-- Create a goal/project.
 - Create a new session for a goal.
 
 Example flow:
@@ -237,7 +239,7 @@ Rules:
 2. `feat: add goal/project model and service layer` - implemented.
 3. `feat: link one-time quests to goals` - implemented.
 4. `feat: add goal progress UI in Quest Planner` - implemented.
-5. `feat: add goal creation UI in Quest Planner`
+5. `feat: add goal creation UI in Quest Planner` - implemented.
 6. `feat: add goal analytics`
 7. `docs: update long-term goals documentation`
 
