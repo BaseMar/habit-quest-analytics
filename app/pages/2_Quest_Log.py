@@ -24,7 +24,17 @@ from src.services.checklist_service import (
     is_checklist_cell_editable,
     update_checklist_cell_status,
 )
-from src.services.goal_service import create_goal, get_goal_progress, list_active_goals
+from src.services.goal_service import (
+    archive_goal,
+    complete_goal,
+    create_goal,
+    delete_goal_if_unused,
+    get_goal_history_summary,
+    get_goal_progress,
+    list_active_goals,
+    list_goals,
+    reopen_goal,
+)
 from src.services.quest_service import (
     create_scheduled_quest,
     delete_one_time_quest_if_unresolved,
@@ -292,6 +302,13 @@ def render_day_summary(quests: list) -> None:
 
 
 def render_goal_progress_section(category_options: dict[str, int]) -> None:
+    status_message = st.session_state.pop("goal_status_message", None)
+    if status_message:
+        if st.session_state.pop("goal_status_warning", False):
+            st.warning(status_message)
+        else:
+            st.success(status_message)
+
     active_goals = list_active_goals()
     if not active_goals:
         render_empty_state(
@@ -411,6 +428,86 @@ def render_goal_creation_form(category_options: dict[str, int]) -> None:
                 else:
                     st.success("Goal created.")
                     st.rerun()
+
+
+def render_goal_management(category_options: dict[str, int]) -> None:
+    goals = list_goals()
+    if not goals:
+        return
+
+    category_names_by_id = {category_id: name for name, category_id in category_options.items()}
+    with st.expander("Manage Goals", expanded=False):
+        for goal in goals:
+            history = get_goal_history_summary(goal.id)
+            category = category_names_by_id.get(goal.category_id, "Uncategorized")
+            with st.container(border=True):
+                detail_col, action_col = st.columns([0.58, 0.42], vertical_alignment="center")
+                with detail_col:
+                    st.write(f"**{goal.title}**")
+                    st.caption(
+                        f"{goal.status} | {category} | "
+                        f"{history['linked_quests_count']} linked sessions | "
+                        f"{history['earned_xp']} XP earned"
+                    )
+
+                with action_col:
+                    action_cols = st.columns(3)
+                    with action_cols[0]:
+                        if goal.status == "Active":
+                            if st.button("Archive", key=f"goal_archive_{goal.id}", use_container_width=True):
+                                archive_goal(goal.id)
+                                st.session_state["goal_status_message"] = (
+                                    "Goal archived. Existing linked quest history was preserved."
+                                )
+                                st.rerun()
+                        elif goal.status == "Completed":
+                            if st.button("Archive", key=f"goal_archive_{goal.id}", use_container_width=True):
+                                archive_goal(goal.id)
+                                st.session_state["goal_status_message"] = (
+                                    "Goal archived. Existing linked quest history was preserved."
+                                )
+                                st.rerun()
+                        else:
+                            if st.button("Reopen", key=f"goal_reopen_{goal.id}", use_container_width=True):
+                                reopen_goal(goal.id)
+                                st.session_state["goal_status_message"] = "Goal reopened."
+                                st.rerun()
+
+                    with action_cols[1]:
+                        if goal.status == "Active":
+                            if st.button("Complete", key=f"goal_complete_{goal.id}", use_container_width=True):
+                                complete_goal(goal.id)
+                                st.session_state["goal_status_message"] = (
+                                    "Goal marked as completed. Existing linked quest history was preserved."
+                                )
+                                st.rerun()
+                        elif goal.status == "Completed":
+                            if st.button("Reopen", key=f"goal_reopen_{goal.id}", use_container_width=True):
+                                reopen_goal(goal.id)
+                                st.session_state["goal_status_message"] = "Goal reopened."
+                                st.rerun()
+
+                    with action_cols[2]:
+                        confirm_delete = st.checkbox(
+                            "Confirm delete",
+                            key=f"goal_confirm_delete_{goal.id}",
+                        )
+                        if st.button(
+                            "Delete",
+                            key=f"goal_delete_{goal.id}",
+                            use_container_width=True,
+                            disabled=not confirm_delete,
+                        ):
+                            delete_summary = delete_goal_if_unused(goal.id)
+                            if delete_summary["deleted"]:
+                                st.session_state["goal_status_message"] = "Unused goal deleted."
+                            else:
+                                st.session_state["goal_status_message"] = (
+                                    "This goal has linked quest sessions and cannot be deleted safely. "
+                                    "Archive it instead."
+                                )
+                                st.session_state["goal_status_warning"] = True
+                            st.rerun()
 
 
 def _ensure_checklist_period_state() -> None:
@@ -1204,6 +1301,7 @@ render_section_title(
 with st.container(border=True):
     render_goal_progress_section(category_options)
     render_goal_creation_form(category_options)
+    render_goal_management(category_options)
 
 render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
 with st.container(border=True):

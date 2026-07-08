@@ -148,6 +148,30 @@ def test_list_active_goals_returns_only_active_goals(session):
     assert archived not in goals
 
 
+def test_list_active_goals_excludes_completed_goals(session):
+    active = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    completed = create_goal(
+        "Finished Project",
+        planned_total_minutes=300,
+        status="Completed",
+        session=session,
+    )
+
+    goals = list_active_goals(session=session)
+
+    assert goals == [active]
+    assert completed not in goals
+
+
+def test_reopened_goal_returns_to_active_goals(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, status="Archived", session=session)
+    reopen_goal(goal.id, session=session)
+
+    goals = list_active_goals(session=session)
+
+    assert goals == [goal]
+
+
 def test_get_goal_returns_correct_goal(session):
     goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
 
@@ -202,6 +226,18 @@ def test_complete_goal_sets_status_completed(session):
     completed = complete_goal(goal.id, session=session)
 
     assert completed.status == "Completed"
+
+
+def test_complete_goal_with_linked_quest_preserves_quest_and_checkin(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal)
+    checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+
+    completed = complete_goal(goal.id, session=session)
+
+    assert completed.status == "Completed"
+    assert session.get(Quest, quest.id) is not None
+    assert session.get(QuestCheckin, checkin.id) is not None
 
 
 def test_reopen_goal_sets_status_active(session):
@@ -362,3 +398,20 @@ def test_goal_history_summary_counts_linked_sessions(session):
         "failed_sessions_count": 1,
         "earned_xp": 40,
     }
+
+
+def test_goal_progress_remains_available_after_archive_complete_and_reopen(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    quest = _create_goal_session(session, goal, minutes=120)
+    complete_checkin(quest.id, date(2026, 7, 1), session=session)
+
+    archive_goal(goal.id, session=session)
+    archived_progress = get_goal_progress(goal.id, session=session)
+    complete_goal(goal.id, session=session)
+    completed_progress = get_goal_progress(goal.id, session=session)
+    reopen_goal(goal.id, session=session)
+    reopened_progress = get_goal_progress(goal.id, session=session)
+
+    assert archived_progress["completed_minutes"] == 120
+    assert completed_progress["earned_xp"] == 40
+    assert reopened_progress["completed_sessions_count"] == 1
