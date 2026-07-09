@@ -4,6 +4,7 @@ from html import escape
 from typing import TypedDict
 
 import streamlit as st
+from streamlit import config as streamlit_config
 
 
 class ThemeTokens(TypedDict):
@@ -170,9 +171,31 @@ def render_appearance_controls() -> None:
     )
 
 
+def _sync_streamlit_theme_config(tokens: ThemeTokens) -> None:
+    """Keep native Streamlit/BaseWeb widgets aligned with the selected app theme."""
+    theme_options = {
+        "theme.primaryColor": tokens["accent"],
+        "theme.backgroundColor": tokens["background"],
+        "theme.secondaryBackgroundColor": tokens["surface"],
+        "theme.textColor": tokens["text_primary"],
+    }
+    for option_name, option_value in theme_options.items():
+        try:
+            if streamlit_config.get_option(option_name) != option_value:
+                streamlit_config.set_option(option_name, option_value)
+        except Exception:
+            # CSS tokens still provide the fallback if Streamlit disallows a runtime theme update.
+            continue
+
+
 def apply_global_styles() -> None:
     """Apply token-based app-wide styles."""
     tokens = get_theme_tokens()
+    _sync_streamlit_theme_config(tokens)
+    accent_rgb = ", ".join(
+        str(int(tokens["accent"].lstrip("#")[index : index + 2], 16))
+        for index in (0, 2, 4)
+    )
     is_dark = tokens["mode"] == "Dark"
     if is_dark:
         app_background = (
@@ -216,9 +239,27 @@ def apply_global_styles() -> None:
             --hq-muted-surface: {tokens["muted_surface"]};
             --hq-chart-grid: {tokens["chart_grid"]};
             --hq-radius: 8px;
+            --primary-color: var(--hq-accent);
+            --primary-color-rgb: {accent_rgb};
+            --background-color: var(--hq-background);
+            --secondary-background-color: var(--hq-surface);
+            --text-color: var(--hq-text-primary);
+            --border-color: var(--hq-border);
+            --input-background-color: var(--hq-input-background);
+            --button-secondary-background-color: var(--hq-surface-elevated);
+            --button-secondary-text-color: var(--hq-text-primary);
+            --button-secondary-border-color: var(--hq-border);
+            color-scheme: {"dark" if is_dark else "light"};
         }}
 
         .stApp {{
+            --primary-color: var(--hq-accent);
+            --primary-color-rgb: {accent_rgb};
+            --background-color: var(--hq-background);
+            --secondary-background-color: var(--hq-surface);
+            --text-color: var(--hq-text-primary);
+            --border-color: var(--hq-border);
+            --input-background-color: var(--hq-input-background);
             background: {app_background};
             background-attachment: fixed;
             background-size: {app_background_size};
@@ -299,12 +340,11 @@ def apply_global_styles() -> None:
 
         .hq-sidebar-brand-title {{
             color: var(--hq-text-primary);
-            font-size: 1.02rem;
-            font-weight: 780;
+            font-size: 1.08rem;
+            font-weight: 820;
             line-height: 1.12;
         }}
 
-        .hq-sidebar-brand-subtitle,
         .hq-sidebar-section-title {{
             color: var(--hq-accent);
             font-size: 0.74rem;
@@ -611,13 +651,91 @@ def apply_global_styles() -> None:
             margin: 0.15rem 0 0.75rem;
         }}
 
-        div[data-testid="stSegmentedControl"] label {{
+        div[data-testid="stSegmentedControl"] > div,
+        div[data-testid="stSegmentedControl"] [role="radiogroup"],
+        div[data-testid="stSegmentedControl"] [role="tablist"] {{
+            background: var(--hq-surface-elevated) !important;
+            border: 1px solid var(--hq-border) !important;
+            border-radius: 8px !important;
+            overflow: hidden;
+        }}
+
+        input[type="checkbox"],
+        input[type="radio"] {{
+            accent-color: var(--hq-accent) !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] label,
+        div[data-testid="stSegmentedControl"] p {{
             color: var(--hq-text-secondary) !important;
         }}
 
+        div[data-testid="stSegmentedControl"] label {{
+            background: transparent !important;
+            border: 0 !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] label > div,
+        div[data-testid="stSegmentedControl"] button > div,
+        div[data-testid="stSegmentedControl"] [role="radio"],
+        div[data-testid="stSegmentedControl"] [role="tab"] {{
+            background: transparent !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] label:has(input:checked),
+        div[data-testid="stSegmentedControl"] label:has(input[checked]),
+        div[data-testid="stSegmentedControl"] label:has([aria-checked="true"]) {{
+            background: var(--hq-accent) !important;
+            border-color: var(--hq-accent-border) !important;
+            color: white !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] label:has(input:checked) > div,
+        div[data-testid="stSegmentedControl"] label:has(input[checked]) > div,
+        div[data-testid="stSegmentedControl"] label:has([aria-checked="true"]) > div {{
+            background: var(--hq-accent) !important;
+            color: white !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] label:has(input:checked) *,
+        div[data-testid="stSegmentedControl"] label:has(input[checked]) *,
+        div[data-testid="stSegmentedControl"] label:has([aria-checked="true"]) * {{
+            color: white !important;
+        }}
+
         div[data-testid="stSegmentedControl"] button {{
+            background: var(--hq-surface-elevated) !important;
+            border: 1px solid var(--hq-border) !important;
             border-radius: 7px !important;
+            color: var(--hq-text-primary) !important;
             font-weight: 720 !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] button:hover {{
+            background: var(--hq-muted-surface) !important;
+            border-color: var(--hq-accent-border) !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] button[aria-pressed="true"],
+        div[data-testid="stSegmentedControl"] button[aria-selected="true"],
+        div[data-testid="stSegmentedControl"] button[data-selected="true"],
+        div[data-testid="stSegmentedControl"] [role="radio"][aria-checked="true"],
+        div[data-testid="stSegmentedControl"] [role="tab"][aria-selected="true"] {{
+            background: var(--hq-accent) !important;
+            border-color: var(--hq-accent-border) !important;
+            color: white !important;
+            box-shadow: 0 0 0 1px var(--hq-accent-border) inset !important;
+        }}
+
+        div[data-testid="stSegmentedControl"] button[aria-pressed="true"] *,
+        div[data-testid="stSegmentedControl"] button[aria-selected="true"] *,
+        div[data-testid="stSegmentedControl"] button[data-selected="true"] *,
+        div[data-testid="stSegmentedControl"] [role="radio"][aria-checked="true"] *,
+        div[data-testid="stSegmentedControl"] [role="tab"][aria-selected="true"] * {{
+            color: white !important;
         }}
 
         div[data-testid="stExpander"] details {{
@@ -629,6 +747,7 @@ def apply_global_styles() -> None:
         }}
 
         div[data-testid="stExpander"] summary {{
+            background: var(--hq-surface) !important;
             color: var(--hq-text-primary);
             font-weight: 720;
             min-height: 40px;
@@ -636,7 +755,19 @@ def apply_global_styles() -> None:
             padding-top: 0.42rem !important;
         }}
 
+        div[data-testid="stExpander"] summary:hover {{
+            background: var(--hq-surface-elevated) !important;
+        }}
+
+        div[data-testid="stExpander"] summary *,
+        div[data-testid="stExpander"] summary svg {{
+            color: var(--hq-text-primary) !important;
+            fill: var(--hq-text-primary) !important;
+            stroke: var(--hq-text-primary) !important;
+        }}
+
         div[data-testid="stExpander"] details > div {{
+            background: var(--hq-surface) !important;
             border-top-color: var(--hq-border) !important;
         }}
 
@@ -704,7 +835,10 @@ def apply_global_styles() -> None:
         }}
 
         button[kind="primary"],
-        div[data-testid="stFormSubmitButton"] button {{
+        div[data-testid="stFormSubmitButton"] button,
+        div[data-testid="stButton"] button[kind="primary"],
+        button[data-testid="stBaseButton-primary"],
+        button[data-testid="baseButton-primary"] {{
             background: var(--hq-accent) !important;
             border: 1px solid var(--hq-accent-border) !important;
             border-radius: 7px !important;
@@ -713,7 +847,10 @@ def apply_global_styles() -> None:
             font-weight: 750 !important;
         }}
 
-        button[kind="secondary"] {{
+        button[kind="secondary"],
+        div[data-testid="stButton"] button,
+        button[data-testid="stBaseButton-secondary"],
+        button[data-testid="baseButton-secondary"] {{
             background: var(--hq-surface-elevated) !important;
             border: 1px solid var(--hq-border) !important;
             border-radius: 7px !important;
@@ -723,15 +860,48 @@ def apply_global_styles() -> None:
 
         button[kind="primary"]:hover,
         button[kind="secondary"]:hover,
+        div[data-testid="stButton"] button:hover,
         div[data-testid="stFormSubmitButton"] button:hover {{
+            background:
+                linear-gradient(180deg, var(--hq-accent-soft), transparent 120%),
+                var(--hq-surface-elevated) !important;
             border-color: var(--hq-accent-border) !important;
             transform: none;
+        }}
+
+        button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] button:hover,
+        div[data-testid="stButton"] button[kind="primary"]:hover,
+        button[data-testid="stBaseButton-primary"]:hover,
+        button[data-testid="baseButton-primary"]:hover {{
+            background: var(--hq-accent) !important;
+            color: white !important;
+        }}
+
+        button:disabled,
+        button[disabled],
+        div[data-testid="stButton"] button:disabled,
+        div[data-testid="stFormSubmitButton"] button:disabled {{
+            background: var(--hq-muted-surface) !important;
+            border-color: var(--hq-border) !important;
+            color: var(--hq-text-secondary) !important;
+            opacity: 0.62 !important;
+        }}
+
+        button *,
+        div[data-testid="stButton"] button *,
+        div[data-testid="stFormSubmitButton"] button * {{
+            color: inherit !important;
         }}
 
         div[data-baseweb="select"] > div,
         div[data-baseweb="input"] > div,
         div[data-baseweb="textarea"] > div,
+        div[data-testid="stNumberInput"] > div,
+        div[data-testid="stNumberInput"] input,
+        div[data-testid="stDateInput"] > div,
         div[data-testid="stDateInput"] input,
+        div[data-testid="stTimeInput"] > div,
         div[data-testid="stTimeInput"] input,
         input,
         textarea {{
@@ -740,11 +910,252 @@ def apply_global_styles() -> None:
             color: var(--hq-text-primary) !important;
         }}
 
+        div[data-baseweb="select"] > div:hover,
+        div[data-baseweb="input"] > div:hover,
+        div[data-baseweb="textarea"] > div:hover,
+        div[data-testid="stDateInput"] input:hover,
+        div[data-testid="stTimeInput"] input:hover {{
+            border-color: var(--hq-accent-border) !important;
+        }}
+
+        div[data-baseweb="select"] > div:hover {{
+            background:
+                linear-gradient(90deg, var(--hq-accent-soft), transparent 68%),
+                var(--hq-input-background) !important;
+        }}
+
+        div[data-baseweb="select"] > div:focus-within,
+        div[data-baseweb="input"] > div:focus-within,
+        div[data-baseweb="textarea"] > div:focus-within,
+        div[data-testid="stDateInput"] div:focus-within,
+        div[data-testid="stTimeInput"] div:focus-within {{
+            border-color: var(--hq-accent-border) !important;
+            box-shadow: 0 0 0 1px var(--hq-accent-border) !important;
+            outline-color: var(--hq-accent-border) !important;
+        }}
+
+        div[data-baseweb="select"] > div:focus-within {{
+            background: var(--hq-input-background) !important;
+            border-color: var(--hq-accent) !important;
+            box-shadow: none !important;
+        }}
+
+        div[data-baseweb="input"] > div:focus-within,
+        div[data-testid="stNumberInput"] > div:focus-within,
+        div[data-testid="stDateInput"] > div:focus-within,
+        div[data-testid="stTimeInput"] > div:focus-within {{
+            border-color: var(--hq-accent-border) !important;
+            box-shadow: 0 0 0 1px var(--hq-accent-border) !important;
+        }}
+
+        div[data-testid="stDateInput"] > div:focus-within,
+        div[data-testid="stDateInput"] input:focus {{
+            border-color: var(--hq-border) !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }}
+
+        input:focus,
+        textarea:focus {{
+            border-color: var(--hq-accent-border) !important;
+            box-shadow: none !important;
+            outline-color: var(--hq-accent-border) !important;
+        }}
+
+        div[data-baseweb="input"] > div,
+        div[data-testid="stNumberInput"] > div,
+        div[data-testid="stDateInput"] > div,
+        div[data-testid="stTimeInput"] > div {{
+            box-shadow: none !important;
+        }}
+
+        div[data-baseweb="select"] svg,
+        div[data-baseweb="input"] svg,
+        div[data-testid="stDateInput"] svg,
+        div[data-testid="stTimeInput"] svg {{
+            color: var(--hq-text-secondary) !important;
+            fill: var(--hq-text-secondary) !important;
+        }}
+
+        div[data-testid="stMultiSelect"] [data-baseweb="tag"],
+        div[data-baseweb="select"] [data-baseweb="tag"],
+        span[data-baseweb="tag"] {{
+            background: var(--hq-accent) !important;
+            border-color: var(--hq-accent-border) !important;
+            color: white !important;
+        }}
+
+        div[data-testid="stMultiSelect"] [data-baseweb="tag"] *,
+        div[data-baseweb="select"] [data-baseweb="tag"] *,
+        span[data-baseweb="tag"] * {{
+            color: white !important;
+            fill: white !important;
+            stroke: white !important;
+        }}
+
+        div[data-testid="stNumberInput"] button,
+        div[data-testid="stNumberInput"] button[kind],
+        div[data-testid="stDateInput"] button,
+        div[data-testid="stTimeInput"] button {{
+            background: var(--hq-surface-elevated) !important;
+            border-color: var(--hq-border) !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stNumberInput"] button:hover,
+        div[data-testid="stDateInput"] button:hover,
+        div[data-testid="stTimeInput"] button:hover {{
+            background: var(--hq-accent-soft) !important;
+            border-color: var(--hq-accent-border) !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stNumberInput"] button svg,
+        div[data-testid="stDateInput"] button svg,
+        div[data-testid="stTimeInput"] button svg {{
+            color: var(--hq-text-primary) !important;
+            fill: var(--hq-text-primary) !important;
+            stroke: var(--hq-text-primary) !important;
+        }}
+
+        div[role="radiogroup"] label,
+        div[data-testid="stRadio"] label,
+        div[data-baseweb="radio"] label {{
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stRadio"] label,
+        div[data-testid="stCheckbox"] label {{
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stRadio"] label p,
+        div[data-testid="stCheckbox"] label p {{
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-testid="stCheckbox"] [role="checkbox"],
+        div[data-testid="stCheckbox"] label > div:first-child,
+        div[data-baseweb="checkbox"] [role="checkbox"] {{
+            background: var(--hq-input-background) !important;
+            border-color: var(--hq-border) !important;
+        }}
+
+        div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="true"],
+        div[data-testid="stCheckbox"] label:has(input:checked) > div:first-child,
+        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] {{
+            background: var(--hq-accent) !important;
+            border-color: var(--hq-accent) !important;
+            color: white !important;
+        }}
+
+        div[data-testid="stCheckbox"] [role="checkbox"][aria-checked="true"] *,
+        div[data-testid="stCheckbox"] label:has(input:checked) > div:first-child *,
+        div[data-baseweb="checkbox"] [role="checkbox"][aria-checked="true"] * {{
+            color: white !important;
+            fill: white !important;
+            stroke: white !important;
+        }}
+
+        div[role="radiogroup"] label > div:first-child,
+        div[data-testid="stRadio"] label > div:first-child,
+        div[data-baseweb="radio"] div:first-child {{
+            background: var(--hq-input-background) !important;
+            border-color: var(--hq-border) !important;
+        }}
+
+        div[role="radiogroup"] [aria-checked="true"],
+        div[data-testid="stRadio"] [aria-checked="true"],
+        div[data-testid="stRadio"] label:has(input:checked) > div:first-child,
+        div[data-baseweb="radio"] [aria-checked="true"] {{
+            background: var(--hq-accent) !important;
+            border-color: var(--hq-accent) !important;
+            color: var(--hq-accent) !important;
+        }}
+
+        div[role="radiogroup"] [aria-checked="true"] *,
+        div[data-testid="stRadio"] [aria-checked="true"] *,
+        div[data-testid="stRadio"] label:has(input:checked) > div:first-child *,
+        div[data-baseweb="radio"] [aria-checked="true"] * {{
+            color: var(--hq-accent) !important;
+            fill: var(--hq-accent) !important;
+            border-color: var(--hq-accent) !important;
+        }}
+
         div[data-baseweb="popover"],
-        div[data-baseweb="menu"] {{
+        div[data-baseweb="menu"],
+        div[data-baseweb="popover"] > div {{
             background: var(--hq-surface) !important;
             border: 1px solid var(--hq-border) !important;
             color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-baseweb="menu"] li,
+        div[role="listbox"] li,
+        div[role="option"] {{
+            background: var(--hq-surface) !important;
+            background-image: none !important;
+            border-left: 3px solid transparent !important;
+            color: var(--hq-text-primary) !important;
+            transition:
+                background-color 140ms ease,
+                border-color 140ms ease,
+                color 140ms ease;
+        }}
+
+        div[data-baseweb="menu"] li > div,
+        div[role="listbox"] li > div,
+        div[role="option"] > div {{
+            background: transparent !important;
+            background-image: none !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-baseweb="menu"] li:hover,
+        div[data-baseweb="menu"] li[data-highlighted="true"],
+        div[data-baseweb="menu"] li[aria-current="true"],
+        div[data-baseweb="menu"] li[aria-selected="true"],
+        div[role="listbox"] li:hover,
+        div[role="listbox"] li[data-highlighted="true"],
+        div[role="listbox"] li[aria-current="true"],
+        div[role="listbox"] li[aria-selected="true"],
+        div[role="option"]:hover,
+        div[role="option"][data-highlighted="true"],
+        div[role="option"][aria-current="true"],
+        div[role="option"][aria-selected="true"] {{
+            background-color: rgba(var(--primary-color-rgb), 0.16) !important;
+            background-image: none !important;
+            border-left-color: var(--hq-accent) !important;
+            box-shadow: inset 3px 0 0 var(--hq-accent) !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-baseweb="menu"] li:hover > div,
+        div[data-baseweb="menu"] li[data-highlighted="true"] > div,
+        div[data-baseweb="menu"] li[aria-current="true"] > div,
+        div[data-baseweb="menu"] li[aria-selected="true"] > div,
+        div[role="listbox"] li:hover > div,
+        div[role="listbox"] li[data-highlighted="true"] > div,
+        div[role="listbox"] li[aria-current="true"] > div,
+        div[role="listbox"] li[aria-selected="true"] > div,
+        div[role="option"]:hover > div,
+        div[role="option"][data-highlighted="true"] > div,
+        div[role="option"][aria-current="true"] > div,
+        div[role="option"][aria-selected="true"] > div {{
+            background-color: transparent !important;
+            background-image: none !important;
+            color: var(--hq-text-primary) !important;
+        }}
+
+        div[data-baseweb="menu"] li[aria-selected="true"],
+        div[role="listbox"] li[aria-selected="true"],
+        div[role="option"][aria-selected="true"] {{
+            background-color: rgba(var(--primary-color-rgb), 0.2) !important;
+            background-image: none !important;
+            border-left-color: var(--hq-accent) !important;
+            box-shadow: inset 3px 0 0 var(--hq-accent) !important;
+            color: var(--hq-text-primary) !important;
+            font-weight: 740 !important;
         }}
 
         .stProgress > div > div > div > div {{

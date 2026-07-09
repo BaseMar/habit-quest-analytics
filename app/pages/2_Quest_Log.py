@@ -328,7 +328,10 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             events=calendar_events,
             options=calendar_options,
             custom_css=custom_css,
-            key=f"quest_calendar_{selected_view_label}_{_calendar_events_signature(calendar_events)}",
+            key=(
+                f"quest_calendar_{tokens['mode']}_{tokens['accent_name']}_"
+                f"{selected_view_label}_{_calendar_events_signature(calendar_events)}"
+            ),
         )
     except Exception as error:
         st.warning(f"Calendar component could not render. Use the selected date field below. Details: {error}")

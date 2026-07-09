@@ -156,8 +156,7 @@ def render_sidebar_brand() -> None:
     st.sidebar.markdown(
         """
         <div class="hq-sidebar-brand">
-            <div class="hq-sidebar-brand-title">Habit Quest</div>
-            <div class="hq-sidebar-brand-subtitle">Analytics</div>
+            <div class="hq-sidebar-brand-title">Habit Quest Analytics</div>
             <div class="hq-sidebar-brand-caption">RPG habit planner</div>
         </div>
         """,
