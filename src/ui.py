@@ -1085,18 +1085,25 @@ def apply_global_styles() -> None:
         div[data-baseweb="popover"],
         div[data-baseweb="menu"],
         div[data-baseweb="popover"] > div {{
-            background: var(--hq-surface) !important;
+            background: {tokens["surface"]} !important;
             border: 1px solid var(--hq-border) !important;
-            color: var(--hq-text-primary) !important;
+            color: {tokens["text_primary"]} !important;
+        }}
+
+        div[data-baseweb="popover"] ul,
+        div[data-baseweb="menu"] ul,
+        ul[role="listbox"] {{
+            background: {tokens["surface"]} !important;
+            color: {tokens["text_primary"]} !important;
         }}
 
         div[data-baseweb="menu"] li,
         div[role="listbox"] li,
         div[role="option"] {{
-            background: var(--hq-surface) !important;
+            background: {tokens["surface"]} !important;
             background-image: none !important;
             border-left: 3px solid transparent !important;
-            color: var(--hq-text-primary) !important;
+            color: {tokens["text_primary"]} !important;
             transition:
                 background-color 140ms ease,
                 border-color 140ms ease,
@@ -1108,7 +1115,7 @@ def apply_global_styles() -> None:
         div[role="option"] > div {{
             background: transparent !important;
             background-image: none !important;
-            color: var(--hq-text-primary) !important;
+            color: {tokens["text_primary"]} !important;
         }}
 
         div[data-baseweb="menu"] li:hover,
@@ -1127,7 +1134,7 @@ def apply_global_styles() -> None:
             background-image: none !important;
             border-left-color: var(--hq-accent) !important;
             box-shadow: inset 3px 0 0 var(--hq-accent) !important;
-            color: var(--hq-text-primary) !important;
+            color: {tokens["text_primary"]} !important;
         }}
 
         div[data-baseweb="menu"] li:hover > div,
@@ -1144,7 +1151,7 @@ def apply_global_styles() -> None:
         div[role="option"][aria-selected="true"] > div {{
             background-color: transparent !important;
             background-image: none !important;
-            color: var(--hq-text-primary) !important;
+            color: {tokens["text_primary"]} !important;
         }}
 
         div[data-baseweb="menu"] li[aria-selected="true"],
@@ -1154,7 +1161,7 @@ def apply_global_styles() -> None:
             background-image: none !important;
             border-left-color: var(--hq-accent) !important;
             box-shadow: inset 3px 0 0 var(--hq-accent) !important;
-            color: var(--hq-text-primary) !important;
+            color: {tokens["text_primary"]} !important;
             font-weight: 740 !important;
         }}
 

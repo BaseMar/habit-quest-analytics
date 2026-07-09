@@ -7,11 +7,14 @@ from sqlalchemy.orm import joinedload
 from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
 from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
-from src.database.models import PlayerProfile, Quest, QuestCheckin
+from src.database.models import Goal, PlayerProfile, Quest, QuestCheckin
 from src.services.checklist_service import ensure_checkin
+from src.services.goal_service import get_goal_progress
 from src.services.xp_service import calculate_level, get_character_level_progress, get_stat_level_progress
 
 STATUS_ORDER = QUEST_STATUSES
+DEFAULT_GOAL_ANALYTICS_STATUSES = ("Active", "Completed")
+GOAL_ANALYTICS_STATUSES = ("Active", "Completed", "Archived")
 
 
 def build_quest_summary(quests: pd.DataFrame) -> dict:
@@ -225,6 +228,152 @@ def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
             "completion_rate_by_weekday": build_completion_rate_by_weekday(quests),
             "estimated_minutes_by_category": build_estimated_minutes_by_category(quests),
         }
+    finally:
+        if owns_session:
+            session.close()
+
+
+def get_goal_analytics_summary(
+    statuses: list[str] | tuple[str, ...] | str | None = None,
+    category_id: int | None = None,
+    session=None,
+) -> dict:
+    """Return KPI and table-ready goal analytics derived from linked quest check-ins."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        goals = _get_filtered_goals(session, statuses=statuses, category_id=category_id)
+        rows = _build_goal_progress_rows(goals, session=session)
+
+        planned_effort_minutes = sum(row["Planned Minutes"] for row in rows)
+        completed_effort_minutes = sum(row["Completed Minutes"] for row in rows)
+        overall_progress = _bounded_percent(completed_effort_minutes, planned_effort_minutes)
+
+        return {
+            "has_goals": bool(session.query(Goal.id).first()),
+            "included_goals_count": len(rows),
+            "active_goals": sum(1 for row in rows if row["Status"] == "Active"),
+            "completed_goals": sum(1 for row in rows if row["Status"] == "Completed"),
+            "archived_goals": sum(1 for row in rows if row["Status"] == "Archived"),
+            "planned_effort_minutes": planned_effort_minutes,
+            "completed_effort_minutes": completed_effort_minutes,
+            "remaining_effort_minutes": sum(row["Remaining Minutes"] for row in rows),
+            "overall_progress_percent": overall_progress,
+            "goal_xp_earned": sum(row["Earned XP"] for row in rows),
+            "expected_total_xp": sum(row["Expected Total XP"] for row in rows),
+            "linked_sessions_count": sum(row["Linked Sessions"] for row in rows),
+            "completed_sessions_count": sum(row["Completed Sessions"] for row in rows),
+            "planned_sessions_count": sum(row["Planned Sessions"] for row in rows),
+            "skipped_sessions_count": sum(row["Skipped Sessions"] for row in rows),
+            "failed_sessions_count": sum(row["Failed Sessions"] for row in rows),
+            "goal_rows": rows,
+            "goal_table": pd.DataFrame(rows),
+        }
+    finally:
+        if owns_session:
+            session.close()
+
+
+def get_goal_progress_dataset(
+    statuses: list[str] | tuple[str, ...] | str | None = None,
+    category_id: int | None = None,
+    session=None,
+) -> pd.DataFrame:
+    """Return per-goal completed and remaining effort rows for comparison charts."""
+    summary = get_goal_analytics_summary(statuses=statuses, category_id=category_id, session=session)
+    rows = []
+    for row in summary["goal_rows"]:
+        rows.append(
+            {
+                "Goal ID": row["Goal ID"],
+                "Goal": row["Goal"],
+                "Status": row["Status"],
+                "Category": row["Category"],
+                "Completed Effort": row["Completed Minutes"],
+                "Remaining Effort": row["Remaining Minutes"],
+                "Progress Percent": row["Progress Percent"],
+            }
+        )
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "Goal ID",
+                "Goal",
+                "Status",
+                "Category",
+                "Completed Effort",
+                "Remaining Effort",
+                "Progress Percent",
+            ]
+        )
+    return (
+        pd.DataFrame(rows)
+        .sort_values(["Progress Percent", "Completed Effort", "Goal"], ascending=[False, False, True])
+        .reset_index(drop=True)
+    )
+
+
+def get_goal_session_status_dataset(
+    statuses: list[str] | tuple[str, ...] | str | None = None,
+    category_id: int | None = None,
+    session=None,
+) -> pd.DataFrame:
+    """Return linked goal session status counts for charting."""
+    summary = get_goal_analytics_summary(statuses=statuses, category_id=category_id, session=session)
+    rows = []
+    for row in summary["goal_rows"]:
+        rows.extend(
+            [
+                {"Goal": row["Goal"], "Status": "Completed", "Count": row["Completed Sessions"]},
+                {"Goal": row["Goal"], "Status": "Planned", "Count": row["Planned Sessions"]},
+                {"Goal": row["Goal"], "Status": "Skipped", "Count": row["Skipped Sessions"]},
+                {"Goal": row["Goal"], "Status": "Failed", "Count": row["Failed Sessions"]},
+            ]
+        )
+    return pd.DataFrame(rows, columns=["Goal", "Status", "Count"])
+
+
+def get_goal_completed_minutes_by_week(
+    statuses: list[str] | tuple[str, ...] | str | None = None,
+    category_id: int | None = None,
+    session=None,
+) -> pd.DataFrame:
+    """Return completed linked goal effort grouped by check-in week."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        goals = _get_filtered_goals(session, statuses=statuses, category_id=category_id)
+        goal_ids = [goal.id for goal in goals]
+        if not goal_ids:
+            return pd.DataFrame(columns=["Week", "Completed Minutes"])
+
+        checkins = (
+            session.query(QuestCheckin)
+            .options(joinedload(QuestCheckin.quest))
+            .join(Quest)
+            .filter(Quest.goal_id.in_(goal_ids), QuestCheckin.status == "Completed")
+            .all()
+        )
+        rows = []
+        for checkin in checkins:
+            if checkin.quest is None:
+                continue
+            week_start = checkin.checkin_date - timedelta(days=checkin.checkin_date.weekday())
+            rows.append(
+                {
+                    "Week": week_start,
+                    "Completed Minutes": _checkin_planned_minutes(checkin),
+                }
+            )
+        if not rows:
+            return pd.DataFrame(columns=["Week", "Completed Minutes"])
+        return (
+            pd.DataFrame(rows)
+            .groupby("Week", as_index=False)["Completed Minutes"]
+            .sum()
+            .sort_values("Week")
+            .reset_index(drop=True)
+        )
     finally:
         if owns_session:
             session.close()
@@ -763,6 +912,87 @@ def _checkin_planned_minutes(checkin: QuestCheckin) -> int:
     if checkin.quest is None:
         return 0
     return checkin.quest.estimated_minutes or 0
+
+
+def _get_filtered_goals(
+    session,
+    statuses: list[str] | tuple[str, ...] | str | None = None,
+    category_id: int | None = None,
+) -> list[Goal]:
+    normalized_statuses = _normalize_goal_status_filter(statuses)
+    query = session.query(Goal).options(joinedload(Goal.category))
+    if normalized_statuses is not None:
+        query = query.filter(Goal.status.in_(normalized_statuses))
+    if category_id is not None:
+        query = query.filter(Goal.category_id == category_id)
+    return (
+        query.order_by(
+            Goal.status.asc(),
+            Goal.target_end_date.is_(None),
+            Goal.target_end_date.asc(),
+            Goal.title.asc(),
+            Goal.id.asc(),
+        )
+        .all()
+    )
+
+
+def _normalize_goal_status_filter(statuses: list[str] | tuple[str, ...] | str | None) -> tuple[str, ...] | None:
+    if statuses is None:
+        return DEFAULT_GOAL_ANALYTICS_STATUSES
+    if isinstance(statuses, str):
+        if statuses == "All":
+            return None
+        raw_statuses = [statuses]
+    else:
+        raw_statuses = list(statuses)
+    if "All" in raw_statuses:
+        return None
+
+    lookup = {status.lower(): status for status in GOAL_ANALYTICS_STATUSES}
+    normalized = []
+    for status in raw_statuses:
+        key = str(status).strip().lower()
+        if key in lookup:
+            normalized.append(lookup[key])
+    return tuple(normalized)
+
+
+def _build_goal_progress_rows(goals: list[Goal], session) -> list[dict]:
+    rows = []
+    for goal in goals:
+        progress = get_goal_progress(goal.id, session=session)
+        rows.append(
+            {
+                "Goal ID": goal.id,
+                "Goal": goal.title,
+                "Status": goal.status,
+                "Category": goal.category.name if goal.category else "Uncategorized",
+                "Planned Effort": progress["planned_total_minutes"],
+                "Planned Minutes": progress["planned_total_minutes"],
+                "Completed Effort": progress["completed_minutes"],
+                "Completed Minutes": progress["completed_minutes"],
+                "Remaining Effort": progress["remaining_minutes"],
+                "Remaining Minutes": progress["remaining_minutes"],
+                "Progress": round(float(progress["progress_percent"]), 1),
+                "Progress Percent": round(float(progress["progress_percent"]), 1),
+                "Earned XP": int(progress["earned_xp"]),
+                "Expected Total XP": int(progress["expected_total_xp"]),
+                "Linked Sessions": int(progress["linked_sessions_count"]),
+                "Completed Sessions": int(progress["completed_sessions_count"]),
+                "Planned Sessions": int(progress["planned_sessions_count"]),
+                "Skipped Sessions": int(progress["skipped_sessions_count"]),
+                "Failed Sessions": int(progress["failed_sessions_count"]),
+                "Target Date": goal.target_end_date,
+            }
+        )
+    return rows
+
+
+def _bounded_percent(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 0.0
+    return round(max(0.0, min((numerator / denominator) * 100, 100.0)), 1)
 
 
 def _ensure_legacy_command_center_checkins(session, today: date) -> None:

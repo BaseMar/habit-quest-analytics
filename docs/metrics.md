@@ -167,6 +167,60 @@ planned_minutes_by_category = sum(parent quest estimated_minutes grouped by cate
 
 This represents planned workload attached to check-ins. It is not actual time spent.
 
+## Goal Analytics
+
+Goal analytics use long-term `Goal` records, one-time `Quest` sessions linked
+through `Quest.goal_id`, and their `QuestCheckin` rows.
+
+Recurring habits are not linked to goals in the current implementation and are
+excluded from goal analytics.
+
+### Goal Earned XP
+
+```text
+goal_earned_xp = sum(QuestCheckin.xp_awarded for linked goal sessions)
+```
+
+Goal XP is derived from linked session check-ins only. Goals do not award XP
+directly, and expected goal XP is not counted as earned XP.
+
+### Goal Completed Effort
+
+```text
+goal_completed_minutes = sum(Quest.estimated_minutes for completed linked check-ins)
+```
+
+Rules:
+
+- Completed linked sessions contribute estimated minutes.
+- Planned linked sessions do not contribute completed effort.
+- Skipped and failed linked sessions do not contribute completed effort.
+- Reset check-ins return to planned state with `xp_awarded = 0`, so they do not
+  contribute completed effort or earned XP.
+- Remaining effort is never below zero.
+- Per-goal progress is capped at 100%.
+
+### Weighted Overall Goal Progress
+
+```text
+overall_goal_progress =
+    sum(completed_minutes across included goals)
+    / sum(planned_total_minutes across included goals)
+    * 100
+```
+
+Overall goal progress is weighted by planned effort. It is not a simple average
+of individual goal percentages. The displayed value is capped between 0 and 100.
+
+### Completed Goal Effort By Week
+
+```text
+completed_goal_effort_by_week =
+    sum(Quest.estimated_minutes for completed linked check-ins grouped by checkin_date week)
+```
+
+The weekly trend uses `QuestCheckin.checkin_date` as the activity date.
+
 ## RPG Stat XP
 
 ```text

@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, Quest, QuestCheckin
+from src.database.models import Base, Category, Goal, Quest, QuestCheckin
 from src.services.analytics_service import (
     build_character_activity_stats,
     build_today_focus_rows,
@@ -18,6 +18,10 @@ from src.services.analytics_service import (
     get_command_center_data,
     get_character_profile_data,
     get_dashboard_kpis,
+    get_goal_analytics_summary,
+    get_goal_completed_minutes_by_week,
+    get_goal_progress_dataset,
+    get_goal_session_status_dataset,
     get_habit_analytics_data,
 )
 
@@ -51,6 +55,7 @@ def _add_quest(
     planned_end_at: datetime | None = None,
     estimated_minutes: int | None = None,
     category: Category | None = None,
+    goal: Goal | None = None,
 ) -> Quest:
     quest = Quest(
         title=title,
@@ -61,6 +66,7 @@ def _add_quest(
         planned_end_at=planned_end_at,
         estimated_minutes=estimated_minutes,
         category=category,
+        goal=goal,
     )
     session.add(quest)
     session.commit()
@@ -83,6 +89,26 @@ def _add_checkin(
     session.add(checkin)
     session.commit()
     return checkin
+
+
+def _add_goal(
+    session,
+    title: str = "Portfolio Project",
+    status: str = "Active",
+    planned_total_minutes: int = 1200,
+    category: Category | None = None,
+    target_end_date: date | None = None,
+) -> Goal:
+    goal = Goal(
+        title=title,
+        status=status,
+        planned_total_minutes=planned_total_minutes,
+        category=category,
+        target_end_date=target_end_date,
+    )
+    session.add(goal)
+    session.commit()
+    return goal
 
 
 def test_get_dashboard_kpis_counts_completed_quests_and_xp(session):
@@ -934,3 +960,163 @@ def test_character_profile_radar_source_uses_stat_levels_not_raw_xp(session):
     assert strength_stats["XP"] == 60
     assert strength_profile["level"] == 2
     assert strength_profile["level"] != strength_profile["xp"]
+
+
+def test_get_goal_analytics_summary_empty(session):
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["has_goals"] is False
+    assert summary["included_goals_count"] == 0
+    assert summary["planned_effort_minutes"] == 0
+    assert summary["completed_effort_minutes"] == 0
+    assert summary["overall_progress_percent"] == 0
+    assert summary["goal_xp_earned"] == 0
+    assert summary["goal_table"].empty
+
+
+def test_get_goal_analytics_summary_filters_statuses(session):
+    active = _add_goal(session, "Active goal", status="Active")
+    completed = _add_goal(session, "Completed goal", status="Completed")
+    archived = _add_goal(session, "Archived goal", status="Archived")
+
+    default_summary = get_goal_analytics_summary(session=session)
+    archived_summary = get_goal_analytics_summary(statuses=["Archived"], session=session)
+    all_summary = get_goal_analytics_summary(statuses="All", session=session)
+
+    assert {row["Goal ID"] for row in default_summary["goal_rows"]} == {active.id, completed.id}
+    assert [row["Goal ID"] for row in archived_summary["goal_rows"]] == [archived.id]
+    assert {row["Goal ID"] for row in all_summary["goal_rows"]} == {active.id, completed.id, archived.id}
+
+
+def test_get_goal_analytics_summary_filters_category(session):
+    work = _add_category(session, "Work")
+    health = _add_category(session, "Health")
+    work_goal = _add_goal(session, "Work goal", category=work)
+    _add_goal(session, "Health goal", category=health)
+
+    summary = get_goal_analytics_summary(category_id=work.id, session=session)
+
+    assert [row["Goal ID"] for row in summary["goal_rows"]] == [work_goal.id]
+
+
+def test_goal_analytics_weighted_overall_progress(session):
+    first = _add_goal(session, "Small", planned_total_minutes=100)
+    second = _add_goal(session, "Large", planned_total_minutes=900)
+    first_quest = _add_quest(session, "Small session", estimated_minutes=100, goal=first)
+    second_quest = _add_quest(session, "Large session", estimated_minutes=450, goal=second)
+    _add_checkin(session, first_quest, date(2026, 7, 1), "Completed", xp_awarded=20)
+    _add_checkin(session, second_quest, date(2026, 7, 2), "Completed", xp_awarded=150)
+
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["planned_effort_minutes"] == 1000
+    assert summary["completed_effort_minutes"] == 550
+    assert summary["overall_progress_percent"] == 55.0
+
+
+def test_goal_analytics_planned_session_does_not_increase_completed_effort(session):
+    goal = _add_goal(session)
+    quest = _add_quest(session, "Planned session", estimated_minutes=120, goal=goal)
+    _add_checkin(session, quest, date(2026, 7, 1), "Planned", xp_awarded=0)
+
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["linked_sessions_count"] == 1
+    assert summary["planned_sessions_count"] == 1
+    assert summary["completed_effort_minutes"] == 0
+    assert summary["goal_xp_earned"] == 0
+
+
+def test_goal_analytics_completed_session_adds_effort_and_checkin_xp(session):
+    goal = _add_goal(session)
+    quest = _add_quest(session, "Completed session", estimated_minutes=120, xp_reward=999, goal=goal)
+    _add_checkin(session, quest, date(2026, 7, 1), "Completed", xp_awarded=40)
+
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["completed_sessions_count"] == 1
+    assert summary["completed_effort_minutes"] == 120
+    assert summary["goal_xp_earned"] == 40
+
+
+@pytest.mark.parametrize("status", ["Skipped", "Failed"])
+def test_goal_analytics_skipped_failed_sessions_do_not_add_effort_or_xp(session, status):
+    goal = _add_goal(session)
+    quest = _add_quest(session, f"{status} session", estimated_minutes=120, goal=goal)
+    _add_checkin(session, quest, date(2026, 7, 1), status, xp_awarded=0)
+
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["completed_effort_minutes"] == 0
+    assert summary["goal_xp_earned"] == 0
+    assert summary[f"{status.lower()}_sessions_count"] == 1
+
+
+def test_goal_analytics_reset_session_removes_completed_effort_and_xp(session):
+    goal = _add_goal(session)
+    quest = _add_quest(session, "Reset session", estimated_minutes=120, goal=goal)
+    _add_checkin(session, quest, date(2026, 7, 1), "Planned", xp_awarded=0)
+
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["completed_effort_minutes"] == 0
+    assert summary["goal_xp_earned"] == 0
+    assert summary["planned_sessions_count"] == 1
+
+
+def test_goal_analytics_progress_capped_and_remaining_not_negative(session):
+    goal = _add_goal(session, planned_total_minutes=60)
+    quest = _add_quest(session, "Oversized session", estimated_minutes=120, goal=goal)
+    _add_checkin(session, quest, date(2026, 7, 1), "Completed", xp_awarded=40)
+
+    summary = get_goal_analytics_summary(session=session)
+    progress_row = get_goal_progress_dataset(session=session).iloc[0]
+
+    assert summary["overall_progress_percent"] == 100.0
+    assert summary["remaining_effort_minutes"] == 0
+    assert progress_row["Progress Percent"] == 100.0
+    assert progress_row["Remaining Effort"] == 0
+
+
+def test_goal_completed_minutes_by_week_groups_by_checkin_date(session):
+    goal = _add_goal(session)
+    first = _add_quest(session, "First", estimated_minutes=60, goal=goal)
+    second = _add_quest(session, "Second", estimated_minutes=90, goal=goal)
+    planned = _add_quest(session, "Planned", estimated_minutes=120, goal=goal)
+    _add_checkin(session, first, date(2026, 7, 6), "Completed", xp_awarded=20)
+    _add_checkin(session, second, date(2026, 7, 12), "Completed", xp_awarded=30)
+    _add_checkin(session, planned, date(2026, 7, 13), "Planned", xp_awarded=0)
+
+    result = get_goal_completed_minutes_by_week(session=session)
+
+    assert result.to_dict("records") == [{"Week": date(2026, 7, 6), "Completed Minutes": 150}]
+
+
+def test_goal_session_status_dataset_counts_by_goal(session):
+    goal = _add_goal(session)
+    completed = _add_quest(session, "Completed", estimated_minutes=60, goal=goal)
+    skipped = _add_quest(session, "Skipped", estimated_minutes=60, goal=goal)
+    _add_checkin(session, completed, date(2026, 7, 1), "Completed", xp_awarded=20)
+    _add_checkin(session, skipped, date(2026, 7, 2), "Skipped", xp_awarded=0)
+
+    result = get_goal_session_status_dataset(session=session)
+
+    assert result.to_dict("records") == [
+        {"Goal": "Portfolio Project", "Status": "Completed", "Count": 1},
+        {"Goal": "Portfolio Project", "Status": "Planned", "Count": 0},
+        {"Goal": "Portfolio Project", "Status": "Skipped", "Count": 1},
+        {"Goal": "Portfolio Project", "Status": "Failed", "Count": 0},
+    ]
+
+
+def test_goal_analytics_excludes_quests_without_goal_id(session):
+    goal = _add_goal(session)
+    linked = _add_quest(session, "Linked session", estimated_minutes=60, goal=goal)
+    unlinked = _add_quest(session, "Recurring generated standalone", estimated_minutes=180)
+    _add_checkin(session, linked, date(2026, 7, 1), "Completed", xp_awarded=20)
+    _add_checkin(session, unlinked, date(2026, 7, 1), "Completed", xp_awarded=999)
+
+    summary = get_goal_analytics_summary(session=session)
+
+    assert summary["completed_effort_minutes"] == 60
+    assert summary["goal_xp_earned"] == 20

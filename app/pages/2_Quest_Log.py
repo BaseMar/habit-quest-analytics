@@ -348,19 +348,17 @@ def render_schedule_list(quests: list) -> None:
         st.info("No quests planned for this day.")
         return
 
-    rows = "\n".join(
-        f"""
-        <div class="hq-list-row">
-            <div class="hq-list-time">{escape(_format_time_range(quest))}</div>
-            <div>
-                <div class="hq-list-title">{escape(str(quest.title))}</div>
-                <div class="hq-list-meta">
-                    {escape(_category_name(quest))} / {escape(_display_status(quest))}
-                </div>
-            </div>
-            <div class="hq-list-value">{int(quest.xp_reward or 0)} XP</div>
-        </div>
-        """
+    rows = "".join(
+        (
+            '<div class="hq-list-row">'
+            f'<div class="hq-list-time">{escape(_format_time_range(quest))}</div>'
+            "<div>"
+            f'<div class="hq-list-title">{escape(str(quest.title))}</div>'
+            f'<div class="hq-list-meta">{escape(_category_name(quest))} / {escape(_display_status(quest))}</div>'
+            "</div>"
+            f'<div class="hq-list-value">{int(quest.xp_reward or 0)} XP</div>'
+            "</div>"
+        )
         for quest in quests
     )
     st.markdown(f'<div class="hq-list-panel">{rows}</div>', unsafe_allow_html=True)
@@ -1275,21 +1273,18 @@ def render_recurring_habit_template_list(habits: list, category_names_by_id: dic
         category = category_names_by_id.get(habit.category_id, "Uncategorized")
         end_date = habit.end_date.isoformat() if habit.end_date else "No end"
         rows.append(
-            f"""
-            <div class="hq-list-row">
-                <div class="hq-list-time">{escape(_active_label(habit))}</div>
-                <div>
-                    <div class="hq-list-title">{escape(str(habit.title))}</div>
-                    <div class="hq-list-meta">
-                        {escape(category)} | {escape(_format_habit_pattern(habit))}
-                    </div>
-                    <div class="hq-list-meta">
-                        {escape(_format_habit_time_window(habit))} | {habit.start_date.isoformat()} to {end_date}
-                    </div>
-                </div>
-                <div class="hq-list-value">{int(habit.estimated_minutes)} min</div>
-            </div>
-            """
+            (
+                '<div class="hq-list-row">'
+                f'<div class="hq-list-time">{escape(_active_label(habit))}</div>'
+                "<div>"
+                f'<div class="hq-list-title">{escape(str(habit.title))}</div>'
+                f'<div class="hq-list-meta">{escape(category)} | {escape(_format_habit_pattern(habit))}</div>'
+                f'<div class="hq-list-meta">{escape(_format_habit_time_window(habit))} | '
+                f"{habit.start_date.isoformat()} to {end_date}</div>"
+                "</div>"
+                f'<div class="hq-list-value">{int(habit.estimated_minutes)} min</div>'
+                "</div>"
+            )
         )
 
     st.markdown(

@@ -102,14 +102,14 @@ Implemented:
 - Character Profile XP, level, completed quest days, and RPG stats powered by
   check-in XP.
 - Habit Analytics weekly pulse, trend, breakdown, consistency, planned workload,
-  and insight data powered by check-ins.
+  goal analytics, and insight data powered by check-ins.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
 Still evolving:
 
 - Recurring habit editing and true N-times-per-week scheduling.
-- Long-term Goals / Projects full dashboard and analytics.
+- Long-term Goals / Projects full standalone dashboard.
 - Production persistence.
 - Authentication and user-specific data.
 - External calendar sync.
@@ -213,6 +213,8 @@ The app is designed to answer questions such as:
 - Check-ins by status and category.
 - Completion rate by weekday.
 - Planned minutes by category.
+- Goals / Projects analytics tab with weighted overall progress, goal effort,
+  linked session outcomes, XP by goal, and weekly completed effort.
 - Insight summaries based on completed and failed check-ins.
 
 ### Character Profile
@@ -248,7 +250,7 @@ The app is designed to answer questions such as:
 - `Quest Planner` - calendar planner, selected day schedule, new quest form,
   Recurring Habits with archive/delete/cleanup controls, and Monthly Checklist.
 - `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
-  charts, planned minutes, and insights.
+  charts, planned minutes, goal analytics, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
   radar chart.
 
@@ -504,9 +506,9 @@ Current limitations:
 - Recurring Habits v1 supports selected weekdays and explicit month generation;
   recurring habit editing and true N-times-per-week auto-scheduling are not
   implemented yet.
-- Long-term Goals / Projects full dashboard and goal analytics are not
-  implemented yet; Quest Planner includes goal creation, lifecycle controls, and
-  read-only active goal progress cards. The design is documented in
+- Long-term Goals / Projects full standalone dashboard is not implemented yet;
+  Quest Planner includes goal creation, lifecycle controls, active goal progress
+  cards, and Habit Analytics includes goal analytics. The design is documented in
   [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
@@ -521,7 +523,7 @@ Current limitations:
 
 Suggested future order:
 
-1. Long-term Goals / Projects full dashboard and analytics
+1. Long-term Goals / Projects full standalone dashboard
 2. Recurring habit editing and N-times-per-week scheduling
 3. PostgreSQL / production persistence
 4. Authentication

@@ -52,19 +52,17 @@ def render_todays_focus(today_quests: list[dict]) -> None:
         )
         return
 
-    rows = "\n".join(
-        f"""
-        <div class="command-focus-row">
-            <div class="command-focus-time">{escape(str(quest["Time"]))}</div>
-            <div class="command-focus-main">
-                <div class="command-focus-title">{escape(str(quest["Title"]))}</div>
-                <div class="command-focus-meta">
-                    {escape(str(quest["Category"]))} / {escape(str(quest["Status"]))}
-                </div>
-            </div>
-            <div class="command-focus-xp">{escape(str(quest["XP"]))}</div>
-        </div>
-        """
+    rows = "".join(
+        (
+            '<div class="command-focus-row">'
+            f'<div class="command-focus-time">{escape(str(quest["Time"]))}</div>'
+            '<div class="command-focus-main">'
+            f'<div class="command-focus-title">{escape(str(quest["Title"]))}</div>'
+            f'<div class="command-focus-meta">{escape(str(quest["Category"]))} / {escape(str(quest["Status"]))}</div>'
+            "</div>"
+            f'<div class="command-focus-xp">{escape(str(quest["XP"]))}</div>'
+            "</div>"
+        )
         for quest in today_quests
     )
     st.markdown(f'<div class="command-focus-list">{rows}</div>', unsafe_allow_html=True)

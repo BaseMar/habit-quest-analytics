@@ -194,13 +194,22 @@ Potential future addition:
 
 ### Habit Analytics
 
-Potential future metrics:
+Current implementation:
 
-- goal progress over time,
-- XP by goal,
-- completed minutes by goal,
+- Habit Analytics has a `Goals / Projects` tab.
+- Goal KPIs include active goals, completed goals, planned effort, completed
+  effort, weighted overall progress, and earned goal XP.
+- Goal progress comparison uses completed and remaining effort from linked
+  one-time quest sessions.
+- XP by goal is derived from `QuestCheckin.xp_awarded` for linked sessions.
+- Session outcomes show completed, planned, skipped, and failed linked sessions.
+- Completed goal effort by week uses `QuestCheckin.checkin_date`.
+
+Future analytics ideas:
+
 - most progressed goal,
-- stalled goals.
+- stalled goals,
+- deeper goal-level drilldowns in a standalone dashboard.
 
 ## Data Model Design
 
@@ -252,7 +261,7 @@ Rules:
 5. `feat: add goal creation UI in Quest Planner` - implemented.
 6. `feat: add goal lifecycle actions in Quest Planner` - implemented.
 7. `feat: add goal session quick-add flow` - implemented.
-8. `feat: add goal analytics`
+8. `feat: add goal analytics` - implemented in Habit Analytics.
 9. `docs: update long-term goals documentation`
 
 ## Test Plan
