@@ -7,12 +7,16 @@ Current implementation status:
 
 - `Goal` model and service-layer foundation are implemented.
 - One-time scheduled quests can link to active goals through `Quest.goal_id`.
+- Goal-linked quest sessions receive stable per-goal session numbers through
+  `Quest.goal_session_number`.
 - Goal progress is derived from linked quest sessions and
   `QuestCheckin.xp_awarded`.
 - Quest Planner includes a compact goal creation form.
 - Quest Planner includes read-only active goal progress cards.
 - Active goal cards include a compact Add Session flow for planned one-time
   quest sessions linked to that goal.
+- Goal session titles are generated automatically as
+  `{Goal Title} Session {N}`.
 - Quest Planner includes compact lifecycle actions to archive, complete, reopen,
   and safely delete unused goals.
 - Recurring habits are not linked to goals.
@@ -64,10 +68,17 @@ A quest can optionally belong to a goal/project.
 Implemented field:
 
 - `Quest.goal_id`, nullable foreign key
+- `Quest.goal_session_number`, nullable integer
 
 Rules:
 
 - One-time scheduled quests can be linked to an active goal.
+- Linked goal sessions are numbered per goal using the current maximum session
+  number plus one.
+- Existing linked sessions without a number are backfilled deterministically by
+  planned start/due date, creation time, then id.
+- Deleting a session does not renumber remaining sessions.
+- User-supplied titles do not override goal session titles.
 - Recurring habits can remain separate for v1.
 - Generated recurring habit quests do not need goal linking in v1 unless that is
   explicitly added later.
@@ -145,7 +156,7 @@ Rules:
 Current backend/minimal UI behavior:
 
 - Goals can be created in Quest Planner with title, planned total time, optional
-  notes, category, start date, and target date.
+  notes, required category, start date, and target date.
 - A one-time scheduled quest can optionally be linked to an active goal/project
   at creation time.
 - Active goals are shown in a compact read-only Goal Progress section in Quest
@@ -155,6 +166,9 @@ Current backend/minimal UI behavior:
 - Active goal cards can quick-add a normal one-time scheduled quest session for
   that goal. The session creates a normal planned `QuestCheckin` and awards no
   XP until completed.
+- The quick-add flow shows a read-only preview of the generated session title
+  instead of asking the user to name the session manually.
+- Goal/project creation and linked goal sessions reject missing categories.
 - A compact Manage Goals section supports Archive, Complete, Reopen, and Delete.
 - Delete is allowed only for goals with no linked quests; goals with linked
   quest sessions should be archived instead.
@@ -222,7 +236,7 @@ Possible model additions:
 | `id` | Primary key. |
 | `title` | Goal/project name shown to the user. |
 | `description` | Optional detail. |
-| `category_id` | Optional foreign key to `categories.id`. |
+| `category_id` | Foreign key to `categories.id`; current service/UI creation requires it. |
 | `planned_total_minutes` | Total planned effort for the goal. |
 | `start_date` | Optional start date. |
 | `target_end_date` | Optional target completion date. |
@@ -235,6 +249,7 @@ Possible model additions:
 | Field | Purpose |
 | --- | --- |
 | `goal_id` | Nullable foreign key to `goals.id`. Implemented for one-time scheduled quests. |
+| `goal_session_number` | Nullable stable session number scoped to a goal. |
 
 No new XP table is added in v1. `QuestCheckin.xp_awarded` remains the XP source
 of truth.

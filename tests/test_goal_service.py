@@ -9,7 +9,7 @@ from src.services.checklist_service import complete_checkin, fail_checkin, reset
 from src.services.goal_service import (
     archive_goal,
     complete_goal,
-    create_goal,
+    create_goal as service_create_goal,
     delete_goal_if_unused,
     get_goal,
     get_goal_history_summary,
@@ -56,6 +56,13 @@ def _create_goal_session(
     )
 
 
+def create_goal(*args, **kwargs):
+    session = kwargs.get("session")
+    if kwargs.get("category_id") is None and session is not None:
+        kwargs["category_id"] = session.query(Category).one().id
+    return service_create_goal(*args, **kwargs)
+
+
 def test_create_goal_creates_valid_goal(session):
     category = session.query(Category).one()
 
@@ -86,6 +93,21 @@ def test_create_goal_rejects_empty_title(session):
 def test_create_goal_rejects_non_positive_planned_total_minutes(session, planned_total_minutes):
     with pytest.raises(ValueError, match="planned total minutes must be positive"):
         create_goal("Portfolio Project", planned_total_minutes=planned_total_minutes, session=session)
+
+
+def test_create_goal_rejects_missing_category(session):
+    with pytest.raises(ValueError, match="Goal category is required"):
+        service_create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+
+
+def test_create_goal_rejects_unknown_category(session):
+    with pytest.raises(ValueError, match="Category with id 999 was not found"):
+        service_create_goal(
+            "Portfolio Project",
+            planned_total_minutes=1200,
+            category_id=999,
+            session=session,
+        )
 
 
 def test_create_goal_rejects_invalid_status(session):
@@ -210,6 +232,13 @@ def test_update_goal_rejects_invalid_status(session):
 
     with pytest.raises(ValueError, match="Unknown goal status"):
         update_goal(goal.id, status="Paused", session=session)
+
+
+def test_update_goal_rejects_missing_category(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+
+    with pytest.raises(ValueError, match="Goal category is required"):
+        update_goal(goal.id, category_id=None, session=session)
 
 
 def test_archive_goal_sets_status_archived(session):

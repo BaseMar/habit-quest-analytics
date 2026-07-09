@@ -40,7 +40,7 @@ habits are not linked to goals in the current phase.
 | `id` | Primary key. |
 | `title` | Goal/project name shown to the user. |
 | `description` | Optional detail. |
-| `category_id` | Optional foreign key to `categories.id`. |
+| `category_id` | Foreign key to `categories.id`. Current service/UI creation requires a category for goals/projects. |
 | `planned_total_minutes` | Required positive total planned effort. |
 | `start_date` | Optional start date. |
 | `target_end_date` | Optional target completion date. |
@@ -54,6 +54,8 @@ Relationships:
 - One goal can have many linked one-time quest sessions.
 - Goals do not award XP directly.
 - Goal earned XP is derived from linked `QuestCheckin.xp_awarded` values.
+- Goal/project creation rejects missing or unknown categories. The database
+  column remains nullable for compatibility with older local data.
 
 ### quests
 
@@ -75,6 +77,7 @@ Stores scheduled task or habit plans represented as RPG quests.
 | `created_at` | Timestamp set when the quest is created. |
 | `category_id` | Optional foreign key to `categories.id`. |
 | `goal_id` | Optional foreign key to `goals.id` for one-time goal/project sessions. |
+| `goal_session_number` | Nullable stable per-goal session number. Non-goal and recurring generated quests keep this `NULL`. |
 
 Relationships:
 
@@ -83,6 +86,11 @@ Relationships:
 - One quest can have many daily check-ins.
 - One generated recurring habit instance can point to one quest.
 - Recurring generated quests keep `goal_id = NULL` in the current phase.
+- Goal-linked one-time sessions receive automatic titles in the format
+  `{Goal Title} Session {N}`.
+- Goal-linked one-time sessions require a category.
+- Goal session numbering is scoped per goal and uses `max(existing number) + 1`;
+  deleted sessions are not renumbered.
 
 Retention behavior:
 
@@ -271,6 +279,7 @@ erDiagram
         datetime created_at
         int category_id FK
         int goal_id FK
+        int goal_session_number
     }
 
     goals {
@@ -361,6 +370,7 @@ Startup can:
 - create `recurring_habits` and `recurring_habit_instances` for existing local databases if the tables are missing,
 - add missing `estimated_minutes`, `planned_start_at`, and `planned_end_at` columns to `quests`,
 - add missing `goal_id` to `quests`,
+- add missing `goal_session_number` to `quests`,
 - add missing `avatar_path` to `player_profiles`.
 
 These helpers do not drop existing data.

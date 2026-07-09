@@ -412,6 +412,7 @@ def test_generated_quest_has_expected_fields(session):
     assert quest.due_date == date(2026, 7, 1)
     assert quest.status == "Planned"
     assert quest.goal_id is None
+    assert quest.goal_session_number is None
     assert quest.planned_start_at is None
     assert quest.planned_end_at is None
 

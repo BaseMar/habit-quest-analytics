@@ -40,6 +40,7 @@ from src.services.quest_service import (
     get_categories,
     get_quests_for_calendar,
     get_quests_for_day,
+    preview_next_goal_session_title,
     validate_schedule_times,
 )
 from src.services.recurring_habit_service import (
@@ -442,11 +443,11 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
 
 def render_goal_session_form(goal) -> None:
     with st.expander("Add Session", expanded=False):
-        session_title = st.text_input(
-            "Session Title",
-            value=f"{goal.title} Session",
-            key=f"goal_session_title_{goal.id}",
-        )
+        try:
+            session_title = preview_next_goal_session_title(goal.id)
+        except ValueError:
+            session_title = f"{goal.title} Session"
+        st.caption(f"New session: {session_title}")
         session_date = st.date_input(
             "Planned Date",
             value=st.session_state.get("selected_date", date.today()),
@@ -482,11 +483,17 @@ def render_goal_session_form(goal) -> None:
         )
         if estimated_minutes is None:
             st.error("End time must be after start time.")
+        if goal.category_id is None:
+            st.error("This goal needs a category before sessions can be added.")
 
-        if st.button("Add Session", type="primary", use_container_width=True, key=f"goal_add_session_{goal.id}"):
-            if not session_title.strip():
-                st.error("Session title is required.")
-            elif estimated_minutes is None:
+        if st.button(
+            "Add Session",
+            type="primary",
+            use_container_width=True,
+            key=f"goal_add_session_{goal.id}",
+            disabled=goal.category_id is None,
+        ):
+            if estimated_minutes is None:
                 st.error("End time must be after start time.")
             else:
                 try:
@@ -548,17 +555,13 @@ def render_goal_creation_form(category_options: dict[str, int]) -> None:
                     key="new_goal_planned_minutes",
                 )
 
-            category_labels = ["No category"] + list(category_options.keys())
+            category_labels = list(category_options.keys())
             selected_category_label = st.selectbox(
                 "Category",
                 category_labels,
                 key="new_goal_category",
             )
-            selected_category_id = (
-                None
-                if selected_category_label == "No category"
-                else category_options[selected_category_label]
-            )
+            selected_category_id = category_options[selected_category_label]
 
             date_col, target_col = st.columns(2)
             with date_col:
@@ -1056,15 +1059,17 @@ def render_monthly_checklist() -> None:
             )
 
     selected_cell = selected_row["cells"][selected_checklist_date]
-    cell_is_editable = is_checklist_cell_editable(selected_row, selected_checklist_date)
+    selected_entry = _select_checklist_cell_entry(selected_row, selected_cell, selected_checklist_date)
+    display_cell = selected_entry or selected_cell
+    cell_is_editable = selected_entry is not None or is_checklist_cell_editable(selected_row, selected_checklist_date)
     current_status = (
-        CHECKLIST_STATUS_LABELS.get(selected_cell["status"], "Unknown")
+        CHECKLIST_STATUS_LABELS.get(display_cell["status"], "Unknown")
         if cell_is_editable
         else "Locked - Not scheduled"
     )
 
     with status_col:
-        marker = CHECKLIST_STATUS_MARKERS.get(selected_cell["status"], "")
+        marker = CHECKLIST_STATUS_MARKERS.get(display_cell["status"], "")
         status_prefix = f"{marker} - " if marker and cell_is_editable else ""
         st.markdown(
             f"""
@@ -1089,7 +1094,13 @@ def render_monthly_checklist() -> None:
         with column:
             if st.button(label, use_container_width=True, disabled=not cell_is_editable, key=key):
                 try:
-                    update_checklist_cell_status(selected_row, selected_checklist_date, status)
+                    update_checklist_cell_status(
+                        selected_row,
+                        selected_checklist_date,
+                        status,
+                        quest_id=display_cell.get("quest_id"),
+                        checkin_id=display_cell.get("checkin_id"),
+                    )
                 except ValueError as error:
                     st.warning(str(error))
                     continue
@@ -1099,7 +1110,7 @@ def render_monthly_checklist() -> None:
                 )
                 st.rerun()
 
-    _render_checklist_delete_action(selected_row, selected_cell, selected_checklist_date, cell_is_editable)
+    _render_checklist_delete_action(selected_row, display_cell, selected_checklist_date, cell_is_editable)
 
 
 def _render_checklist_legend() -> None:
@@ -1140,7 +1151,7 @@ def _render_checklist_table(checklist: dict) -> None:
 
 def _render_checklist_table_row(row: dict, days: list[date]) -> str:
     day_cells = "".join(
-        f'<td class="hq-table-day">{_status_marker_html(row["cells"][day]["status"])}</td>'
+        f'<td class="hq-table-day">{_checklist_cell_marker_html(row["cells"][day])}</td>'
         for day in days
     )
     return (
@@ -1152,17 +1163,74 @@ def _render_checklist_table_row(row: dict, days: list[date]) -> str:
     )
 
 
-def _status_marker_html(status: str | None) -> str:
+def _checklist_cell_marker_html(cell: dict) -> str:
+    entries = cell.get("entries") or []
+    if not entries:
+        return _status_marker_html(cell.get("status"))
+
+    status_counts: dict[str, int] = {}
+    for entry in entries:
+        status = entry.get("status")
+        if status:
+            status_counts[status] = status_counts.get(status, 0) + 1
+    if not status_counts:
+        return ""
+
+    if len(status_counts) == 1:
+        status, count = next(iter(status_counts.items()))
+        marker = CHECKLIST_STATUS_MARKERS.get(status, "")
+        label = marker if count == 1 else f"{marker}{count}"
+        return _status_marker_html(status, label=label)
+
+    ordered_statuses = ("Completed", "Planned", "Skipped", "Failed")
+    return " ".join(
+        _status_marker_html(status, label=f"{CHECKLIST_STATUS_MARKERS[status]}{status_counts[status]}")
+        for status in ordered_statuses
+        if status in status_counts
+    )
+
+
+def _status_marker_html(status: str | None, label: str | None = None) -> str:
     marker = CHECKLIST_STATUS_MARKERS.get(status, "")
     if not marker:
         return ""
+    label = label or marker
     status_class = {
         "Planned": "hq-status-planned",
         "Completed": "hq-status-completed",
         "Skipped": "hq-status-skipped",
         "Failed": "hq-status-failed",
     }.get(status, "hq-status-planned")
-    return f'<span class="hq-status-marker {status_class}">{escape(marker)}</span>'
+    return f'<span class="hq-status-marker {status_class}">{escape(label)}</span>'
+
+
+def _select_checklist_cell_entry(row: dict, cell: dict, selected_date: date) -> dict | None:
+    entries = cell.get("entries") or []
+    if not entries:
+        return cell if is_checklist_cell_editable(row, selected_date) else None
+    if len(entries) == 1:
+        return entries[0]
+
+    option_lookup = {entry["checkin_id"]: entry for entry in entries}
+    selected_checkin_id = st.selectbox(
+        "Goal Session",
+        list(option_lookup.keys()),
+        format_func=lambda checkin_id: _format_checklist_session_option(option_lookup[checkin_id]),
+        key=f"checklist_goal_session_{row.get('row_id')}_{selected_date.isoformat()}",
+    )
+    return option_lookup[selected_checkin_id]
+
+
+def _format_checklist_session_option(entry: dict) -> str:
+    session_number = entry.get("goal_session_number")
+    session_label = f"Session {session_number}" if session_number else str(entry.get("title") or "Session")
+    start = entry.get("planned_start_at")
+    end = entry.get("planned_end_at")
+    time_label = ""
+    if start and end:
+        time_label = f" {start:%H:%M}-{end:%H:%M}"
+    status = CHECKLIST_STATUS_LABELS.get(entry.get("status"), "Unknown")
+    return f"{session_label}{time_label} {status}"
 
 
 def _render_checklist_delete_action(row: dict, cell: dict, selected_date: date, cell_is_editable: bool) -> None:
@@ -1190,14 +1258,14 @@ def _render_checklist_delete_action(row: dict, cell: dict, selected_date: date, 
 
     confirm_delete = st.checkbox(
         confirm_label,
-        key=f"checklist_confirm_delete_{row.get('row_id')}_{selected_date.isoformat()}",
+        key=f"checklist_confirm_delete_{row.get('row_id')}_{selected_date.isoformat()}_{cell.get('checkin_id')}",
         disabled=not is_unresolved,
     )
     if st.button(
         button_label,
         use_container_width=True,
         disabled=not is_unresolved or not confirm_delete,
-        key=f"checklist_delete_{row.get('row_id')}",
+        key=f"checklist_delete_{row.get('row_id')}_{cell.get('checkin_id')}",
     ):
         if is_recurring:
             summary = delete_recurring_generated_occurrence_if_unresolved(cell["quest_id"])
@@ -1257,11 +1325,11 @@ def _sync_checklist_selected_date(row: dict, days: list[date]) -> None:
 
 def _preferred_checklist_date(row: dict, days: list[date]) -> date:
     current_page_date = st.session_state.get("selected_date")
-    if current_page_date in days and row["cells"][current_page_date]["status"] is not None:
+    if current_page_date in days and is_checklist_cell_editable(row, current_page_date):
         return current_page_date
 
     for day in days:
-        if row["cells"][day]["status"] is not None:
+        if is_checklist_cell_editable(row, day):
             return day
 
     return days[0]
@@ -1463,7 +1531,27 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
         default_end = time(10, 0)
 
         with st.container():
-            title = st.text_input("Title", placeholder="Quest title")
+            active_goals = list_active_goals()
+            selected_goal_id = None
+            selected_goal = None
+            if active_goals:
+                goal_options = [None] + [goal.id for goal in active_goals]
+                goal_labels = {None: "None"} | {goal.id: goal.title for goal in active_goals}
+                selected_goal_id = st.selectbox(
+                    "Link to Goal / Project",
+                    goal_options,
+                    format_func=lambda goal_id: goal_labels[goal_id],
+                )
+                selected_goal = next((goal for goal in active_goals if goal.id == selected_goal_id), None)
+
+            if selected_goal is None:
+                title = st.text_input("Title", placeholder="Quest title")
+            else:
+                try:
+                    title = preview_next_goal_session_title(selected_goal.id)
+                except ValueError:
+                    title = f"{selected_goal.title} Session"
+                st.caption(f"New goal session: {title}")
 
             category_name = st.selectbox("Category", list(category_options.keys()))
 
@@ -1475,23 +1563,13 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
 
             estimated_minutes = _calculate_duration_minutes(start_time, end_time)
             notes = st.text_area("Notes", height=64, placeholder="Optional notes")
-            active_goals = list_active_goals()
-            selected_goal_id = None
-            if active_goals:
-                goal_options = [None] + [goal.id for goal in active_goals]
-                goal_labels = {None: "None"} | {goal.id: goal.title for goal in active_goals}
-                selected_goal_id = st.selectbox(
-                    "Link to Goal / Project",
-                    goal_options,
-                    format_func=lambda goal_id: goal_labels[goal_id],
-                )
 
             if estimated_minutes is None:
                 st.error("End time must be after start time.")
 
             submitted = st.button("Add Quest", type="primary", use_container_width=True)
             if submitted:
-                if not title.strip():
+                if selected_goal_id is None and not title.strip():
                     st.error("Every quest needs a title.")
                 elif estimated_minutes is None:
                     st.error("End time must be after start time.")

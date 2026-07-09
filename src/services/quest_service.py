@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.database.db import get_session
@@ -18,6 +18,82 @@ STATUS_COLORS = {
     "Skipped": "#f59e0b",
 }
 
+
+def build_goal_session_title(goal_title: str, session_number: int) -> str:
+    """Return the canonical title for a numbered goal session."""
+    title = _normalize_title(goal_title)
+    number = int(session_number)
+    if number <= 0:
+        raise ValueError("Goal session number must be positive.")
+    return f"{title} Session {number}"
+
+
+def get_next_goal_session_number(goal_id: int, session=None) -> int:
+    """Return the next stable session number for a goal without filling gaps."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        max_number = (
+            session.query(func.max(Quest.goal_session_number))
+            .filter(Quest.goal_id == goal_id)
+            .scalar()
+            or 0
+        )
+        return int(max_number) + 1
+    finally:
+        if owns_session:
+            session.close()
+
+
+def preview_next_goal_session_title(goal_id: int, session=None) -> str:
+    """Return the title the next goal-linked session will receive."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        goal = _get_active_goal_for_link(session, goal_id)
+        session_number = get_next_goal_session_number(goal.id, session=session)
+        return build_goal_session_title(goal.title, session_number)
+    finally:
+        if owns_session:
+            session.close()
+
+
+def backfill_goal_session_numbers(session=None) -> dict:
+    """Assign stable numbers to existing goal-linked quests that predate numbering."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        assigned_count = 0
+        goals_checked = 0
+        goals = session.query(Goal).order_by(Goal.id).all()
+        for goal in goals:
+            goals_checked += 1
+            next_number = get_next_goal_session_number(goal.id, session=session)
+            unnumbered_quests = (
+                session.query(Quest)
+                .filter(
+                    Quest.goal_id == goal.id,
+                    Quest.goal_session_number.is_(None),
+                    ~Quest.recurring_habit_instance.has(),
+                )
+                .all()
+            )
+            for quest in sorted(unnumbered_quests, key=_goal_session_backfill_sort_key):
+                _validate_goal_session_number_unique(session, goal.id, next_number, quest_id=quest.id)
+                quest.goal_session_number = next_number
+                next_number += 1
+                assigned_count += 1
+
+        session.commit()
+        return {"goals_checked": goals_checked, "assigned_count": assigned_count}
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 def create_quest(
     title: str,
     description: str = "",
@@ -34,12 +110,18 @@ def create_quest(
     owns_session = session is None
     session = session or get_session()
     try:
-        normalized_goal_id = _validate_goal_for_link(session, goal_id)
+        normalized_goal_id, normalized_title, goal_session_number = _prepare_goal_session_values(
+            session,
+            goal_id,
+            title,
+            category_id,
+        )
         quest = Quest(
-            title=_normalize_title(title),
+            title=normalized_title,
             description=(description or "").strip() or None,
             category_id=category_id,
             goal_id=normalized_goal_id,
+            goal_session_number=goal_session_number,
             status="Planned",
             xp_reward=xp_reward,
             due_date=planned_date,
@@ -82,12 +164,18 @@ def create_scheduled_quest(
     owns_session = session is None
     session = session or get_session()
     try:
-        normalized_goal_id = _validate_goal_for_link(session, goal_id)
+        normalized_goal_id, normalized_title, goal_session_number = _prepare_goal_session_values(
+            session,
+            goal_id,
+            title,
+            category_id,
+        )
         quest = Quest(
-            title=_normalize_title(title),
+            title=normalized_title,
             description=(description or "").strip() or None,
             category_id=category_id,
             goal_id=normalized_goal_id,
+            goal_session_number=goal_session_number,
             status="Planned",
             xp_reward=calculate_time_based_xp(estimated_minutes),
             due_date=planned_date,
@@ -467,16 +555,73 @@ def _normalize_estimated_minutes(estimated_minutes: int | None) -> int | None:
     return value
 
 
-def _validate_goal_for_link(session, goal_id: int | None) -> int | None:
+def _prepare_goal_session_values(
+    session,
+    goal_id: int | None,
+    title: str,
+    category_id: int | None,
+) -> tuple[int | None, str, int | None]:
     if goal_id is None:
-        return None
+        return None, _normalize_title(title), None
 
+    _validate_goal_session_category(category_id)
+    goal = _get_active_goal_for_link(session, goal_id)
+    session_number = get_next_goal_session_number(goal.id, session=session)
+    _validate_goal_session_number_unique(session, goal.id, session_number)
+    return goal.id, build_goal_session_title(goal.title, session_number), session_number
+
+
+def _validate_goal_session_category(category_id: int | None) -> None:
+    if category_id is None:
+        raise ValueError("Goal sessions require a category.")
+
+
+def _get_active_goal_for_link(session, goal_id: int) -> Goal:
     goal = session.get(Goal, goal_id)
     if goal is None:
         raise ValueError(f"Goal with id {goal_id} was not found.")
     if goal.status != "Active":
         raise ValueError("Only active goals can receive new quest sessions.")
-    return goal.id
+    return goal
+
+
+def _validate_goal_for_link(session, goal_id: int | None) -> int | None:
+    if goal_id is None:
+        return None
+    return _get_active_goal_for_link(session, goal_id).id
+
+
+def _validate_goal_session_number_unique(
+    session,
+    goal_id: int,
+    session_number: int,
+    quest_id: int | None = None,
+) -> None:
+    duplicate_query = session.query(Quest).filter(
+        Quest.goal_id == goal_id,
+        Quest.goal_session_number == session_number,
+    )
+    if quest_id is not None:
+        duplicate_query = duplicate_query.filter(Quest.id != quest_id)
+    if duplicate_query.first() is not None:
+        raise ValueError(
+            f"Goal session number {session_number} already exists for goal {goal_id}."
+        )
+
+
+def _goal_session_backfill_sort_key(quest: Quest) -> tuple:
+    if quest.planned_start_at is not None:
+        scheduled_value = quest.planned_start_at
+    elif quest.due_date is not None:
+        scheduled_value = datetime.combine(quest.due_date, time.min)
+    else:
+        scheduled_value = None
+    return (
+        scheduled_value is None,
+        scheduled_value or datetime.min,
+        quest.created_at or datetime.min,
+        quest.id or 0,
+    )
 
 
 def _quest_event_date(quest: Quest) -> date | None:

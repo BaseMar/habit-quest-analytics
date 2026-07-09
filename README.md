@@ -92,10 +92,13 @@ Implemented:
 - Long-term Goals / Projects backend foundation with a `Goal` model, service
   layer, Quest Planner goal creation UI, one-time quest linking, and progress
   cards derived from linked check-ins.
+- Goal/project creation and linked goal sessions require a category.
 - Active goal cards support quick-add one-time work sessions linked to that
-  goal.
+  goal, with automatic per-goal session numbering and generated session titles.
 - Goal lifecycle controls in Quest Planner: archive, complete, reopen, and safe
   delete for unused goals.
+- Monthly Checklist groups goal-linked sessions into one visual row per goal
+  while preserving separate underlying `Quest` and `QuestCheckin` records.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
 - Nonlinear character leveling and RPG stat leveling.
 - Command Center operational metrics powered by check-ins.

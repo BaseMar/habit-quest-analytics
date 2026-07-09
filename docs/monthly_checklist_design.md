@@ -21,6 +21,8 @@ Implemented:
 - Habit Analytics using check-ins.
 - Generated recurring habit days grouped into one logical checklist row per
   template.
+- Goal-linked one-time sessions grouped into one logical checklist row per
+  goal/project.
 
 Not implemented:
 
@@ -51,9 +53,11 @@ The checklist tracks completion per quest per day. Completion status should not 
 Core behavior:
 
 - User selects a month and year.
-- Rows represent planned quests.
+- Rows represent planned quests, recurring habit templates, or goals/projects.
 - Columns represent days of the selected month.
-- Each cell represents one quest on one date.
+- Each non-goal cell represents one quest on one date.
+- Goal cells can represent one or more linked session check-ins for that goal on
+  that date.
 - User selects a quest/date and marks it `Completed`, `Skipped`, `Failed`, or resets it to `Planned` only when that cell is scheduled/generated.
 - Unresolved planned cells remain `Planned`.
 - Empty days remain neutral/blank and are locked.
@@ -64,6 +68,9 @@ Editability rules:
 
 - One-time quests can be updated only on their scheduled/check-in date.
 - Recurring habits can be updated only on generated dates.
+- Goal rows can be updated only on dates with actual linked sessions.
+- If a goal has multiple sessions on the same date, the UI requires selecting
+  the specific session/check-in before applying a status.
 - Neutral blank/not-scheduled cells are not editable.
 - Status actions must not create check-ins for unscheduled dates.
 - The UI shows a locked/not-scheduled state when a user selects an invalid
@@ -107,6 +114,8 @@ Why this table is needed:
 - `Quest.status` can only represent one global state.
 - A checklist needs one status per quest per day.
 - Future recurring habits need one check-in per generated habit date.
+- Long-term goal sessions remain separate `Quest` and `QuestCheckin` records
+  even when Monthly Checklist groups them into one visual goal row.
 - Analytics and XP calculations need stable daily completion records.
 
 ## XP Rules
@@ -163,7 +172,7 @@ Current v1 structure:
 - Year selector.
 - Status legend.
 - Matrix preview:
-  - rows are quests,
+  - rows are quests, recurring habits, or goals/projects,
   - columns are days of the month,
   - cells show simple status symbols.
 - Selected quest/date action controls:
@@ -171,7 +180,15 @@ Current v1 structure:
   - select date,
   - view current status,
   - show locked/not-scheduled state for blank cells,
+  - select a concrete goal session when a goal/date contains multiple sessions,
   - Complete, Skip, Fail, Reset only for scheduled/generated cells.
+
+Goal row display:
+
+- One linked session on a date shows the normal `P`, `C`, `S`, or `F` marker.
+- Multiple linked sessions with the same status show a count, such as `P2`.
+- Mixed statuses show compact counts, such as `C1 F1`.
+- These markers are presentation only; no check-ins are merged.
 
 V1 intentionally avoids a fragile fully editable 31-column widget grid. The matrix preview plus selected quest/date controls is simpler, more reliable in Streamlit, and easier to test.
 
@@ -189,6 +206,8 @@ Current behavior:
 - Selected Day Schedule displays check-in status for the selected date when available.
 - Blank/not-scheduled Monthly Checklist cells cannot create check-ins through
   status updates.
+- Goal-linked sessions are grouped visually into one goal row, but status
+  updates still target one underlying `QuestCheckin`.
 - Safe delete controls are available only for unresolved scheduled/generated
   cells.
 - `Quest.status` is not synchronized from check-in status.
@@ -282,6 +301,8 @@ Covered by current tests:
 - Character Profile XP/stat calculations from check-ins.
 - Habit Analytics metrics from check-ins.
 - Monthly Checklist recurring habit grouping from generated instances.
+- Monthly Checklist goal session grouping while preserving separate
+  `Quest`/`QuestCheckin` records.
 
 Manual verification focus:
 

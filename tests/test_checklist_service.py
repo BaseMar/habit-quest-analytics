@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, Quest, QuestCheckin
+from src.database.models import Base, Category, Goal, Quest, QuestCheckin
 from src.services.checklist_service import (
     build_month_days,
     complete_checkin,
@@ -18,7 +18,7 @@ from src.services.checklist_service import (
     update_checklist_cell_status,
     update_checkin_status,
 )
-from src.services.quest_service import create_quest
+from src.services.quest_service import create_quest, create_scheduled_quest
 from src.services.recurring_habit_service import create_recurring_habit, generate_recurring_habit_for_month
 
 
@@ -393,6 +393,113 @@ def test_get_month_checklist_does_not_overwrite_existing_checkins(session):
     assert checkin.status == "Completed"
     assert checkin.completed_at == original_completed_at
     assert checkin.xp_awarded == original_xp_awarded
+
+
+def test_get_month_checklist_groups_goal_sessions_into_one_goal_row(session):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", category_id=category.id, planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+    first = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 7),
+        start_time=datetime(2026, 7, 7, 9, 0).time(),
+        end_time=datetime(2026, 7, 7, 10, 0).time(),
+        session=session,
+    )
+    second = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 9),
+        start_time=datetime(2026, 7, 9, 9, 0).time(),
+        end_time=datetime(2026, 7, 9, 10, 0).time(),
+        session=session,
+    )
+
+    checklist = get_month_checklist(2026, 7, session=session)
+
+    assert len(checklist["rows"]) == 1
+    row = checklist["rows"][0]
+    assert row["row_type"] == "goal"
+    assert row["goal_id"] == goal.id
+    assert row["quest_id"] is None
+    assert row["title"] == "Portfolio Project"
+    assert row["cells"][date(2026, 7, 7)]["quest_id"] == first.id
+    assert row["cells"][date(2026, 7, 7)]["status"] == "Planned"
+    assert row["cells"][date(2026, 7, 9)]["quest_id"] == second.id
+    assert row["cells"][date(2026, 7, 9)]["status"] == "Planned"
+
+
+def test_goal_sessions_on_same_date_remain_separately_editable(session):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", category_id=category.id, planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+    first = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 7),
+        start_time=datetime(2026, 7, 7, 9, 0).time(),
+        end_time=datetime(2026, 7, 7, 10, 0).time(),
+        session=session,
+    )
+    second = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 7),
+        start_time=datetime(2026, 7, 7, 11, 0).time(),
+        end_time=datetime(2026, 7, 7, 12, 0).time(),
+        session=session,
+    )
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+    cell = row["cells"][date(2026, 7, 7)]
+
+    updated = update_checklist_cell_status(
+        row,
+        date(2026, 7, 7),
+        "Completed",
+        quest_id=second.id,
+        checkin_id=cell["entries"][1]["checkin_id"],
+        session=session,
+    )
+    first_checkin = session.query(QuestCheckin).filter_by(quest_id=first.id).one()
+    second_checkin = session.query(QuestCheckin).filter_by(quest_id=second.id).one()
+
+    assert is_checklist_cell_editable(row, date(2026, 7, 7)) is True
+    assert len(cell["entries"]) == 2
+    assert updated.quest_id == second.id
+    assert first_checkin.status == "Planned"
+    assert second_checkin.status == "Completed"
+
+
+def test_goal_blank_checklist_date_is_locked(session):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", category_id=category.id, planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+    create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 7),
+        start_time=datetime(2026, 7, 7, 9, 0).time(),
+        end_time=datetime(2026, 7, 7, 10, 0).time(),
+        session=session,
+    )
+    checklist = get_month_checklist(2026, 7, session=session)
+    row = checklist["rows"][0]
+
+    with pytest.raises(ValueError, match="not scheduled"):
+        update_checklist_cell_status(row, date(2026, 7, 8), "Completed", session=session)
+
+    assert is_checklist_cell_editable(row, date(2026, 7, 8)) is False
+    assert session.query(QuestCheckin).filter_by(checkin_date=date(2026, 7, 8)).count() == 0
 
 
 def test_get_month_checklist_groups_recurring_habit_instances_into_one_row(session):

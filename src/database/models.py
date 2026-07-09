@@ -83,6 +83,7 @@ class Quest(Base):
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     goal_id = Column(Integer, ForeignKey("goals.id"), nullable=True)
+    goal_session_number = Column(Integer, nullable=True)
     category = relationship("Category", back_populates="quests")
     goal = relationship("Goal", back_populates="quests")
     checkins = relationship("QuestCheckin", back_populates="quest")

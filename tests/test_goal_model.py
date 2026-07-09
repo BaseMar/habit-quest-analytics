@@ -57,6 +57,7 @@ def test_quest_goal_id_is_nullable():
         session.refresh(quest)
 
         assert quest.goal_id is None
+        assert quest.goal_session_number is None
     finally:
         session.close()
 
@@ -158,3 +159,4 @@ def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path, mo
     quest_columns = {column["name"] for column in inspector.get_columns("quests")}
 
     assert "goal_id" in quest_columns
+    assert "goal_session_number" in quest_columns

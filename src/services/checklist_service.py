@@ -5,7 +5,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
-from src.database.models import RecurringHabit, RecurringHabitInstance, Quest, QuestCheckin, utc_now
+from src.database.models import Goal, RecurringHabit, RecurringHabitInstance, Quest, QuestCheckin, utc_now
 
 
 VALID_CHECKIN_STATUSES = ("Planned", "Completed", "Skipped", "Failed")
@@ -35,6 +35,7 @@ def get_month_checklist(year: int, month: int, session=None) -> dict:
             session.query(Quest)
             .options(
                 joinedload(Quest.category),
+                joinedload(Quest.goal).joinedload(Goal.category),
                 joinedload(Quest.recurring_habit_instance)
                 .joinedload(RecurringHabitInstance.recurring_habit)
                 .joinedload(RecurringHabit.category),
@@ -85,8 +86,9 @@ def get_month_checklist(year: int, month: int, session=None) -> dict:
             "rows": [
                 _build_month_row(quest, days, checkins_by_quest_and_date.get(quest.id, {}))
                 for quest in quests
-                if quest.recurring_habit_instance is None
+                if quest.recurring_habit_instance is None and quest.goal_id is None
             ]
+            + _build_goal_month_rows(quests, days, checkins_by_quest_and_date, month_start, month_end)
             + _build_recurring_month_rows(quests, days, checkins_by_quest_and_date, month_start, month_end),
         }
     finally:
@@ -163,13 +165,19 @@ def get_checklist_cell_for_date(row: dict, checkin_date: date) -> dict | None:
 def is_checklist_cell_editable(row: dict, checkin_date: date) -> bool:
     """Return whether a checklist row/date has a scheduled quest day to update."""
     cell = get_checklist_cell_for_date(row, checkin_date)
-    return cell is not None and cell.get("quest_id") is not None and cell.get("checkin_id") is not None
+    if cell is None:
+        return False
+    if cell.get("entries"):
+        return any(entry.get("quest_id") is not None and entry.get("checkin_id") is not None for entry in cell["entries"])
+    return cell.get("quest_id") is not None and cell.get("checkin_id") is not None
 
 
 def update_checklist_cell_status(
     row: dict,
     checkin_date: date,
     status: str,
+    quest_id: int | None = None,
+    checkin_id: int | None = None,
     session=None,
 ) -> QuestCheckin:
     """Update status only for a scheduled/generated checklist cell."""
@@ -177,7 +185,8 @@ def update_checklist_cell_status(
         raise ValueError("This quest is not scheduled for the selected date.")
 
     cell = get_checklist_cell_for_date(row, checkin_date)
-    return update_checkin_status(cell["quest_id"], checkin_date, status, session=session)
+    entry = _resolve_checklist_update_entry(cell, quest_id=quest_id, checkin_id=checkin_id)
+    return update_checkin_status(entry["quest_id"], checkin_date, status, session=session)
 
 
 def complete_checkin(quest_id: int, checkin_date: date, session=None) -> QuestCheckin:
@@ -311,6 +320,7 @@ def _build_month_cell(day: date, checkin: QuestCheckin | None) -> dict:
             "completed_at": None,
             "skipped_at": None,
             "failed_at": None,
+            "entries": [],
         }
 
     return {
@@ -323,7 +333,96 @@ def _build_month_cell(day: date, checkin: QuestCheckin | None) -> dict:
         "completed_at": checkin.completed_at,
         "skipped_at": checkin.skipped_at,
         "failed_at": checkin.failed_at,
+        "entries": [],
     }
+
+
+def _build_goal_month_rows(
+    quests: list[Quest],
+    days: list[date],
+    checkins_by_quest_and_date: dict[int, dict[date, QuestCheckin]],
+    month_start: date,
+    month_end: date,
+) -> list[dict]:
+    quests_by_goal_id: dict[int, list[Quest]] = {}
+    for quest in quests:
+        if quest.goal_id is None or quest.recurring_habit_instance is not None or quest.goal is None:
+            continue
+        scheduled_date = _get_scheduled_date_in_month(quest, month_start, month_end)
+        if scheduled_date is not None or checkins_by_quest_and_date.get(quest.id):
+            quests_by_goal_id.setdefault(quest.goal_id, []).append(quest)
+
+    rows = []
+    for goal_id in sorted(
+        quests_by_goal_id,
+        key=lambda current_id: (
+            quests_by_goal_id[current_id][0].goal.title.lower(),
+            current_id,
+        ),
+    ):
+        goal_quests = sorted(quests_by_goal_id[goal_id], key=_goal_row_quest_sort_key)
+        rows.append(_build_goal_month_row(goal_quests, days, checkins_by_quest_and_date))
+    return rows
+
+
+def _build_goal_month_row(
+    quests: list[Quest],
+    days: list[date],
+    checkins_by_quest_and_date: dict[int, dict[date, QuestCheckin]],
+) -> dict:
+    goal = quests[0].goal
+    category = goal.category.name if goal.category else quests[0].category.name if quests[0].category else None
+    return {
+        "row_id": f"goal:{goal.id}",
+        "row_type": "goal",
+        "quest_id": None,
+        "goal_id": goal.id,
+        "recurring_habit_id": None,
+        "title": goal.title,
+        "category": category,
+        "xp_reward": sum(quest.xp_reward or 0 for quest in quests),
+        "estimated_minutes": sum(quest.estimated_minutes or 0 for quest in quests),
+        "cells": {
+            day: _build_goal_month_cell(day, quests, checkins_by_quest_and_date)
+            for day in days
+        },
+    }
+
+
+def _build_goal_month_cell(
+    day: date,
+    quests: list[Quest],
+    checkins_by_quest_and_date: dict[int, dict[date, QuestCheckin]],
+) -> dict:
+    entries = []
+    for quest in quests:
+        checkin = checkins_by_quest_and_date.get(quest.id, {}).get(day)
+        if checkin is None:
+            continue
+        entry = _build_month_cell(day, checkin)
+        entry.update(
+            {
+                "title": quest.title,
+                "goal_session_number": quest.goal_session_number,
+                "planned_start_at": quest.planned_start_at,
+                "planned_end_at": quest.planned_end_at,
+                "xp_reward": quest.xp_reward,
+                "estimated_minutes": quest.estimated_minutes,
+            }
+        )
+        entries.append(entry)
+
+    entries.sort(key=_goal_cell_entry_sort_key)
+    if not entries:
+        return _build_month_cell(day, None)
+
+    cell = _build_month_cell(day, None)
+    cell["entries"] = entries
+    cell["xp_awarded"] = sum(entry.get("xp_awarded", 0) or 0 for entry in entries)
+    if len(entries) == 1:
+        cell.update({key: value for key, value in entries[0].items() if key != "entries"})
+        cell["entries"] = entries
+    return cell
 
 
 def _build_recurring_month_rows(
@@ -407,6 +506,55 @@ def _get_scheduled_date_in_month(
         return quest.due_date
 
     return None
+
+
+def _resolve_checklist_update_entry(
+    cell: dict,
+    quest_id: int | None = None,
+    checkin_id: int | None = None,
+) -> dict:
+    entries = cell.get("entries") or []
+    if not entries:
+        return cell
+
+    if quest_id is None and checkin_id is None:
+        if len(entries) == 1:
+            return entries[0]
+        raise ValueError("Select a goal session for the selected date.")
+
+    for entry in entries:
+        if quest_id is not None and entry.get("quest_id") != quest_id:
+            continue
+        if checkin_id is not None and entry.get("checkin_id") != checkin_id:
+            continue
+        return entry
+
+    raise ValueError("Selected goal session is not scheduled for the selected date.")
+
+
+def _goal_row_quest_sort_key(quest: Quest) -> tuple:
+    if quest.planned_start_at is not None:
+        scheduled_value = quest.planned_start_at
+    elif quest.due_date is not None:
+        scheduled_value = datetime.combine(quest.due_date, time.min)
+    else:
+        scheduled_value = datetime.max
+    return (
+        quest.planned_start_at is None,
+        scheduled_value,
+        quest.goal_session_number or 0,
+        quest.created_at or datetime.min,
+        quest.id or 0,
+    )
+
+
+def _goal_cell_entry_sort_key(entry: dict) -> tuple:
+    return (
+        entry.get("planned_start_at") is None,
+        entry.get("planned_start_at") or datetime.max,
+        entry.get("goal_session_number") or 0,
+        entry.get("quest_id") or 0,
+    )
 
 
 def _normalize_checkin_status(status: str) -> str:

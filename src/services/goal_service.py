@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
-from src.database.models import Goal, Quest, QuestCheckin, utc_now
+from src.database.models import Category, Goal, Quest, QuestCheckin, utc_now
 from src.services.xp_service import calculate_time_based_xp
 
 
@@ -29,10 +29,11 @@ def create_goal(
     owns_session = session is None
     session = session or get_session()
     try:
+        normalized_category_id = _validate_required_category(session, category_id)
         goal = Goal(
             title=normalized_title,
             description=_normalize_description(description),
-            category_id=category_id,
+            category_id=normalized_category_id,
             planned_total_minutes=normalized_minutes,
             start_date=start_date,
             target_end_date=target_end_date,
@@ -129,7 +130,7 @@ def update_goal(goal_id: int, session=None, **changes) -> Goal:
         if "description" in changes:
             goal.description = _normalize_description(changes["description"])
         if "category_id" in changes:
-            goal.category_id = changes["category_id"]
+            goal.category_id = _validate_required_category(session, changes["category_id"])
 
         goal.updated_at = utc_now()
         session.commit()
@@ -354,6 +355,16 @@ def _normalize_status(status: str) -> str:
         valid = ", ".join(GOAL_STATUSES)
         raise ValueError(f"Unknown goal status '{status}'. Valid values: {valid}.")
     return lookup[key]
+
+
+def _validate_required_category(session, category_id: int | None) -> int:
+    if category_id is None:
+        raise ValueError("Goal category is required.")
+
+    category = session.get(Category, category_id)
+    if category is None:
+        raise ValueError(f"Category with id {category_id} was not found.")
+    return category.id
 
 
 def _validate_dates(start_date: date | None, target_end_date: date | None) -> None:

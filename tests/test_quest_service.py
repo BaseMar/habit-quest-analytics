@@ -13,6 +13,8 @@ from src.services.checklist_service import (
     skip_checkin,
 )
 from src.services.quest_service import (
+    backfill_goal_session_numbers,
+    build_goal_session_title,
     create_quest,
     create_scheduled_quest,
     delete_one_time_quest_if_unresolved,
@@ -21,6 +23,7 @@ from src.services.quest_service import (
     get_quests_by_date,
     get_quests_for_calendar,
     get_quests_for_day,
+    preview_next_goal_session_title,
     quest_to_calendar_event,
     update_quest_status,
     validate_schedule_times,
@@ -168,9 +171,173 @@ def test_create_scheduled_quest_with_active_goal_links_quest(session):
     session.refresh(goal)
 
     assert quest.goal_id == goal.id
+    assert quest.goal_session_number == 1
+    assert quest.title == "Portfolio Project Session 1"
     assert quest.goal == goal
     assert quest in goal.quests
     assert quest.xp_reward == 40
+
+
+def test_goal_sessions_receive_stable_sequential_numbers_and_titles(session):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+
+    first = create_scheduled_quest(
+        title="User title ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    second = create_scheduled_quest(
+        title="Another user title ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 6, 27),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    assert first.goal_session_number == 1
+    assert second.goal_session_number == 2
+    assert first.title == "Portfolio Project Session 1"
+    assert second.title == "Portfolio Project Session 2"
+    assert preview_next_goal_session_title(goal.id, session=session) == "Portfolio Project Session 3"
+    assert build_goal_session_title("Portfolio Project", 4) == "Portfolio Project Session 4"
+
+
+def test_non_goal_quest_still_uses_manual_title_and_no_goal_session_number(session):
+    category = session.query(Category).one()
+
+    quest = create_scheduled_quest(
+        title="Manual quest title",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    assert quest.title == "Manual quest title"
+    assert quest.goal_id is None
+    assert quest.goal_session_number is None
+
+
+def test_goal_session_rejects_missing_category(session):
+    goal = Goal(title="Portfolio Project", planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+
+    with pytest.raises(ValueError, match="Goal sessions require a category"):
+        create_scheduled_quest(
+            title="Ignored",
+            goal_id=goal.id,
+            planned_date=date(2026, 6, 26),
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            session=session,
+        )
+
+    assert session.query(Quest).count() == 0
+    assert session.query(QuestCheckin).count() == 0
+
+
+def test_backfill_goal_session_numbers_is_deterministic_and_idempotent(session):
+    goal = Goal(title="Portfolio Project", planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+    late = Quest(
+        title="Late",
+        status="Planned",
+        goal_id=goal.id,
+        due_date=date(2026, 7, 3),
+        created_at=datetime(2026, 7, 1, 12, 0),
+    )
+    early = Quest(
+        title="Early",
+        status="Planned",
+        goal_id=goal.id,
+        planned_start_at=datetime(2026, 7, 1, 9, 0),
+        created_at=datetime(2026, 7, 2, 12, 0),
+    )
+    existing = Quest(
+        title="Existing",
+        status="Planned",
+        goal_id=goal.id,
+        goal_session_number=5,
+        due_date=date(2026, 6, 30),
+    )
+    session.add_all([late, early, existing])
+    session.commit()
+
+    first_summary = backfill_goal_session_numbers(session=session)
+    second_summary = backfill_goal_session_numbers(session=session)
+    session.refresh(early)
+    session.refresh(late)
+    session.refresh(existing)
+
+    assert first_summary["assigned_count"] == 2
+    assert second_summary["assigned_count"] == 0
+    assert existing.goal_session_number == 5
+    assert early.goal_session_number == 6
+    assert late.goal_session_number == 7
+
+
+def test_deleting_goal_session_does_not_renumber_and_next_session_uses_max_plus_one(session):
+    category = session.query(Category).one()
+    goal = Goal(title="Portfolio Project", planned_total_minutes=1200, status="Active")
+    session.add(goal)
+    session.commit()
+    first = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 1),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    second = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 2),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    third = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 3),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    summary = delete_one_time_quest_if_unresolved(second.id, session=session)
+    fourth = create_scheduled_quest(
+        "Ignored",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 7, 4),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    session.refresh(first)
+    session.refresh(third)
+
+    assert summary["deleted"] is True
+    assert first.goal_session_number == 1
+    assert third.goal_session_number == 3
+    assert fourth.goal_session_number == 4
 
 
 def test_create_scheduled_quest_with_invalid_goal_id_fails_without_creating_checkin(session):

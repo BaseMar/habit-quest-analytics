@@ -23,6 +23,9 @@ def init_db() -> None:
     DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     _ensure_sqlite_schema()
+    from src.services.quest_service import backfill_goal_session_numbers
+
+    backfill_goal_session_numbers()
 
 
 def get_session():
@@ -67,6 +70,9 @@ def _ensure_sqlite_schema() -> None:
     if "goal_id" not in quest_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE quests ADD COLUMN goal_id INTEGER"))
+    if "goal_session_number" not in quest_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE quests ADD COLUMN goal_session_number INTEGER"))
 
     recurring_habit_columns = (
         set(RecurringHabit.__table__.columns.keys())
