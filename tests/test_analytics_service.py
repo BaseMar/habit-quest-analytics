@@ -974,6 +974,20 @@ def test_get_goal_analytics_summary_empty(session):
     assert summary["goal_table"].empty
 
 
+def test_goal_analytics_handles_goal_without_planned_time_target(session):
+    category = _add_category(session, "Work")
+    _add_goal(session, planned_total_minutes=0, category=category)
+
+    summary = get_goal_analytics_summary(session=session)
+    progress_row = get_goal_progress_dataset(session=session).iloc[0]
+
+    assert summary["planned_effort_minutes"] == 0
+    assert summary["remaining_effort_minutes"] == 0
+    assert summary["expected_total_xp"] == 0
+    assert summary["overall_progress_percent"] == 0
+    assert progress_row["Progress Percent"] == 0
+
+
 def test_get_goal_analytics_summary_filters_statuses(session):
     active = _add_goal(session, "Active goal", status="Active")
     completed = _add_goal(session, "Completed goal", status="Completed")

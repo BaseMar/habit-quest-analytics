@@ -39,7 +39,7 @@ class Category(Base):
 class Goal(Base):
     __tablename__ = "goals"
     __table_args__ = (
-        CheckConstraint("planned_total_minutes > 0", name="ck_goal_planned_total_minutes_positive"),
+        CheckConstraint("planned_total_minutes >= 0", name="ck_goal_planned_total_minutes_nonnegative"),
         CheckConstraint(
             "status IN ('Active', 'Completed', 'Archived')",
             name="ck_goal_status_valid",

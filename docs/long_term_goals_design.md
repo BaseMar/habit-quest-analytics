@@ -61,6 +61,10 @@ Suggested fields:
 A goal/project does not award XP directly. XP is earned through completed linked
 quest sessions.
 
+`planned_total_minutes` can be `0` when the user does not know the total effort
+up front. In that case the app still tracks completed session effort and XP, but
+does not show a time-target percentage until a target is set.
+
 ## Quest / Session Relationship
 
 A quest can optionally belong to a goal/project.
@@ -146,8 +150,10 @@ Rules:
 - Skipped and failed sessions do not contribute to `completed_minutes`.
 - Reset sessions remove completed contribution because `xp_awarded` returns to
   `0` and status is reset.
-- `progress_percent = completed_minutes / planned_total_minutes * 100`, capped
-  at 100% for display.
+- When `planned_total_minutes > 0`, `progress_percent = completed_minutes /
+  planned_total_minutes * 100`, capped at 100% for display.
+- When `planned_total_minutes = 0`, progress percent remains `0` and completed
+  effort is still tracked from linked sessions.
 
 ## UI Design
 
@@ -155,8 +161,8 @@ Rules:
 
 Current backend/minimal UI behavior:
 
-- Goals can be created in Quest Planner with title, planned total time, optional
-  notes, required category, start date, and target date.
+- Goals can be created in Quest Planner with title, optional planned total time,
+  optional notes, required category, start date, and target date.
 - A one-time scheduled quest can optionally be linked to an active goal/project
   at creation time.
 - Active goals are shown in a compact read-only Goal Progress section in Quest
@@ -237,7 +243,7 @@ Possible model additions:
 | `title` | Goal/project name shown to the user. |
 | `description` | Optional detail. |
 | `category_id` | Foreign key to `categories.id`; current service/UI creation requires it. |
-| `planned_total_minutes` | Total planned effort for the goal. |
+| `planned_total_minutes` | Total planned effort for the goal. `0` means no time target has been set yet. |
 | `start_date` | Optional start date. |
 | `target_end_date` | Optional target completion date. |
 | `status` | `Active`, `Completed`, or `Archived`. |

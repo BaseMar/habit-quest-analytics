@@ -280,14 +280,15 @@ def _build_goal_progress(session, goal: Goal) -> dict:
         elif checkin.status == "Failed":
             failed_sessions_count += 1
 
-    remaining_minutes = max(goal.planned_total_minutes - completed_minutes, 0)
-    raw_progress = completed_minutes / goal.planned_total_minutes * 100
+    planned_total_minutes = goal.planned_total_minutes or 0
+    remaining_minutes = max(planned_total_minutes - completed_minutes, 0)
+    raw_progress = completed_minutes / planned_total_minutes * 100 if planned_total_minutes > 0 else 0
     progress_percent = max(0, min(raw_progress, 100))
 
     return {
         "goal_id": goal.id,
         "title": goal.title,
-        "planned_total_minutes": goal.planned_total_minutes,
+        "planned_total_minutes": planned_total_minutes,
         "completed_minutes": completed_minutes,
         "remaining_minutes": remaining_minutes,
         "progress_percent": progress_percent,
@@ -297,7 +298,7 @@ def _build_goal_progress(session, goal: Goal) -> dict:
         "skipped_sessions_count": skipped_sessions_count,
         "failed_sessions_count": failed_sessions_count,
         "earned_xp": earned_xp,
-        "expected_total_xp": calculate_time_based_xp(goal.planned_total_minutes),
+        "expected_total_xp": calculate_time_based_xp(planned_total_minutes) if planned_total_minutes > 0 else 0,
     }
 
 
@@ -338,10 +339,13 @@ def _normalize_description(description: str | None) -> str | None:
     return (description or "").strip() or None
 
 
-def _normalize_planned_total_minutes(planned_total_minutes: int) -> int:
+def _normalize_planned_total_minutes(planned_total_minutes: int | None) -> int:
+    if planned_total_minutes is None:
+        return 0
+
     value = int(planned_total_minutes)
-    if value <= 0:
-        raise ValueError("Goal planned total minutes must be positive.")
+    if value < 0:
+        raise ValueError("Goal planned total minutes cannot be negative.")
     return value
 
 

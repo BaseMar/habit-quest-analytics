@@ -48,6 +48,8 @@ def _ensure_sqlite_schema() -> None:
     if "goals" not in table_names:
         Goal.__table__.create(bind=engine, checkfirst=True)
         table_names.append("goals")
+    else:
+        _ensure_goals_allow_unspecified_planned_time()
     recurring_habits_created = False
     if "recurring_habits" not in table_names:
         RecurringHabit.__table__.create(bind=engine, checkfirst=True)
@@ -95,3 +97,51 @@ def _ensure_sqlite_schema() -> None:
     if "avatar_path" not in profile_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE player_profiles ADD COLUMN avatar_path VARCHAR(255)"))
+
+
+def _ensure_goals_allow_unspecified_planned_time() -> None:
+    """Rebuild old local SQLite goals tables that required planned time > 0."""
+    with engine.connect() as connection:
+        table_sql = connection.execute(
+            text("SELECT sql FROM sqlite_master WHERE type='table' AND name='goals'")
+        ).scalar()
+
+    if not table_sql or "planned_total_minutes > 0" not in table_sql:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text("PRAGMA foreign_keys=OFF"))
+        connection.execute(text("ALTER TABLE goals RENAME TO goals_old"))
+        Goal.__table__.create(bind=connection, checkfirst=False)
+        connection.execute(
+            text(
+                """
+                INSERT INTO goals (
+                    id,
+                    title,
+                    description,
+                    planned_total_minutes,
+                    start_date,
+                    target_end_date,
+                    status,
+                    created_at,
+                    updated_at,
+                    category_id
+                )
+                SELECT
+                    id,
+                    title,
+                    description,
+                    planned_total_minutes,
+                    start_date,
+                    target_end_date,
+                    status,
+                    created_at,
+                    updated_at,
+                    category_id
+                FROM goals_old
+                """
+            )
+        )
+        connection.execute(text("DROP TABLE goals_old"))
+        connection.execute(text("PRAGMA foreign_keys=ON"))

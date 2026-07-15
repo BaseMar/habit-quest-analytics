@@ -191,6 +191,10 @@ def _format_minutes(minutes: int) -> str:
     return f"{remainder} min"
 
 
+def _format_optional_minutes(minutes: int) -> str:
+    return _format_minutes(minutes) if int(minutes or 0) > 0 else "No time target"
+
+
 def _format_percent(value: float) -> str:
     rounded = round(float(value), 1)
     if rounded.is_integer():
@@ -316,6 +320,10 @@ def render_single_goal_progress_card(goal_row: dict) -> None:
     progress = max(0, min(float(goal_row["Progress Percent"]), 100))
     target = goal_row["Target Date"]
     target_label = target.isoformat() if hasattr(target, "isoformat") else "No target date"
+    planned_minutes = int(goal_row["Planned Minutes"])
+    progress_effort_label = (
+        f"{_format_minutes(int(goal_row['Completed Minutes']))} / {_format_optional_minutes(planned_minutes)}"
+    )
     sessions = (
         f"{int(goal_row['Completed Sessions'])} completed / "
         f"{int(goal_row['Planned Sessions'])} planned"
@@ -334,7 +342,7 @@ def render_single_goal_progress_card(goal_row: dict) -> None:
                 </div>
                 <div>
                     <div class="hq-progress-value">
-                        {escape(_format_minutes(int(goal_row["Completed Minutes"])))} / {escape(_format_minutes(int(goal_row["Planned Minutes"])))}
+                        {escape(progress_effort_label)}
                     </div>
                     <div class="hq-progress-caption">{escape(_format_percent(progress))} complete</div>
                 </div>
@@ -509,7 +517,7 @@ def render_goal_comparison_table(goal_table: pd.DataFrame) -> None:
     display_table["Completed / Planned"] = (
         display_table["Completed Minutes"].map(_format_minutes)
         + " / "
-        + display_table["Planned Minutes"].map(_format_minutes)
+        + display_table["Planned Minutes"].map(_format_optional_minutes)
     )
     display_table["Sessions"] = display_table.apply(
         lambda row: (

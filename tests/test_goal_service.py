@@ -89,10 +89,15 @@ def test_create_goal_rejects_empty_title(session):
         create_goal("  ", planned_total_minutes=1200, session=session)
 
 
-@pytest.mark.parametrize("planned_total_minutes", [0, -1])
-def test_create_goal_rejects_non_positive_planned_total_minutes(session, planned_total_minutes):
-    with pytest.raises(ValueError, match="planned total minutes must be positive"):
-        create_goal("Portfolio Project", planned_total_minutes=planned_total_minutes, session=session)
+def test_create_goal_allows_unspecified_planned_total_minutes(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=0, session=session)
+
+    assert goal.planned_total_minutes == 0
+
+
+def test_create_goal_rejects_negative_planned_total_minutes(session):
+    with pytest.raises(ValueError, match="planned total minutes cannot be negative"):
+        create_goal("Portfolio Project", planned_total_minutes=-1, session=session)
 
 
 def test_create_goal_rejects_missing_category(session):
@@ -332,6 +337,18 @@ def test_get_goal_progress_with_no_linked_quests_returns_zero_progress(session):
         "earned_xp": 0,
         "expected_total_xp": 400,
     }
+
+
+def test_get_goal_progress_with_unspecified_time_target_is_safe(session):
+    goal = create_goal("Open-ended Strength Goal", planned_total_minutes=0, session=session)
+
+    progress = get_goal_progress(goal.id, session=session)
+
+    assert progress["planned_total_minutes"] == 0
+    assert progress["completed_minutes"] == 0
+    assert progress["remaining_minutes"] == 0
+    assert progress["progress_percent"] == 0
+    assert progress["expected_total_xp"] == 0
 
 
 def test_planned_linked_quest_does_not_increase_completed_minutes(session):

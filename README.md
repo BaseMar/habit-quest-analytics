@@ -93,6 +93,8 @@ Implemented:
   layer, Quest Planner goal creation UI, one-time quest linking, and progress
   cards derived from linked check-ins.
 - Goal/project creation and linked goal sessions require a category.
+- Goal/project planned total time can be left unset when the total effort is not
+  known yet.
 - Active goal cards support quick-add one-time work sessions linked to that
   goal, with automatic per-goal session numbering and generated session titles.
 - Goal lifecycle controls in Quest Planner: archive, complete, reopen, and safe

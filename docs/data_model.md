@@ -41,7 +41,7 @@ habits are not linked to goals in the current phase.
 | `title` | Goal/project name shown to the user. |
 | `description` | Optional detail. |
 | `category_id` | Foreign key to `categories.id`. Current service/UI creation requires a category for goals/projects. |
-| `planned_total_minutes` | Required positive total planned effort. |
+| `planned_total_minutes` | Planned total effort. `0` means the user has not set a time target yet. |
 | `start_date` | Optional start date. |
 | `target_end_date` | Optional target completion date. |
 | `status` | Goal state: `Active`, `Completed`, or `Archived`. |

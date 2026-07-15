@@ -122,6 +122,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
     calendar_options = {
         "initialView": view_config["view"],
         "initialDate": selected_date.isoformat(),
+        "firstDay": 1,
         "selectable": True,
         "editable": False,
         "eventResizableFromStart": False,
@@ -137,7 +138,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         },
         "nowIndicator": True,
         "slotMinTime": "06:00:00",
-        "slotMaxTime": "22:00:00",
+        "slotMaxTime": "24:00:00",
         "slotDuration": "00:30:00",
         "slotLabelInterval": "01:00:00",
         "slotEventOverlap": False,
@@ -399,6 +400,16 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
         progress_percent = float(progress["progress_percent"])
         progress_label = _format_percent(progress_percent)
         progress_width = max(0, min(100, progress_percent))
+        planned_label = (
+            _format_minutes(progress["planned_total_minutes"])
+            if int(progress["planned_total_minutes"]) > 0
+            else "No time target"
+        )
+        xp_label = (
+            f"{int(progress['earned_xp'])} / {int(progress['expected_total_xp'])} XP earned"
+            if int(progress["expected_total_xp"]) > 0
+            else f"{int(progress['earned_xp'])} XP earned"
+        )
         category = category_names_by_id.get(goal.category_id, "Uncategorized")
         target = goal.target_end_date.isoformat() if goal.target_end_date else "No target date"
         skipped_failed = progress["skipped_sessions_count"] + progress["failed_sessions_count"]
@@ -416,7 +427,7 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
                     <div>
                         <div class="hq-progress-value">
                             {_format_minutes(progress['completed_minutes'])}
-                            / {_format_minutes(progress['planned_total_minutes'])}
+                            / {escape(planned_label)}
                         </div>
                         <div class="hq-progress-caption">{progress_label} complete</div>
                     </div>
@@ -426,7 +437,7 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
                 </div>
                 <div class="hq-progress-footer">
                     <div class="hq-progress-caption">
-                        {int(progress['earned_xp'])} / {int(progress['expected_total_xp'])} XP earned
+                        {escape(xp_label)}
                     </div>
                     <div>
                         <span class="hq-progress-pill">{int(progress['completed_sessions_count'])} completed</span>
@@ -541,7 +552,7 @@ def render_goal_creation_form(category_options: dict[str, int]) -> None:
                 planned_hours = st.number_input(
                     "Planned Hours",
                     min_value=0,
-                    value=20,
+                    value=0,
                     step=1,
                     key="new_goal_planned_hours",
                 )
@@ -583,8 +594,6 @@ def render_goal_creation_form(category_options: dict[str, int]) -> None:
                 planned_total_minutes = int(planned_hours) * 60 + int(planned_minutes_remainder)
                 if not title.strip():
                     st.error("Goal title is required.")
-                elif planned_total_minutes <= 0:
-                    st.error("Planned total time must be greater than 0.")
                 else:
                     try:
                         create_goal(
