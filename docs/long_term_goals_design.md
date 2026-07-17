@@ -15,6 +15,8 @@ Current implementation status:
 - Quest Planner includes read-only active goal progress cards.
 - Active goal cards include a compact Add Session flow for planned one-time
   quest sessions linked to that goal.
+- Active goal cards include a Goal Session Planner for previewing and bulk
+  creating multiple planned one-time sessions.
 - Goal session titles are generated automatically as
   `{Goal Title} Session {N}`.
 - Quest Planner includes compact lifecycle actions to archive, complete, reopen,
@@ -180,18 +182,50 @@ Current backend/minimal UI behavior:
   quest sessions should be archived instead.
 - Recurring habit template creation does not show or set a goal link.
 - Linked quest sessions continue to create normal planned `QuestCheckin` rows.
+- Bulk-planned sessions also create separate normal `Quest` and
+  `QuestCheckin` records. They do not award XP until completed.
 
-Future Quest Planner capabilities:
+Goal Session Planner behavior:
 
-- Create a new session for a goal.
+- The planner is opened explicitly from an active goal card.
+- It does not generate sessions on page load.
+- The user enters session duration, start date, selected weekdays, start time,
+  optional planning end date, and whether a shorter final session is allowed.
+- The UI shows goal effort, completed effort, already planned effort, and the
+  still-unscheduled effort before preview.
+- Preview is read-only and shows proposed session number, generated title, date,
+  time, duration, and expected quest XP.
+- Bulk creation requires explicit confirmation after preview.
+- Generation recalculates scheduling effort immediately before writing rows, so
+  reruns or stale previews do not over-allocate already planned effort.
+- Each generated session uses time-based `Quest.xp_reward`, but
+  `QuestCheckin.xp_awarded` remains `0` until completion.
+- Existing sessions are not renamed or renumbered.
+
+Planning effort formula:
+
+```text
+effort_to_schedule_minutes =
+    max(planned_total_minutes - completed_minutes - currently_planned_minutes, 0)
+```
+
+Rules:
+
+- Completed check-ins reduce effort still requiring scheduling.
+- Planned check-ins reduce effort still requiring scheduling.
+- Failed and skipped check-ins are counted separately but do not reduce
+  scheduling effort, so replacement work can be planned.
+- Reset check-ins count according to their current `Planned` status.
+- Archived and completed goals cannot generate sessions.
 
 Example flow:
 
 1. Create Goal: Portfolio Project, 20h total.
-2. Add Session: 2h on Monday.
-3. Add Session: 2h on Wednesday.
-4. Complete sessions in Monthly Checklist.
-5. Goal progress updates automatically.
+2. Open Plan Multiple Sessions.
+3. Preview 2h sessions on Monday, Wednesday, and Friday.
+4. Confirm generation of 10 separate planned quest sessions.
+5. Complete sessions in Monthly Checklist.
+6. Goal progress updates automatically.
 
 ### Goal Dashboard / Project Board
 
@@ -282,8 +316,9 @@ Rules:
 5. `feat: add goal creation UI in Quest Planner` - implemented.
 6. `feat: add goal lifecycle actions in Quest Planner` - implemented.
 7. `feat: add goal session quick-add flow` - implemented.
-8. `feat: add goal analytics` - implemented in Habit Analytics.
-9. `docs: update long-term goals documentation`
+8. `feat: add goal session planner` - implemented.
+9. `feat: add goal analytics` - implemented in Habit Analytics.
+10. `docs: update long-term goals documentation`
 
 ## Test Plan
 
@@ -305,7 +340,7 @@ Future tests should cover:
 ## Out Of Scope For V1
 
 - Automatic AI goal planning.
-- Automatic session generation from total planned hours.
+- Automatic session generation without explicit preview and confirmation.
 - Completion bonus XP.
 - Dependencies between goals.
 - Subtasks beyond linked quest sessions.

@@ -16,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.components.plan_form import WEEKDAY_OPTIONS, render_plan_form
 from src.database.db import init_db
 from src.database.seed import ensure_default_categories
 from src.services.checklist_service import (
@@ -34,14 +35,17 @@ from src.services.goal_service import (
     list_goals,
     reopen_goal,
 )
+from src.services.goal_session_planner_service import (
+    build_goal_session_plan_preview,
+    get_goal_session_planning_summary,
+    plan_goal_sessions,
+)
 from src.services.quest_service import (
     create_scheduled_quest,
     delete_one_time_quest_if_unresolved,
     get_categories,
     get_quests_for_calendar,
     get_quests_for_day,
-    preview_next_goal_session_title,
-    validate_schedule_times,
 )
 from src.services.recurring_habit_service import (
     archive_recurring_habit,
@@ -50,6 +54,7 @@ from src.services.recurring_habit_service import (
     delete_recurring_generated_occurrence_if_unresolved,
     deserialize_weekdays,
     generate_all_recurring_habits_for_month,
+    generate_recurring_habit_for_month,
     get_recurring_habit_history_summary,
     list_recurring_habits,
     remove_future_planned_recurring_instances,
@@ -71,19 +76,6 @@ CHECKLIST_STATUS_MARKERS = {
     "Completed": "C",
     "Skipped": "S",
     "Failed": "F",
-}
-WEEKDAY_OPTIONS = {
-    "Monday": 0,
-    "Tuesday": 1,
-    "Wednesday": 2,
-    "Thursday": 3,
-    "Friday": 4,
-    "Saturday": 5,
-    "Sunday": 6,
-}
-RECURRENCE_PRESETS = {
-    "Every day": [0, 1, 2, 3, 4, 5, 6],
-    "Weekdays": [0, 1, 2, 3, 4],
 }
 CALENDAR_VIEW_OPTIONS = {
     "Month": {"view": "dayGridMonth", "height": 650, "content_height": 590},
@@ -449,80 +441,186 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
             """,
             unsafe_allow_html=True,
         )
-        render_goal_session_form(goal)
+        render_goal_session_planner(goal)
 
 
-def render_goal_session_form(goal) -> None:
-    with st.expander("Add Session", expanded=False):
+def render_goal_session_planner(goal) -> None:
+    planner_key = f"goal_session_planner_{goal.id}"
+    preview_key = f"{planner_key}_preview"
+    config_key = f"{planner_key}_config"
+
+    with st.expander("Plan Multiple Sessions", expanded=False):
+        duration_hours = st.number_input(
+            "Session Duration Hours",
+            min_value=0,
+            value=2,
+            step=1,
+            key=f"{planner_key}_hours",
+        )
+        duration_minutes = st.number_input(
+            "Session Duration Minutes",
+            min_value=0,
+            max_value=59,
+            value=0,
+            step=5,
+            key=f"{planner_key}_minutes",
+        )
+        session_duration_minutes = int(duration_hours) * 60 + int(duration_minutes)
+
         try:
-            session_title = preview_next_goal_session_title(goal.id)
-        except ValueError:
-            session_title = f"{goal.title} Session"
-        st.caption(f"New session: {session_title}")
-        session_date = st.date_input(
-            "Planned Date",
-            value=st.session_state.get("selected_date", date.today()),
-            key=f"goal_session_date_{goal.id}",
+            planning_summary = get_goal_session_planning_summary(
+                goal.id,
+                session_duration_minutes=session_duration_minutes if session_duration_minutes > 0 else None,
+            )
+        except ValueError as error:
+            st.error(str(error))
+            return
+
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("Goal Effort", _format_minutes(planning_summary["planned_total_minutes"]))
+        metric_cols[1].metric("Completed", _format_minutes(planning_summary["completed_minutes"]))
+        metric_cols[2].metric("Already Planned", _format_minutes(planning_summary["currently_planned_minutes"]))
+        metric_cols[3].metric("Still To Schedule", _format_minutes(planning_summary["effort_to_schedule_minutes"]))
+
+        start_date = st.date_input(
+            "Start Date",
+            value=max(st.session_state.get("selected_date", date.today()), goal.start_date or date.min),
+            key=f"{planner_key}_start_date",
+        )
+        selected_weekday_names = st.multiselect(
+            "Selected Weekdays",
+            list(WEEKDAY_OPTIONS.keys()),
+            default=["Monday", "Wednesday", "Friday"],
+            key=f"{planner_key}_weekdays",
+        )
+        selected_weekdays = [WEEKDAY_OPTIONS[name] for name in selected_weekday_names]
+        planned_start_time = st.time_input(
+            "Start Time",
+            value=time(18, 0),
+            step=300,
+            key=f"{planner_key}_start_time",
+        )
+        use_planning_end_date = st.checkbox(
+            "Use Planning End Date",
+            value=goal.target_end_date is not None,
+            key=f"{planner_key}_use_end_date",
+        )
+        planning_end_date = None
+        if use_planning_end_date:
+            end_date_kwargs = {}
+            if goal.target_end_date is not None:
+                end_date_kwargs["max_value"] = goal.target_end_date
+            default_end_date = goal.target_end_date or start_date
+            planning_end_date = st.date_input(
+                "Planning End Date",
+                value=default_end_date if default_end_date < start_date else max(start_date, default_end_date),
+                key=f"{planner_key}_end_date",
+                **end_date_kwargs,
+            )
+        allow_short_final_session = st.checkbox(
+            "Allow shorter final session",
+            value=True,
+            key=f"{planner_key}_allow_short_final",
         )
 
-        start_col, end_col = st.columns(2)
-        with start_col:
-            session_start_time = st.time_input(
-                "Start Time",
-                value=time(9, 0),
-                step=300,
-                key=f"goal_session_start_{goal.id}",
-            )
-        with end_col:
-            session_end_time = st.time_input(
-                "End Time",
-                value=time(10, 0),
-                step=300,
-                key=f"goal_session_end_{goal.id}",
-            )
+        current_config = {
+            "goal_id": goal.id,
+            "session_duration_minutes": session_duration_minutes,
+            "start_date": start_date,
+            "selected_weekdays": tuple(selected_weekdays),
+            "planned_start_time": planned_start_time,
+            "target_end_date": planning_end_date,
+            "allow_short_final_session": allow_short_final_session,
+        }
+        preview = st.session_state.get(preview_key)
+        preview_config = st.session_state.get(config_key)
+        if preview is not None and preview_config != current_config:
+            preview = None
+            st.session_state.pop(preview_key, None)
+            st.session_state.pop(config_key, None)
 
-        session_notes = st.text_area(
-            "Notes",
-            height=64,
-            placeholder="Optional notes",
-            key=f"goal_session_notes_{goal.id}",
+        preview_disabled = (
+            goal.category_id is None
+            or session_duration_minutes <= 0
+            or not selected_weekdays
+            or planning_summary["effort_to_schedule_minutes"] <= 0
         )
-        estimated_minutes = _calculate_duration_minutes_for_date(
-            session_date,
-            session_start_time,
-            session_end_time,
-        )
-        if estimated_minutes is None:
-            st.error("End time must be after start time.")
         if goal.category_id is None:
-            st.error("This goal needs a category before sessions can be added.")
+            st.error("This goal needs a category before sessions can be planned.")
+        if planning_summary["effort_to_schedule_minutes"] <= 0:
+            st.info("This goal has no unscheduled effort right now.")
 
         if st.button(
-            "Add Session",
+            "Preview",
+            use_container_width=True,
+            key=f"{planner_key}_preview_button",
+            disabled=preview_disabled,
+        ):
+            try:
+                preview = build_goal_session_plan_preview(**current_config)
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                st.session_state[preview_key] = preview
+                st.session_state[config_key] = current_config
+
+        if preview is None:
+            return
+
+        if preview["blocked_reason"]:
+            st.warning(preview["blocked_reason"])
+        _render_goal_session_plan_preview(preview)
+
+        if preview["remaining_unallocated_minutes"] > 0:
+            st.warning(
+                f"{_format_minutes(preview['remaining_unallocated_minutes'])} will remain unallocated."
+            )
+
+        confirm_generate = st.checkbox(
+            "Confirm bulk session generation",
+            key=f"{planner_key}_confirm_generate",
+            disabled=not preview["date_range_complete"] or preview["total_sessions"] == 0,
+        )
+        if st.button(
+            "Generate Planned Sessions",
             type="primary",
             use_container_width=True,
-            key=f"goal_add_session_{goal.id}",
-            disabled=goal.category_id is None,
+            key=f"{planner_key}_generate_button",
+            disabled=not confirm_generate or not preview["date_range_complete"] or preview["total_sessions"] == 0,
         ):
-            if estimated_minutes is None:
-                st.error("End time must be after start time.")
+            try:
+                generation_summary = plan_goal_sessions(**st.session_state[config_key])
+            except ValueError as error:
+                st.error(str(error))
             else:
-                try:
-                    create_scheduled_quest(
-                        title=session_title,
-                        description=session_notes,
-                        category_id=goal.category_id,
-                        goal_id=goal.id,
-                        planned_date=session_date,
-                        start_time=session_start_time,
-                        end_time=session_end_time,
-                        estimated_minutes=estimated_minutes,
-                    )
-                except ValueError as error:
-                    st.error(str(error))
-                else:
-                    st.session_state["goal_status_message"] = "Goal session planned."
-                    st.rerun()
+                st.session_state.pop(preview_key, None)
+                st.session_state.pop(config_key, None)
+                st.session_state["goal_status_message"] = (
+                    f"Generated {generation_summary['created_count']} planned goal sessions."
+                )
+                st.rerun()
+
+
+def _render_goal_session_plan_preview(preview: dict) -> None:
+    rows = [
+        {
+            "Session": f"Session {row['session_number']}",
+            "Date": row["date"].strftime("%b %d"),
+            "Time": f"{row['start_time']:%H:%M}-{row['end_time']:%H:%M}",
+            "Duration": _format_minutes(row["duration_minutes"]),
+            "Expected XP": f"{row['expected_quest_xp']} XP",
+        }
+        for row in preview["sessions"]
+    ]
+    if rows:
+        st.table(rows)
+    else:
+        st.info("No sessions are proposed for this preview.")
+
+    total_cols = st.columns(3)
+    total_cols[0].metric("Total Sessions", preview["total_sessions"])
+    total_cols[1].metric("Scheduled Effort", _format_minutes(preview["total_planned_minutes"]))
+    total_cols[2].metric("Remaining Unallocated", _format_minutes(preview["remaining_unallocated_minutes"]))
 
 
 def render_goal_creation_form(category_options: dict[str, int]) -> None:
@@ -744,123 +842,9 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
     if status_message:
         st.success(status_message)
 
-    form_col, list_col = st.columns([0.4, 0.6], gap="medium")
-
-    with form_col:
-        st.write("**Create Recurring Habit**")
-        st.caption("Define a template, then generate planned days for the selected month.")
-        with st.container():
-            habit_title = st.text_input(
-                "Title",
-                placeholder="Reading",
-                key="recurring_habit_title",
-            )
-            habit_category_name = st.selectbox(
-                "Category",
-                list(category_options.keys()),
-                key="recurring_habit_category",
-            )
-
-            minutes_col, active_col = st.columns([0.58, 0.42])
-            with minutes_col:
-                estimated_minutes = st.number_input(
-                    "Estimated minutes",
-                    min_value=1,
-                    max_value=1440,
-                    value=30,
-                    step=5,
-                    key="recurring_habit_estimated_minutes",
-                )
-            with active_col:
-                is_active = st.checkbox("Active", value=True, key="recurring_habit_is_active")
-
-            recurrence_preset = st.radio(
-                "Recurrence",
-                ["Every day", "Weekdays", "Custom selected weekdays"],
-                horizontal=False,
-                key="recurring_habit_preset",
-            )
-            if recurrence_preset == "Custom selected weekdays":
-                selected_weekday_names = st.multiselect(
-                    "Weekdays",
-                    list(WEEKDAY_OPTIONS.keys()),
-                    default=["Monday", "Wednesday", "Friday"],
-                    key="recurring_habit_weekdays",
-                )
-                weekdays = [WEEKDAY_OPTIONS[name] for name in selected_weekday_names]
-            else:
-                weekdays = RECURRENCE_PRESETS[recurrence_preset]
-
-            date_col, end_col = st.columns(2)
-            with date_col:
-                start_date = st.date_input(
-                    "Start date",
-                    value=st.session_state.get("selected_date", date.today()),
-                    key="recurring_habit_start_date",
-                )
-            with end_col:
-                has_end_date = st.checkbox("End date", value=False, key="recurring_habit_has_end_date")
-                end_date = (
-                    st.date_input(
-                        "Final date",
-                        value=start_date,
-                        key="recurring_habit_end_date",
-                    )
-                    if has_end_date
-                    else None
-                )
-
-            has_time_window = st.checkbox("Time window", value=False, key="recurring_habit_has_time_window")
-            if has_time_window:
-                start_time_col, end_time_col = st.columns(2)
-                with start_time_col:
-                    planned_start_time = st.time_input(
-                        "Start Time",
-                        value=time(9, 0),
-                        step=300,
-                        key="recurring_habit_start_time",
-                    )
-                with end_time_col:
-                    planned_end_time = st.time_input(
-                        "End Time",
-                        value=time(10, 0),
-                        step=300,
-                        key="recurring_habit_end_time",
-                    )
-            else:
-                planned_start_time = None
-                planned_end_time = None
-
-            description = st.text_area(
-                "Notes",
-                height=64,
-                placeholder="Optional notes",
-                key="recurring_habit_description",
-            )
-
-            if st.button("Create Recurring Habit", type="primary", use_container_width=True):
-                try:
-                    create_recurring_habit(
-                        title=habit_title,
-                        category_id=category_options[habit_category_name],
-                        estimated_minutes=int(estimated_minutes),
-                        recurrence_type="selected_weekdays",
-                        weekdays=weekdays,
-                        start_date=start_date,
-                        end_date=end_date,
-                        description=description,
-                        is_active=is_active,
-                        planned_start_time=planned_start_time,
-                        planned_end_time=planned_end_time,
-                    )
-                except ValueError as error:
-                    st.error(str(error))
-                else:
-                    st.session_state["recurring_habit_status_message"] = "Recurring habit created."
-                    st.rerun()
-
-    with list_col:
-        st.write("**Recurring Habit Templates**")
+    st.caption("Create routines from Add to plan in the Calendar & Day Plan tab.")
+    with st.container():
+        st.write("**Routines**")
         st.caption(
             f"Generate planned days for {month_name[selected_month]} {selected_year}. "
             "Change the month in Monthly Checklist."
@@ -870,8 +854,8 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
         habits = list_recurring_habits()
         if not habits:
             render_empty_state(
-                "No recurring habits yet.",
-                "Create one to generate planned quest days for the selected month.",
+                "No routines yet.",
+                "Create a repeating routine from Add to plan in the Calendar & Day Plan tab.",
             )
         else:
             render_recurring_habit_template_list(habits, category_names_by_id)
@@ -1434,30 +1418,6 @@ def _parse_calendar_date(value) -> date | None:
             return None
 
 
-def _calculate_duration_minutes(start_time: time, end_time: time) -> int | None:
-    try:
-        planned_start_at, planned_end_at = validate_schedule_times(
-            st.session_state["selected_date"],
-            start_time,
-            end_time,
-        )
-    except ValueError:
-        return None
-    return int((planned_end_at - planned_start_at).total_seconds() // 60)
-
-
-def _calculate_duration_minutes_for_date(planned_date: date, start_time: time, end_time: time) -> int | None:
-    try:
-        planned_start_at, planned_end_at = validate_schedule_times(
-            planned_date,
-            start_time,
-            end_time,
-        )
-    except ValueError:
-        return None
-    return int((planned_end_at - planned_start_at).total_seconds() // 60)
-
-
 def _format_time_range(quest) -> str:
     if quest.planned_start_at and quest.planned_end_at:
         return f"{quest.planned_start_at:%H:%M} - {quest.planned_end_at:%H:%M}"
@@ -1505,7 +1465,11 @@ def _pluralize(word: str, count: int) -> str:
 
 
 def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
-    st.caption("Plan one-time quests, review the selected day, and link sessions to active goals.")
+    status_message = st.session_state.pop("plan_status_message", None)
+    if status_message:
+        st.success(status_message)
+
+    st.caption("Plan tasks, repeating routines, and project sessions from one place.")
     calendar_events = get_quests_for_calendar()
 
     render_section_title("Quest Calendar", "Review planned quests and select a day to build its schedule.")
@@ -1533,76 +1497,57 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
         render_schedule_list(selected_day_quests)
 
     with planner_col:
-        st.write("**New Quest**")
-        st.caption("Add a scheduled quest to the selected day.")
-        selected_date = st.session_state["selected_date"]
-        default_start = time(9, 0)
-        default_end = time(10, 0)
-
-        with st.container():
-            active_goals = list_active_goals()
-            selected_goal_id = None
-            selected_goal = None
-            if active_goals:
-                goal_options = [None] + [goal.id for goal in active_goals]
-                goal_labels = {None: "None"} | {goal.id: goal.title for goal in active_goals}
-                selected_goal_id = st.selectbox(
-                    "Link to Goal / Project",
-                    goal_options,
-                    format_func=lambda goal_id: goal_labels[goal_id],
-                )
-                selected_goal = next((goal for goal in active_goals if goal.id == selected_goal_id), None)
-
-            if selected_goal is None:
-                title = st.text_input("Title", placeholder="Quest title")
-            else:
-                try:
-                    title = preview_next_goal_session_title(selected_goal.id)
-                except ValueError:
-                    title = f"{selected_goal.title} Session"
-                st.caption(f"New goal session: {title}")
-
-            category_name = st.selectbox("Category", list(category_options.keys()))
-
-            start_col, end_col = st.columns(2)
-            with start_col:
-                start_time = st.time_input("Start Time", value=default_start, step=300)
-            with end_col:
-                end_time = st.time_input("End Time", value=default_end, step=300)
-
-            estimated_minutes = _calculate_duration_minutes(start_time, end_time)
-            notes = st.text_area("Notes", height=64, placeholder="Optional notes")
-
-            if estimated_minutes is None:
-                st.error("End time must be after start time.")
-
-            submitted = st.button("Add Quest", type="primary", use_container_width=True)
-            if submitted:
-                if selected_goal_id is None and not title.strip():
-                    st.error("Every quest needs a title.")
-                elif estimated_minutes is None:
-                    st.error("End time must be after start time.")
-                else:
-                    try:
-                        create_scheduled_quest(
-                            title=title,
-                            description=notes,
-                            category_id=category_options[category_name],
-                            planned_date=selected_date,
-                            start_time=start_time,
-                            end_time=end_time,
-                            estimated_minutes=estimated_minutes,
-                            goal_id=selected_goal_id,
+        st.write("**Add to plan**")
+        st.caption("Schedule one task, a repeating routine, or a session for an existing project.")
+        active_goals = list_active_goals()
+        draft = render_plan_form(
+            category_options=category_options,
+            active_goals=active_goals,
+            selected_date=st.session_state["selected_date"],
+            goal_title_by_id={goal.id: goal.title for goal in active_goals},
+        )
+        if draft is not None:
+            try:
+                if draft.is_recurring:
+                    habit = create_recurring_habit(
+                        title=draft.title,
+                        category_id=draft.category_id,
+                        estimated_minutes=draft.estimated_minutes,
+                        recurrence_type="selected_weekdays",
+                        weekdays=draft.weekdays,
+                        start_date=draft.planned_date,
+                        end_date=draft.end_date,
+                        description=draft.notes,
+                        planned_start_time=draft.start_time,
+                        planned_end_time=draft.end_time,
+                    )
+                    if draft.generate_initial_month:
+                        generate_recurring_habit_for_month(
+                            habit.id,
+                            draft.planned_date.year,
+                            draft.planned_date.month,
                         )
-                    except ValueError as error:
-                        st.error(str(error))
-                    else:
-                        st.success("Quest scheduled.")
-                        st.rerun()
+                    st.session_state["recurring_habit_status_message"] = "Routine created."
+                else:
+                    create_scheduled_quest(
+                        title=draft.title,
+                        description=draft.notes,
+                        category_id=draft.category_id,
+                        planned_date=draft.planned_date,
+                        start_time=draft.start_time,
+                        end_time=draft.end_time,
+                        estimated_minutes=draft.estimated_minutes,
+                        goal_id=draft.goal_id,
+                    )
+                    st.session_state["plan_status_message"] = "Item added to the plan."
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                st.rerun()
 
 
 def render_goals_projects_tab(category_options: dict[str, int]) -> None:
-    st.caption("Create long-term goals, add planned sessions, and monitor linked quest progress.")
+    st.caption("Create long-term goals and monitor linked sessions. Add one session from Add to plan in Calendar & Day Plan.")
     render_section_title(
         "Goal Progress",
         "Track active long-term goals through linked one-time quest sessions.",
@@ -1613,8 +1558,8 @@ def render_goals_projects_tab(category_options: dict[str, int]) -> None:
 
 
 def render_recurring_habits_tab(category_options: dict[str, int]) -> None:
-    st.caption("Manage recurring templates and generate planned quest days for the selected checklist month.")
-    render_section_title("Recurring Habits", "Create templates and generate planned days for the selected month.")
+    st.caption("Manage repeating routines and generate their planned days for the selected month.")
+    render_section_title("Routines", "Create routines from Add to plan, then manage their planned days here.")
     render_recurring_habits(category_options)
 
 

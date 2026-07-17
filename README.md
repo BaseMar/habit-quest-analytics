@@ -55,6 +55,8 @@ I designed and implemented the current MVP, including:
 - Monthly Checklist tracking system backed by daily `QuestCheckin` records.
 - Checklist status service with idempotent XP rules.
 - Command Center, Habit Analytics, and Character Profile data services.
+- Long-term goal/project planning services, including bulk goal session preview
+  and generation.
 - RPG XP, level, and stat progression logic.
 - Pytest coverage for models, services, metrics, and migration behavior.
 - Project documentation and roadmap.
@@ -97,6 +99,9 @@ Implemented:
   known yet.
 - Active goal cards support quick-add one-time work sessions linked to that
   goal, with automatic per-goal session numbering and generated session titles.
+- Active goal cards include a Goal Session Planner that previews and bulk
+  creates multiple scheduled one-time sessions from remaining unscheduled goal
+  effort.
 - Goal lifecycle controls in Quest Planner: archive, complete, reopen, and safe
   delete for unused goals.
 - Monthly Checklist groups goal-linked sessions into one visual row per goal
@@ -146,6 +151,7 @@ the current UI.
 Habit Quest Analytics turns productivity tracking into a compact RPG loop:
 
 - Schedule quests on a calendar.
+- Divide long-term goals/projects into multiple planned work sessions.
 - Track daily completion in a Monthly Checklist.
 - Complete quest days to earn XP.
 - Grow RPG stats through quest categories.
@@ -171,7 +177,9 @@ The app is designed to answer questions such as:
 ### Quest Planning
 
 - Calendar-based scheduled quest creation.
-- Title, category, start time, end time, and notes.
+- One `Add to plan` form for one-time tasks, repeating routines, and sessions
+  linked to an existing goal/project.
+- Title, category, date, start time, duration, and notes.
 - XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
@@ -186,6 +194,12 @@ The app is designed to answer questions such as:
 - Single unresolved generated recurring days can be removed safely.
 - One-time planned quests can be deleted only while they have no resolved
   history or awarded XP.
+- Goal/project sessions can be added one at a time or generated in bulk from
+  remaining unscheduled effort after an explicit preview and confirmation.
+- Bulk goal planning respects selected weekdays, start time, optional planning
+  end date, the goal target date, and shorter final session behavior.
+- Planner-generated sessions remain normal one-time `Quest` records with one
+  planned `QuestCheckin` each and no XP awarded until completion.
 
 ### Monthly Checklist
 
@@ -252,8 +266,9 @@ The app is designed to answer questions such as:
   local-first MVP note.
 - `Command Center` - read-only operational overview powered by daily quest
   check-ins.
-- `Quest Planner` - calendar planner, selected day schedule, new quest form,
-  Recurring Habits with archive/delete/cleanup controls, and Monthly Checklist.
+- `Quest Planner` - calendar planner, selected day schedule, unified planning
+  form, Goals / Projects with bulk-session planning, routines with
+  archive/delete/cleanup controls, and Monthly Checklist.
 - `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
   charts, planned minutes, goal analytics, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
@@ -270,6 +285,11 @@ The app is designed to answer questions such as:
 - New scheduled quest and recurring habit template XP is time-based:
   `max(5, round(planned_minutes / 60 * 20))`.
 - Scheduled quests create a planned check-in for the scheduled date.
+- Goal Session Planner uses remaining scheduling effort, not XP, to decide how
+  much work can still be planned:
+  `max(planned_total_minutes - completed_minutes - currently_planned_minutes, 0)`.
+- Failed and skipped goal sessions do not reduce remaining scheduling effort,
+  so replacement work can be planned.
 - Monthly Checklist updates and delete controls use the built checklist cell as
   the editability source of truth, so unscheduled dates stay locked.
 - Deletion workflows are conservative: completed, skipped, failed, and
@@ -290,6 +310,14 @@ Scheduled Quest
   -> Command Center operational metrics
   -> Character Profile XP/progression
   -> Habit Analytics trends and consistency
+```
+
+```text
+Goal Session Planner Preview
+  -> Explicit confirmation
+  -> Normal scheduled goal-linked Quest rows
+  -> Planned QuestCheckin per session
+  -> Existing checklist, calendar, XP, and analytics flows
 ```
 
 Streamlit pages are presentation surfaces. Services prepare workflow and
@@ -321,7 +349,9 @@ Core entities:
 - `Category` - groups quests into areas such as Health, Work, Learning, Home,
   and Social.
 - `Quest` - scheduled task or habit plan with XP reward, due date, optional
-  time window, and legacy status.
+  time window, optional goal link, stable goal session number, and legacy status.
+- `Goal` - long-term project container with planned effort, lifecycle status,
+  target dates, and linked one-time quest sessions.
 - `QuestCheckin` - daily status record for one quest on one date.
 - `RecurringHabit` - reusable selected-weekday habit template.
 - `RecurringHabitInstance` - link from one generated habit date to one generated
@@ -335,6 +365,8 @@ Core entities:
 Important relationship:
 
 - One `Quest` can have many `QuestCheckin` records.
+- One `Goal` can have many one-time `Quest` sessions.
+- Goal-linked quests use `Quest.goal_id` and `Quest.goal_session_number`.
 - A `QuestCheckin` tracks the status for a specific `quest_id` and
   `checkin_date`.
 - `QuestCheckin.xp_awarded` is used for XP, progression, RPG stats, and
@@ -346,6 +378,8 @@ Important relationship:
 erDiagram
     categories ||--o{ quests : groups
     categories ||--o{ recurring_habits : groups
+    categories ||--o{ goals : groups
+    goals ||--o{ quests : links
     quests ||--o{ quest_checkins : has
     recurring_habits ||--o{ recurring_habit_instances : generates
     quests ||--o| recurring_habit_instances : generated_as
@@ -371,6 +405,21 @@ erDiagram
         int estimated_minutes
         datetime completed_at
         datetime created_at
+        int category_id FK
+        int goal_id FK
+        int goal_session_number
+    }
+
+    goals {
+        int id PK
+        string title
+        text description
+        int planned_total_minutes
+        date start_date
+        date target_end_date
+        string status
+        datetime created_at
+        datetime updated_at
         int category_id FK
     }
 

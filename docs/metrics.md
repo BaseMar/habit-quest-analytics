@@ -200,6 +200,27 @@ Rules:
 - Remaining effort is never below zero.
 - Per-goal progress is capped at 100%.
 
+### Goal Scheduling Effort
+
+The Goal Session Planner uses scheduling effort to decide how many future
+sessions can still be planned.
+
+```text
+effort_to_schedule_minutes =
+    max(planned_total_minutes - completed_minutes - currently_planned_minutes, 0)
+```
+
+Rules:
+
+- Completed linked check-ins reduce scheduling effort.
+- Planned linked check-ins reduce scheduling effort.
+- Failed and skipped linked check-ins do not reduce scheduling effort, so
+  replacement sessions can be planned.
+- Reset check-ins count according to their current `Planned` status.
+- Scheduling effort never uses `QuestCheckin.xp_awarded`.
+- Planning creates normal planned check-ins with `xp_awarded = 0`; XP is awarded
+  only when a session is completed through the existing check-in flow.
+
 ### Weighted Overall Goal Progress
 
 ```text

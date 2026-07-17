@@ -54,6 +54,8 @@ Relationships:
 - One goal can have many linked one-time quest sessions.
 - Goals do not award XP directly.
 - Goal earned XP is derived from linked `QuestCheckin.xp_awarded` values.
+- Bulk-planned goal sessions do not use a separate table; they are ordinary
+  one-time `Quest` rows linked through `Quest.goal_id`.
 - Goal/project creation rejects missing or unknown categories. The database
   column remains nullable for compatibility with older local data.
 
@@ -91,6 +93,8 @@ Relationships:
 - Goal-linked one-time sessions require a category.
 - Goal session numbering is scoped per goal and uses `max(existing number) + 1`;
   deleted sessions are not renumbered.
+- Goal Session Planner-generated quests follow the same numbering and title
+  rules as individually added goal sessions.
 
 Retention behavior:
 
