@@ -75,6 +75,10 @@ after redeploys, reboots, or instance changes.
 
 The MVP is functional and deployed.
 
+In the interface, everyday work is called a **task**, repeated work a
+**routine**, and a larger outcome a **project**. RPG terminology remains part of
+the product name and progression system, not a requirement for using the planner.
+
 Implemented:
 
 - Home Base onboarding hub.
@@ -92,17 +96,17 @@ Implemented:
   date.
 - Safe deletion for unresolved one-time planned quests.
 - Long-term Goals / Projects backend foundation with a `Goal` model, service
-  layer, Quest Planner goal creation UI, one-time quest linking, and progress
-  cards derived from linked check-ins.
+  layer, Quest Planner goal creation UI, one-time quest linking, and a single
+  project workspace derived from linked check-ins.
 - Goal/project creation and linked goal sessions require a category.
 - Goal/project planned total time can be left unset when the total effort is not
   known yet.
 - The unified Add to plan form can create a project inline and then add a
   one-time work session to it, with automatic per-goal session numbering and
   generated session titles.
-- A selected project detail view includes a Goal Session Planner that previews
-  and bulk creates multiple scheduled one-time sessions from remaining
-  unscheduled goal effort.
+- The project workspace combines progress, lifecycle actions, and a Goal
+  Session Planner that previews and bulk creates multiple scheduled one-time
+  sessions from remaining unscheduled goal effort.
 - Goal lifecycle controls in Quest Planner: archive, complete, reopen, and safe
   delete for unused goals.
 - Monthly Checklist groups goal-linked sessions into one visual row per goal
@@ -180,7 +184,8 @@ The app is designed to answer questions such as:
 - Calendar-based scheduled quest creation.
 - One `Add to plan` form for one-time tasks, repeating routines, and sessions
   linked to an existing goal/project.
-- Title, category, date, start time, duration, and notes.
+- One-time tasks default to the selected day; schedule timing, project linking,
+  and notes are available only when needed.
 - XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
@@ -190,6 +195,8 @@ The app is designed to answer questions such as:
   weekdays.
 - Explicit selected-month generation for recurring planned quest days from
   Monthly Review.
+- Monthly Review keeps the selected period and missing-routine generation in
+  one control row, and status editing offers only scheduled dates.
 - Recurring habits can be all-day or use a planned start/end time window.
 - Routine templates can be edited without changing already generated days or
   their history; new settings apply to later month generation.
@@ -204,8 +211,9 @@ The app is designed to answer questions such as:
   history or awarded XP.
 - Unresolved one-time quests and project sessions can be edited from the day
   plan, including title, category, date, duration, and notes.
-- Goal/project sessions can be added one at a time or generated in bulk from
-  remaining unscheduled effort after an explicit preview and confirmation.
+- Goal/project sessions can be added one at a time from Add to plan or generated
+  in bulk from the selected project workspace after an explicit preview and
+  confirmation.
 - Bulk goal planning respects selected weekdays, start time, optional planning
   end date, the goal target date, and shorter final session behavior.
 - Planner-generated sessions remain normal one-time `Quest` records with one
@@ -572,8 +580,9 @@ Current limitations:
 - Recurring Habits v1 supports selected weekdays, template editing, and explicit
   month generation; true N-times-per-week auto-scheduling is not implemented yet.
 - Long-term Goals / Projects full standalone dashboard is not implemented yet;
-  Quest Planner includes goal creation, lifecycle controls, active goal progress
-  cards, and Habit Analytics includes goal analytics. The design is documented in
+  Quest Planner includes project creation and a selected-project workspace for
+  progress, sessions, and lifecycle actions, while Habit Analytics includes goal
+  analytics. The design is documented in
   [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.

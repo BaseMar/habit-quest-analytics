@@ -13,15 +13,15 @@ Current implementation status:
   `QuestCheckin.xp_awarded`.
 - Quest Planner creates a compact project inline from the unified Add to plan
   form.
-- Quest Planner includes read-only active goal progress cards.
+- Quest Planner includes one selected-project workspace with derived progress.
 - The unified Add to plan form can create a project inline and add planned
   one-time quest sessions linked to it.
-- A selected project detail includes a Goal Session Planner for previewing and
-  bulk creating multiple planned one-time sessions.
+- The selected-project workspace includes a Goal Session Planner for previewing
+  and bulk creating multiple planned one-time sessions.
 - Goal session titles are generated automatically as
   `{Goal Title} Session {N}`.
-- Quest Planner includes compact lifecycle actions to archive, complete, reopen,
-  and safely delete unused goals.
+- The same project workspace includes lifecycle actions to archive, complete,
+  reopen, and safely delete unused goals.
 - Recurring habits are not linked to goals.
 - Full Goal Dashboard / Project Board UI is not implemented yet.
 
@@ -168,17 +168,18 @@ Current backend/minimal UI behavior:
   optional notes, required category, start date, and target date.
 - A one-time scheduled quest can optionally be linked to an active goal/project
   at creation time.
-- Active goals are shown in a compact read-only Goal Progress section in Quest
-  Planner.
-- Goal progress cards show completed/planned effort, progress percentage,
+- Users select one project workspace in Quest Planner; it shows
+  completed/planned effort, progress percentage,
   earned/expected XP, session counts, category, status, and target date.
 - The unified Add to plan form can select an active project or create one
-  inline. A selected project creates a normal one-time scheduled quest session
-  with a planned `QuestCheckin` and awards no XP until completed.
+  inline from its optional project section. A selected project creates a normal
+  one-time scheduled quest session with a planned `QuestCheckin` and awards no
+  XP until completed.
 - Project-linked sessions use generated session titles instead of asking the
   user to name each session manually.
 - Goal/project creation and linked goal sessions reject missing categories.
-- A compact Manage Goals section supports Archive, Complete, Reopen, and Delete.
+- Project lifecycle actions appear alongside the selected project's progress and
+  session planning controls.
 - Delete is allowed only for goals with no linked quests; goals with linked
   quest sessions should be archived instead.
 - Recurring habit template creation does not show or set a goal link.
@@ -188,9 +189,9 @@ Current backend/minimal UI behavior:
 
 Goal Session Planner behavior:
 
-- The planner is opened explicitly from a selected project detail.
+- The planner is opened explicitly from the selected project workspace.
 - It does not generate sessions on page load.
-- The user enters session duration, start date, selected weekdays, start time,
+- The user enters one session duration in minutes, start date, selected weekdays, start time,
   optional planning end date, and whether a shorter final session is allowed.
 - The UI shows goal effort, completed effort, already planned effort, and the
   still-unscheduled effort before preview.

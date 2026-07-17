@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, time
 
 import streamlit as st
+
+from app.components.scheduling import duration_crosses_midnight, end_at_for_duration
 
 
 WEEKDAY_OPTIONS = {
@@ -94,8 +96,10 @@ def render_plan_form(
 
     goal_id = None
     if not is_recurring:
-        project_col, create_col = st.columns([0.72, 0.28])
-        with project_col:
+        with st.expander(
+            "Project session",
+            expanded=bool(st.session_state.get(f"{key_prefix}_creating_project")),
+        ):
             goal_options = [None] + [goal.id for goal in active_goals]
             goal_id = st.selectbox(
                 "Project",
@@ -103,19 +107,15 @@ def render_plan_form(
                 format_func=lambda value: "No project" if value is None else goal_title_by_id[value],
                 key=f"{key_prefix}_goal",
             )
-        with create_col:
-            st.write("")
             if st.button("New project", use_container_width=True, key=f"{key_prefix}_new_project"):
                 st.session_state[f"{key_prefix}_creating_project"] = True
 
-        if st.session_state.get(f"{key_prefix}_creating_project"):
-            st.caption("New project")
-            project_title = st.text_input(
-                "Project name",
-                placeholder="Portfolio project",
-                key=f"{key_prefix}_new_project_title",
-            )
-            with st.expander("Project details", expanded=False):
+            if st.session_state.get(f"{key_prefix}_creating_project"):
+                project_title = st.text_input(
+                    "Project name",
+                    placeholder="Portfolio project",
+                    key=f"{key_prefix}_new_project_title",
+                )
                 planned_total_minutes = int(
                     st.number_input(
                         "Target effort (min)",
@@ -139,25 +139,24 @@ def render_plan_form(
                     if set_target_date
                     else None
                 )
-
-            project_actions = st.columns(2)
-            with project_actions[0]:
-                if st.button("Save project", type="primary", use_container_width=True, key=f"{key_prefix}_save_project"):
-                    if not project_title.strip():
-                        st.error("A project name is required.")
-                    else:
-                        return PlanFormResult(
-                            new_project=NewProjectDraft(
-                                title=project_title,
-                                category_id=category_id,
-                                planned_total_minutes=planned_total_minutes,
-                                target_end_date=target_end_date,
+                project_actions = st.columns(2)
+                with project_actions[0]:
+                    if st.button("Save project", type="primary", use_container_width=True, key=f"{key_prefix}_save_project"):
+                        if not project_title.strip():
+                            st.error("A project name is required.")
+                        else:
+                            return PlanFormResult(
+                                new_project=NewProjectDraft(
+                                    title=project_title,
+                                    category_id=category_id,
+                                    planned_total_minutes=planned_total_minutes,
+                                    target_end_date=target_end_date,
+                                )
                             )
-                        )
-            with project_actions[1]:
-                if st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel_project"):
-                    st.session_state.pop(f"{key_prefix}_creating_project", None)
-                    st.rerun()
+                with project_actions[1]:
+                    if st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel_project"):
+                        st.session_state.pop(f"{key_prefix}_creating_project", None)
+                        st.rerun()
 
     if goal_id is None:
         title = st.text_input("Title", placeholder="What do you want to plan?", key=f"{key_prefix}_title")
@@ -165,35 +164,36 @@ def render_plan_form(
         title = goal_title_by_id[goal_id]
         st.caption(f"A new session will be added to {title}.")
 
-    date_col, time_col, duration_col = st.columns([0.42, 0.29, 0.29])
-    with date_col:
-        planned_date = st.date_input(
-            "Starts on" if is_recurring else "Date",
-            value=selected_date,
-            key=f"{key_prefix}_date",
-        )
-    with time_col:
-        start_time = st.time_input(
-            "Start time",
-            value=time(9, 0),
-            step=300,
-            key=f"{key_prefix}_start_time",
-        )
-    with duration_col:
-        estimated_minutes = int(
-            st.number_input(
-                "Duration (min)",
-                min_value=5,
-                max_value=720,
-                value=60,
-                step=5,
-                key=f"{key_prefix}_duration",
+    with st.expander("Schedule details", expanded=is_recurring):
+        date_col, time_col, duration_col = st.columns([0.42, 0.29, 0.29])
+        with date_col:
+            planned_date = st.date_input(
+                "Starts on" if is_recurring else "Date",
+                value=selected_date,
+                key=f"{key_prefix}_date",
             )
-        )
+        with time_col:
+            start_time = st.time_input(
+                "Start time",
+                value=time(9, 0),
+                step=300,
+                key=f"{key_prefix}_start_time",
+            )
+        with duration_col:
+            estimated_minutes = int(
+                st.number_input(
+                    "Duration (min)",
+                    min_value=5,
+                    max_value=720,
+                    value=60,
+                    step=5,
+                    key=f"{key_prefix}_duration",
+                )
+            )
 
-    end_at = datetime.combine(planned_date, start_time) + timedelta(minutes=estimated_minutes)
+    end_at = end_at_for_duration(planned_date, start_time, estimated_minutes)
     end_time = end_at.time()
-    if end_at.date() != planned_date:
+    if duration_crosses_midnight(planned_date, start_time, estimated_minutes):
         st.error("The selected duration cannot cross midnight.")
 
     weekdays = None
@@ -247,7 +247,7 @@ def render_plan_form(
     if not title.strip() and goal_id is None:
         st.error("A title is required.")
         return None
-    if end_at.date() != planned_date:
+    if duration_crosses_midnight(planned_date, start_time, estimated_minutes):
         return None
     if is_recurring and not weekdays:
         st.error("Choose at least one day for the routine.")

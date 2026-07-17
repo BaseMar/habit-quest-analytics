@@ -172,7 +172,7 @@ def render_home_base() -> None:
     render_page_header(
         "Home Base",
         "Home Base",
-        "A focused workspace for planning quests, reviewing progress, and keeping daily work visible.",
+        "A focused workspace for planning tasks, reviewing progress, and keeping daily work visible.",
     )
 
     st.markdown(
@@ -199,7 +199,7 @@ def render_home_base() -> None:
             <div class="home-step-card">
                 <div class="home-step-number">1</div>
                 <div class="home-step-title">Plan</div>
-                <div class="home-step-body">Schedule one-time quests, recurring habits, and goal sessions.</div>
+                <div class="home-step-body">Schedule tasks, routines, and project sessions.</div>
             </div>
             <div class="home-step-card">
                 <div class="home-step-number">2</div>
@@ -230,11 +230,11 @@ def render_home_base() -> None:
         <div class="hq-card-grid">
             <div class="hq-card">
                 <div class="hq-card-title">Command Center</div>
-                <div class="hq-card-body">Today's focus and operational quest status.</div>
+                <div class="hq-card-body">Today's focus and task status.</div>
             </div>
             <div class="hq-card">
                 <div class="hq-card-title">Quest Planner</div>
-                <div class="hq-card-body">Calendar planner for scheduled quests and habits.</div>
+                <div class="hq-card-body">Calendar planner for scheduled tasks and routines.</div>
             </div>
             <div class="hq-card">
                 <div class="hq-card-title">Habit Analytics</div>
@@ -251,19 +251,19 @@ def render_home_base() -> None:
 
     render_section_title(
         "How It Works",
-        "The app keeps the loop practical: plan the day, complete quests, and review what the data shows.",
+        "The app keeps the loop practical: plan the day, complete tasks, and review what the data shows.",
     )
     st.markdown(
         """
         <div class="home-loop">
-            <div class="home-loop-item">Quests</div>
+            <div class="home-loop-item">Tasks</div>
             <div class="home-loop-item">XP</div>
             <div class="home-loop-item">Character Growth</div>
             <div class="home-loop-item">Analytics</div>
         </div>
         <div class="hq-card">
             <div class="hq-card-body">
-                Scheduled quests create a daily plan. Completed quests award XP. Categories contribute to RPG stats.
+                Scheduled tasks create a daily plan. Completed tasks award XP. Categories contribute to RPG stats.
                 Analytics reveal patterns over time.
             </div>
         </div>

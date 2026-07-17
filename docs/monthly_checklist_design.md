@@ -170,7 +170,7 @@ Current v1 structure:
 - Subtitle: `Track daily quest completion and generate routine days for the selected month.`
 - Month selector.
 - Year selector.
-- Explicit routine generation action for the selected month.
+- Explicit missing-routine generation action next to the selected period.
 - Status legend.
 - Matrix preview:
   - rows are quests, recurring habits, or goals/projects,
@@ -178,7 +178,7 @@ Current v1 structure:
   - cells show simple status symbols.
 - Selected quest/date action controls:
   - select quest,
-  - select date,
+  - select only dates that are scheduled/generated for that quest,
   - view current status,
   - show locked/not-scheduled state for blank cells,
   - select a concrete goal session when a goal/date contains multiple sessions,

@@ -33,6 +33,10 @@ Still not implemented:
 
 Recurring habits are templates. They are not completed directly.
 
+The interface calls these templates `routines` and calls their persisted
+occurrences `scheduled routine days`; the technical model names remain in this
+document for precision.
+
 The implemented flow is:
 
 ```text

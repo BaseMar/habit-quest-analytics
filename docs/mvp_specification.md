@@ -34,9 +34,22 @@ The current usable version includes:
 - `Command Center` - read-only operational overview using daily check-ins.
 - `Quest Planner` - `Plan` for the calendar, direct daily status actions, and
   unified planning form; `Manage` for projects and routines; and `Monthly
-  Review` for the checklist and selected-month routine generation.
+  Review` for the checklist, selected-month routine generation, and historical
+  status updates on scheduled days.
 - `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency, planned minutes, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, radar chart, and achievements placeholder.
+
+## User-Facing Language
+
+The planner uses simple terms in its interface:
+
+- `Task` - one planned item, including a one-time item or a project session.
+- `Routine` - repeated work that can add scheduled days to a selected month.
+- `Project` - a longer outcome made up of task sessions.
+
+`Quest`, `QuestCheckin`, and recurring-template names remain internal model terms
+or part of the RPG presentation. They should not be needed to complete daily
+planning work.
 
 ## Implementation Phases
 
@@ -56,7 +69,8 @@ Status: implemented.
 
 Status: implemented for scheduled one-time quests and recurring habit templates.
 
-- Create scheduled quests from Quest Planner.
+- Create scheduled quests from Quest Planner using the selected day as the
+  default schedule.
 - Store title, notes, category, planned date, planned start/end times, estimated minutes, and XP reward.
 - Validate that end time is after start time.
 - Display quests on the calendar and selected day schedule.
