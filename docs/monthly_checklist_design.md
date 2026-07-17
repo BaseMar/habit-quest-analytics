@@ -166,10 +166,11 @@ Monthly Checklist lives in Quest Planner.
 
 Current v1 structure:
 
-- Section title: `Monthly Checklist`.
-- Subtitle: `Track daily quest completion for the selected month.`
+- Section title: `Monthly Review`.
+- Subtitle: `Track daily quest completion and generate routine days for the selected month.`
 - Month selector.
 - Year selector.
+- Explicit routine generation action for the selected month.
 - Status legend.
 - Matrix preview:
   - rows are quests, recurring habits, or goals/projects,
@@ -181,7 +182,8 @@ Current v1 structure:
   - view current status,
   - show locked/not-scheduled state for blank cells,
   - select a concrete goal session when a goal/date contains multiple sessions,
-  - Complete, Skip, Fail, Reset only for scheduled/generated cells.
+  - Planned scheduled/generated cells offer Complete, Skip, and Fail.
+  - Resolved scheduled/generated cells offer Reset to Planned.
 
 Goal row display:
 
@@ -200,10 +202,14 @@ Current behavior:
 
 - Calendar planning and the New Quest form remain.
 - Creating a scheduled quest creates a planned check-in for the scheduled date.
-- Monthly Checklist is the only user-facing completion/status workflow on Quest Planner.
+- Selected Day Schedule provides direct Complete, Skip, and Fail actions for
+  planned work on the selected date, plus Reset for resolved work.
+- Monthly Checklist remains the full month-level completion, status-history,
+  and multi-session goal workflow.
 - The old Maintenance, Quest Ledger, and Legacy Status Controls UI were removed.
 - Calendar events display check-in status for the event date when available.
-- Selected Day Schedule displays check-in status for the selected date when available.
+- Selected Day Schedule displays check-in status for the selected date and
+  updates the existing scheduled check-in through the same status service.
 - Blank/not-scheduled Monthly Checklist cells cannot create check-ins through
   status updates.
 - Goal-linked sessions are grouped visually into one goal row, but status
@@ -290,7 +296,7 @@ Covered by current tests:
 - Quest/check-in relationships.
 - Planned check-in creation.
 - Idempotent `ensure_checkin`.
-- Complete, Skip, Fail, and Reset behavior.
+- Status-dependent Complete, Skip, Fail, and Reset behavior.
 - XP idempotency.
 - Stale planned failure helper.
 - Scheduled quest creation creates planned check-ins.

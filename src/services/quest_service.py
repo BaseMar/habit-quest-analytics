@@ -238,7 +238,11 @@ def get_quests_for_day(planned_date: date, session=None) -> list[Quest]:
     try:
         quests = (
             session.query(Quest)
-            .options(joinedload(Quest.category), selectinload(Quest.checkins))
+            .options(
+                joinedload(Quest.category),
+                selectinload(Quest.checkins),
+                selectinload(Quest.recurring_habit_instance),
+            )
             .filter(
                 or_(
                     Quest.due_date == planned_date,
@@ -319,6 +323,74 @@ def update_quest_status(quest_id: int, status: str, session=None) -> Quest:
         quest.status = normalized_status
         if normalized_status == "Completed" and quest.completed_at is None:
             quest.completed_at = utc_now()
+
+        session.commit()
+        session.refresh(quest)
+        return quest
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
+def update_one_time_quest_if_unresolved(
+    quest_id: int,
+    title: str,
+    description: str = "",
+    category_id: int | None = None,
+    planned_date: date | None = None,
+    start_time: time | None = None,
+    end_time: time | None = None,
+    estimated_minutes: int | None = None,
+    session=None,
+) -> Quest:
+    """Edit one unresolved scheduled quest while preserving its planned check-in."""
+    if planned_date is None:
+        raise ValueError("Planned date is required.")
+    if start_time is None or end_time is None:
+        raise ValueError("Start and end time are required.")
+
+    planned_start_at, planned_end_at = validate_schedule_times(planned_date, start_time, end_time)
+    normalized_minutes = _normalize_estimated_minutes(estimated_minutes)
+    if normalized_minutes is None:
+        normalized_minutes = int((planned_end_at - planned_start_at).total_seconds() // 60)
+
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        quest = session.get(Quest, quest_id)
+        if quest is None:
+            raise ValueError(f"Quest with id {quest_id} was not found.")
+        if _get_recurring_instance_for_quest(session, quest.id) is not None:
+            raise ValueError("Generated routine days must be edited through the routine workflow.")
+
+        checkins = _get_quest_checkins(session, quest.id)
+        if any(not _is_unresolved_planned_checkin(checkin) for checkin in checkins):
+            raise ValueError("Resolved quests or quests with awarded XP cannot be edited.")
+        if len(checkins) > 1:
+            raise ValueError("Quests with multiple check-ins cannot be edited as one-time planned items.")
+
+        if quest.goal_id is not None and quest.goal_session_number is not None:
+            goal = _get_active_goal_for_link(session, quest.goal_id)
+            normalized_title = build_goal_session_title(goal.title, quest.goal_session_number)
+        else:
+            normalized_title = _normalize_title(title)
+
+        quest.title = normalized_title
+        quest.description = (description or "").strip() or None
+        quest.category_id = category_id
+        quest.due_date = planned_date
+        quest.planned_start_at = planned_start_at
+        quest.planned_end_at = planned_end_at
+        quest.estimated_minutes = normalized_minutes
+        quest.xp_reward = calculate_time_based_xp(normalized_minutes)
+
+        if checkins:
+            checkins[0].checkin_date = planned_date
+        else:
+            ensure_checkin(quest.id, planned_date, session=session)
 
         session.commit()
         session.refresh(quest)

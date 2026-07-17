@@ -32,7 +32,9 @@ The current usable version includes:
 
 - `Home Base` - onboarding, quick start, app map, and local-first MVP note.
 - `Command Center` - read-only operational overview using daily check-ins.
-- `Quest Planner` - calendar planner, selected day schedule, new quest form, Recurring Habits, and Monthly Checklist.
+- `Quest Planner` - `Plan` for the calendar, direct daily status actions, and
+  unified planning form; `Manage` for projects and routines; and `Monthly
+  Review` for the checklist and selected-month routine generation.
 - `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency, planned minutes, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, radar chart, and achievements placeholder.
 
@@ -59,8 +61,11 @@ Status: implemented for scheduled one-time quests and recurring habit templates.
 - Validate that end time is after start time.
 - Display quests on the calendar and selected day schedule.
 - Create recurring habit templates for selected weekdays.
+- Edit recurring habit templates without changing already generated days or
+  their completed, skipped, failed, or planned history.
 - Generate recurring habit planned days for a selected month.
-- Archive/deactivate recurring habit templates with generated history.
+- Stop/resume recurring habit templates with generated history, with optional
+  cleanup of future unresolved planned days when stopping.
 - Delete unused recurring habit templates.
 - Delete unresolved one-time planned quests while preserving historical or
   XP-awarded records.
@@ -71,9 +76,8 @@ Status: implemented for scheduled one-time quests and recurring habit templates.
 
 Still planned:
 
-- quest editing,
 - one-time quest archive/soft-delete workflow for historical records,
-- recurring habit editing beyond active/archive/delete controls.
+- broader historical quest editing beyond unresolved planned records.
 
 ### Phase 3: Monthly Checklist
 
@@ -136,7 +140,7 @@ Legacy quest-based fallback remains only for databases with no check-ins.
 ## Future Features Outside MVP
 
 - Long-term Goals / Projects.
-- Recurring habit editing and true N-times-per-week scheduling.
+- True N-times-per-week recurring habit scheduling.
 - PostgreSQL / production persistence.
 - Authentication and user-specific data isolation.
 - Google Calendar sync.

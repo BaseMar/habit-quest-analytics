@@ -77,6 +77,13 @@ Implementation note:
 
 ## Priority 3. Quest Editing
 
+Current status:
+
+- Unresolved one-time quests and goal/project sessions can be edited from the
+  selected day plan.
+- Generated routine occurrences remain protected. Routine templates can be
+  edited without changing existing generated days or history.
+
 What it adds:
 
 - Ability to edit an existing quest title, notes, category, planned date, and estimated minutes.
@@ -147,20 +154,18 @@ Positive value:
 - Makes analytics more useful without changing the core quest model.
 - Helps compare recent behavior against long-term trends.
 
-## Priority 7. Recurring Habit Editing / Scheduling
+## Priority 7. N-Times-Per-Week Routine Scheduling
 
 What it adds:
 
-- Editing existing recurring habit templates beyond active/archive/delete
-  controls.
 - True `N times per week` scheduling if a clear product rule is designed.
 
 Why it matters:
 
-- Recurring Habits v1 already covers selected-weekday templates and explicit
-  generation.
-- Users will eventually need to refine existing templates without deleting or
-  recreating them.
+- Recurring Habits v1 already covers selected-weekday templates, safe template
+  editing, and explicit generation.
+- Users may eventually prefer a simple weekly frequency over selecting exact
+  weekdays.
 
 Positive value:
 

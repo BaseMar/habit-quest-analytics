@@ -123,6 +123,62 @@ def set_recurring_habit_active(
             session.close()
 
 
+def update_recurring_habit_template(
+    habit_id: int,
+    title: str,
+    category_id: int | None,
+    estimated_minutes: int,
+    recurrence_type: str,
+    weekdays: list[int] | None,
+    start_date: date,
+    end_date: date | None = None,
+    description: str | None = None,
+    planned_start_time: time | None = None,
+    planned_end_time: time | None = None,
+    session=None,
+) -> RecurringHabit:
+    """Update a habit template without changing already generated occurrences."""
+    normalized_title = _normalize_title(title)
+    normalized_estimated_minutes = _normalize_estimated_minutes(estimated_minutes)
+    normalized_recurrence_type = _normalize_recurrence_type(recurrence_type)
+    _validate_dates(start_date, end_date)
+    _validate_planned_times(planned_start_time, planned_end_time)
+    serialized_weekdays = (
+        serialize_weekdays(weekdays)
+        if normalized_recurrence_type == "selected_weekdays"
+        else None
+    )
+
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {habit_id} was not found.")
+
+        habit.title = normalized_title
+        habit.description = (description or "").strip() or None
+        habit.category_id = category_id
+        habit.xp_reward = calculate_time_based_xp(normalized_estimated_minutes)
+        habit.estimated_minutes = normalized_estimated_minutes
+        habit.recurrence_type = normalized_recurrence_type
+        habit.weekdays = serialized_weekdays
+        habit.start_date = start_date
+        habit.end_date = end_date
+        habit.planned_start_time = planned_start_time
+        habit.planned_end_time = planned_end_time
+        habit.updated_at = utc_now()
+        session.commit()
+        session.refresh(habit)
+        return habit
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 def get_recurring_habit_history_summary(
     recurring_habit_id: int,
     session=None,
@@ -226,6 +282,44 @@ def archive_recurring_habit(recurring_habit_id: int, session=None) -> dict:
             session.close()
 
 
+def stop_recurring_habit(
+    recurring_habit_id: int,
+    remove_future_planned: bool = False,
+    today: date | None = None,
+    session=None,
+) -> dict:
+    """Stop a routine and optionally remove only its safe future planned days."""
+    current_date = today or date.today()
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        habit = session.get(RecurringHabit, recurring_habit_id)
+        if habit is None:
+            raise ValueError(f"Recurring habit with id {recurring_habit_id} was not found.")
+
+        removal_summary = _remove_future_planned_instances(session, habit, current_date) if remove_future_planned else {
+            "removed_instances_count": 0,
+            "removed_checkins_count": 0,
+            "removed_quests_count": 0,
+        }
+        habit.is_active = False
+        habit.updated_at = utc_now()
+        session.commit()
+        return {
+            "recurring_habit_id": habit.id,
+            "is_active": habit.is_active,
+            "removed_instances_count": removal_summary["removed_instances_count"],
+            "removed_checkins_count": removal_summary["removed_checkins_count"],
+            "removed_quests_count": removal_summary["removed_quests_count"],
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
+
+
 def remove_future_planned_recurring_instances(
     recurring_habit_id: int,
     today: date | None = None,
@@ -240,54 +334,7 @@ def remove_future_planned_recurring_instances(
         if habit is None:
             raise ValueError(f"Recurring habit with id {recurring_habit_id} was not found.")
 
-        instances = _get_recurring_habit_instances(session, recurring_habit_id)
-        removable_instances = [
-            instance
-            for instance in instances
-            if _is_removable_future_planned_instance(session, instance, current_date)
-        ]
-        summary = {
-            "recurring_habit_id": recurring_habit_id,
-            "generated_instances_count": len(instances),
-            "completed_count": 0,
-            "skipped_count": 0,
-            "failed_count": 0,
-            "planned_count": 0,
-            "removable_future_planned_count": len(removable_instances),
-            "removed_instances_count": 0,
-            "removed_checkins_count": 0,
-            "removed_quests_count": 0,
-        }
-
-        for instance in instances:
-            checkin = _get_instance_scheduled_checkin(session, instance)
-            if checkin is None:
-                continue
-            if checkin.status == "Completed":
-                summary["completed_count"] += 1
-            elif checkin.status == "Skipped":
-                summary["skipped_count"] += 1
-            elif checkin.status == "Failed":
-                summary["failed_count"] += 1
-            elif checkin.status == "Planned":
-                summary["planned_count"] += 1
-
-        for instance in removable_instances:
-            quest = instance.quest
-            checkin = _get_instance_scheduled_checkin(session, instance)
-            if checkin is None or quest is None:
-                continue
-
-            session.delete(checkin)
-            summary["removed_checkins_count"] += 1
-            session.delete(instance)
-            summary["removed_instances_count"] += 1
-            session.flush()
-
-            if not _quest_has_checkins(session, quest.id):
-                session.delete(quest)
-                summary["removed_quests_count"] += 1
-
+        summary = _remove_future_planned_instances(session, habit, current_date)
         session.commit()
         return summary
     except Exception:
@@ -616,6 +663,63 @@ def _is_removable_future_planned_instance(
         return False
 
     return _is_removable_generated_occurrence(session, instance)
+
+
+def _remove_future_planned_instances(
+    session,
+    habit: RecurringHabit,
+    today: date,
+) -> dict:
+    """Remove safe planned instances for a habit without committing the session."""
+    instances = _get_recurring_habit_instances(session, habit.id)
+    removable_instances = [
+        instance
+        for instance in instances
+        if _is_removable_future_planned_instance(session, instance, today)
+    ]
+    summary = {
+        "recurring_habit_id": habit.id,
+        "generated_instances_count": len(instances),
+        "completed_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "planned_count": 0,
+        "removable_future_planned_count": len(removable_instances),
+        "removed_instances_count": 0,
+        "removed_checkins_count": 0,
+        "removed_quests_count": 0,
+    }
+
+    for instance in instances:
+        checkin = _get_instance_scheduled_checkin(session, instance)
+        if checkin is None:
+            continue
+        if checkin.status == "Completed":
+            summary["completed_count"] += 1
+        elif checkin.status == "Skipped":
+            summary["skipped_count"] += 1
+        elif checkin.status == "Failed":
+            summary["failed_count"] += 1
+        elif checkin.status == "Planned":
+            summary["planned_count"] += 1
+
+    for instance in removable_instances:
+        quest = instance.quest
+        checkin = _get_instance_scheduled_checkin(session, instance)
+        if checkin is None or quest is None:
+            continue
+
+        session.delete(checkin)
+        summary["removed_checkins_count"] += 1
+        session.delete(instance)
+        summary["removed_instances_count"] += 1
+        session.flush()
+
+        if not _quest_has_checkins(session, quest.id):
+            session.delete(quest)
+            summary["removed_quests_count"] += 1
+
+    return summary
 
 
 def _is_removable_generated_occurrence(session, instance: RecurringHabitInstance) -> bool:

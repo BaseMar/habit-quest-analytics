@@ -82,8 +82,8 @@ Implemented:
 - Calendar-based Quest Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - Recurring Habit templates with explicit selected-month planned-day generation.
-- Recurring habit archive/deactivate controls, unused-template deletion, single
-  generated-day deletion, and safe future planned-day cleanup.
+- Recurring habit template editing, a unified stop/resume lifecycle, unused-template
+  deletion, single generated-day deletion, and safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
 - Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset
   behavior, XP idempotency, unscheduled-date blocking, and a stale planned
@@ -97,11 +97,12 @@ Implemented:
 - Goal/project creation and linked goal sessions require a category.
 - Goal/project planned total time can be left unset when the total effort is not
   known yet.
-- Active goal cards support quick-add one-time work sessions linked to that
-  goal, with automatic per-goal session numbering and generated session titles.
-- Active goal cards include a Goal Session Planner that previews and bulk
-  creates multiple scheduled one-time sessions from remaining unscheduled goal
-  effort.
+- The unified Add to plan form can create a project inline and then add a
+  one-time work session to it, with automatic per-goal session numbering and
+  generated session titles.
+- A selected project detail view includes a Goal Session Planner that previews
+  and bulk creates multiple scheduled one-time sessions from remaining
+  unscheduled goal effort.
 - Goal lifecycle controls in Quest Planner: archive, complete, reopen, and safe
   delete for unused goals.
 - Monthly Checklist groups goal-linked sessions into one visual row per goal
@@ -118,7 +119,7 @@ Implemented:
 
 Still evolving:
 
-- Recurring habit editing and true N-times-per-week scheduling.
+- True N-times-per-week routine scheduling.
 - Long-term Goals / Projects full standalone dashboard.
 - Production persistence.
 - Authentication and user-specific data.
@@ -183,17 +184,26 @@ The app is designed to answer questions such as:
 - XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
+- Direct Complete, Skip, and Fail actions for planned work in the selected day
+  schedule; resolved work can be reset to Planned there.
 - Recurring Habit templates for Every day, Weekdays, and custom selected
   weekdays.
-- Explicit selected-month generation for recurring planned quest days.
+- Explicit selected-month generation for recurring planned quest days from
+  Monthly Review.
 - Recurring habits can be all-day or use a planned start/end time window.
+- Routine templates can be edited without changing already generated days or
+  their history; new settings apply to later month generation.
 - Unused recurring habits can be deleted.
 - Recurring habits with generated history can be archived/deactivated.
+- Stopping a routine can optionally remove its future unresolved planned days in
+  the same action, while resolved history remains intact.
 - Future unresolved planned generated days can be removed while completed,
   skipped, failed, and XP-awarded history is preserved.
 - Single unresolved generated recurring days can be removed safely.
 - One-time planned quests can be deleted only while they have no resolved
   history or awarded XP.
+- Unresolved one-time quests and project sessions can be edited from the day
+  plan, including title, category, date, duration, and notes.
 - Goal/project sessions can be added one at a time or generated in bulk from
   remaining unscheduled effort after an explicit preview and confirmation.
 - Bulk goal planning respects selected weekdays, start time, optional planning
@@ -204,11 +214,13 @@ The app is designed to answer questions such as:
 ### Monthly Checklist
 
 - Month and year selection.
+- Month-level review and status history for scheduled quest days.
 - Matrix preview with quests as rows and days as columns.
 - Recurring habits appear as one logical row with generated dates populated.
 - Status legend for empty, planned, completed, skipped, and failed days.
-- Compact status editor for selected quest/date actions.
-- Complete, Skip, Fail, and Reset actions.
+- Compact status editor for selected quest/date corrections.
+- Planned cells offer Complete, Skip, and Fail; resolved cells offer Reset to
+  Planned.
 - Status actions are enabled only for scheduled/generated cells; blank
   not-scheduled cells are locked and do not create new check-ins.
 - Compact delete controls for unresolved one-time planned quests and unresolved
@@ -266,9 +278,9 @@ The app is designed to answer questions such as:
   local-first MVP note.
 - `Command Center` - read-only operational overview powered by daily quest
   check-ins.
-- `Quest Planner` - calendar planner, selected day schedule, unified planning
-  form, Goals / Projects with bulk-session planning, routines with
-  archive/delete/cleanup controls, and Monthly Checklist.
+- `Quest Planner` - `Plan` for the calendar, day schedule, and unified form;
+  `Manage` for projects and routines; and `Monthly Review` for the checklist
+  and selected-month routine generation.
 - `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
   charts, planned minutes, goal analytics, and insights.
 - `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
@@ -557,9 +569,8 @@ python -m compileall -q app src tests
 
 Current limitations:
 
-- Recurring Habits v1 supports selected weekdays and explicit month generation;
-  recurring habit editing and true N-times-per-week auto-scheduling are not
-  implemented yet.
+- Recurring Habits v1 supports selected weekdays, template editing, and explicit
+  month generation; true N-times-per-week auto-scheduling is not implemented yet.
 - Long-term Goals / Projects full standalone dashboard is not implemented yet;
   Quest Planner includes goal creation, lifecycle controls, active goal progress
   cards, and Habit Analytics includes goal analytics. The design is documented in
@@ -578,7 +589,7 @@ Current limitations:
 Suggested future order:
 
 1. Long-term Goals / Projects full standalone dashboard
-2. Recurring habit editing and N-times-per-week scheduling
+2. N-times-per-week recurring habit scheduling
 3. PostgreSQL / production persistence
 4. Authentication
 5. Google Calendar sync

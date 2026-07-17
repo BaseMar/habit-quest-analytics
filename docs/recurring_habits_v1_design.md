@@ -16,14 +16,16 @@ Template management is also implemented:
 - unused recurring habit templates can be hard-deleted,
 - templates with generated history are archived/deactivated instead of
   hard-deleted,
+- routine lifecycle controls combine stopping with optional cleanup of future
+  unresolved planned days,
 - future unresolved planned generated days can be removed safely while
   preserving completed, skipped, failed, and XP-awarded history,
-- a single unresolved generated recurring occurrence can be deleted safely.
+- a single unresolved generated recurring occurrence can be deleted safely,
+- templates can be edited without mutating existing generated days.
 
 Still not implemented:
 
 - true `N times per week` auto-scheduling,
-- recurring habit editing beyond active/inactive/archive/delete controls,
 - automatic background generation,
 - generation from analytics, profile, Command Center, or app startup.
 
@@ -184,8 +186,8 @@ Recurring Habits v1 uses explicit month-based generation.
 
 User flow:
 
-1. User selects a month in Quest Planner.
-2. User clicks `Generate Planned Days for selected month`.
+1. User selects a month in Quest Planner's Monthly Review.
+2. User clicks `Generate routines for <month>`.
 3. The system generates planned quest days only inside that month.
 4. Inactive habits are skipped.
 5. `start_date` and `end_date` are respected.
@@ -209,12 +211,15 @@ Quest Planner remains the planning surface.
 
 Current UI:
 
-- Keep the one-time `New Quest` form.
-- Includes a `Recurring Habits` section.
-- Provides a compact form to create recurring habit templates.
-- Provides a recurring habits table.
-- Provides selected template management controls.
-- Provides a selected-month generation button.
+- Use the unified `Add to plan` form for one-time work and recurring routines.
+- Keep recurring routine management under `Manage`.
+- Provide a recurring routines table and selected routine management controls.
+- Allow template fields to be edited under `Manage`; changes affect later
+  generation only and leave existing generated days unchanged.
+- Keep deletion, stopping, optional future-day cleanup, and resuming together
+  under one routine lifecycle control.
+- Provide the selected-month generation button in `Monthly Review`, next to the
+  selected period.
 - Allows unused templates to be deleted after confirmation.
 - Archives/deactivates templates with generated history instead of hard-deleting
   them.
@@ -225,7 +230,7 @@ Current UI:
   safety rule.
 - Show generated habits in calendar, day schedule, and Monthly Checklist as normal planned quest days.
 
-The Recurring Habits section should stay compact and practical for the MVP. It should avoid
+The routine-management view should stay compact and practical for the MVP. It should avoid
 advanced scheduling, drag-and-drop recurrence editing, streak dashboards, or automatic day
 selection in v1.
 
@@ -355,6 +360,8 @@ Covered by focused pytest coverage for:
 - single unresolved generated recurring occurrences can be removed,
 - completed, skipped, failed, and XP-awarded history is preserved,
 - archived/inactive recurring habits do not generate new planned days.
+- template updates affect only future generation and preserve generated quests,
+  check-ins, and instances.
 
 ## Risks And Decisions
 

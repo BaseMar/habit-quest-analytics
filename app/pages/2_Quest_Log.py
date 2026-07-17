@@ -1,5 +1,5 @@
 from calendar import month_name
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 import hashlib
 from html import escape
 import sys
@@ -22,6 +22,7 @@ from src.database.seed import ensure_default_categories
 from src.services.checklist_service import (
     get_month_checklist,
     is_checklist_cell_editable,
+    update_checkin_status,
     update_checklist_cell_status,
 )
 from src.services.goal_service import (
@@ -46,9 +47,9 @@ from src.services.quest_service import (
     get_categories,
     get_quests_for_calendar,
     get_quests_for_day,
+    update_one_time_quest_if_unresolved,
 )
 from src.services.recurring_habit_service import (
-    archive_recurring_habit,
     create_recurring_habit,
     delete_recurring_habit_if_unused,
     delete_recurring_generated_occurrence_if_unresolved,
@@ -57,8 +58,9 @@ from src.services.recurring_habit_service import (
     generate_recurring_habit_for_month,
     get_recurring_habit_history_summary,
     list_recurring_habits,
-    remove_future_planned_recurring_instances,
     set_recurring_habit_active,
+    stop_recurring_habit,
+    update_recurring_habit_template,
 )
 from src.ui import apply_theme, get_theme_tokens, render_empty_state, render_page_header, render_section_title
 
@@ -337,25 +339,164 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
         st.rerun()
 
 
-def render_schedule_list(quests: list) -> None:
+def render_schedule_list(quests: list, planned_date: date) -> None:
     if not quests:
         st.info("No quests planned for this day.")
         return
 
-    rows = "".join(
-        (
-            '<div class="hq-list-row">'
-            f'<div class="hq-list-time">{escape(_format_time_range(quest))}</div>'
-            "<div>"
-            f'<div class="hq-list-title">{escape(str(quest.title))}</div>'
-            f'<div class="hq-list-meta">{escape(_category_name(quest))} / {escape(_display_status(quest))}</div>'
-            "</div>"
-            f'<div class="hq-list-value">{int(quest.xp_reward or 0)} XP</div>'
-            "</div>"
+    for quest in quests:
+        status = _display_status(quest)
+        row_cols = st.columns([0.16, 0.44, 0.12, 0.28], vertical_alignment="center")
+        with row_cols[0]:
+            st.caption(_format_time_range(quest))
+        with row_cols[1]:
+            st.write(f"**{quest.title}**")
+            st.caption(f"{_category_name(quest)} / {status}")
+            if status == "Planned" and quest.recurring_habit_instance is None:
+                if st.button("Edit", key=f"edit_day_quest_{quest.id}"):
+                    st.session_state["editing_day_quest_id"] = quest.id
+                    st.rerun()
+        with row_cols[2]:
+            st.caption(f"{int(quest.xp_reward or 0)} XP")
+        with row_cols[3]:
+            if status == "Planned":
+                complete_col, skip_col, fail_col = st.columns(3)
+                actions = (
+                    (complete_col, "Complete", "Completed", "primary"),
+                    (skip_col, "Skip", "Skipped", "secondary"),
+                    (fail_col, "Fail", "Failed", "secondary"),
+                )
+            else:
+                reset_col, _, _ = st.columns(3)
+                actions = ((reset_col, "Reset", "Planned", "secondary"),)
+
+            for action_col, label, next_status, button_type in actions:
+                with action_col:
+                    if st.button(
+                        label,
+                        type=button_type,
+                        use_container_width=True,
+                        key=f"day_status_{quest.id}_{planned_date.isoformat()}_{next_status}",
+                    ):
+                        try:
+                            update_checkin_status(quest.id, planned_date, next_status)
+                        except ValueError as error:
+                            st.error(str(error))
+                        else:
+                            st.session_state["daily_status_message"] = (
+                                f"{label} saved for {quest.title}."
+                            )
+                            st.rerun()
+        st.divider()
+
+
+def render_day_item_editor(quests: list, category_options: dict[str, int]) -> None:
+    editing_quest_id = st.session_state.get("editing_day_quest_id")
+    if editing_quest_id is None:
+        return
+
+    quest = next((item for item in quests if item.id == editing_quest_id), None)
+    if quest is None:
+        st.session_state.pop("editing_day_quest_id", None)
+        return
+
+    with st.expander("Edit planned item", expanded=True):
+        if _display_status(quest) != "Planned":
+            st.warning("Only unresolved planned items can be edited.")
+            return
+
+        is_goal_session = quest.goal_id is not None
+        if is_goal_session:
+            st.caption(f"Session title is generated from its project: {quest.title}")
+            title = quest.title
+        else:
+            title = st.text_input("Title", value=quest.title, key=f"edit_quest_title_{quest.id}")
+
+        category_names = list(category_options)
+        current_category_index = next(
+            (index for index, name in enumerate(category_names) if category_options[name] == quest.category_id),
+            0,
         )
-        for quest in quests
-    )
-    st.markdown(f'<div class="hq-list-panel">{rows}</div>', unsafe_allow_html=True)
+        category_name = st.selectbox(
+            "Category",
+            category_names,
+            index=current_category_index,
+            key=f"edit_quest_category_{quest.id}",
+        )
+
+        planned_date = st.date_input(
+            "Date",
+            value=quest.due_date or st.session_state["selected_date"],
+            key=f"edit_quest_date_{quest.id}",
+        )
+        start_time = (quest.planned_start_at or datetime.combine(planned_date, time(9, 0))).time()
+        duration_minutes = _quest_duration_minutes(quest) or 60
+        time_col, duration_col = st.columns(2)
+        with time_col:
+            start_time = st.time_input(
+                "Start time",
+                value=start_time,
+                step=300,
+                key=f"edit_quest_start_time_{quest.id}",
+            )
+        with duration_col:
+            duration_minutes = int(
+                st.number_input(
+                    "Duration (min)",
+                    min_value=5,
+                    max_value=720,
+                    value=duration_minutes,
+                    step=5,
+                    key=f"edit_quest_duration_{quest.id}",
+                )
+            )
+
+        end_at = datetime.combine(planned_date, start_time) + timedelta(minutes=duration_minutes)
+        if end_at.date() != planned_date:
+            st.error("The selected duration cannot cross midnight.")
+
+        notes = st.text_area(
+            "Notes",
+            value=quest.description or "",
+            height=64,
+            key=f"edit_quest_notes_{quest.id}",
+        )
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            save_clicked = st.button(
+                "Save changes",
+                type="primary",
+                use_container_width=True,
+                key=f"save_quest_{quest.id}",
+                disabled=end_at.date() != planned_date,
+            )
+        with cancel_col:
+            cancel_clicked = st.button("Cancel", use_container_width=True, key=f"cancel_quest_{quest.id}")
+
+        if cancel_clicked:
+            st.session_state.pop("editing_day_quest_id", None)
+            st.rerun()
+        if not save_clicked:
+            return
+
+        try:
+            update_one_time_quest_if_unresolved(
+                quest.id,
+                title=title,
+                description=notes,
+                category_id=category_options[category_name],
+                planned_date=planned_date,
+                start_time=start_time,
+                end_time=end_at.time(),
+                estimated_minutes=duration_minutes,
+            )
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            st.session_state.pop("editing_day_quest_id", None)
+            st.session_state["pending_selected_date"] = planned_date
+            st.session_state["daily_status_message"] = "Planned item updated."
+            st.rerun()
 
 
 def render_day_summary(quests: list) -> None:
@@ -370,7 +511,7 @@ def render_day_summary(quests: list) -> None:
     complete_col.metric("Completed", completed_count)
 
 
-def render_goal_progress_section(category_options: dict[str, int]) -> None:
+def render_goal_progress_section(category_options: dict[str, int]) -> list:
     status_message = st.session_state.pop("goal_status_message", None)
     if status_message:
         if st.session_state.pop("goal_status_warning", False):
@@ -382,9 +523,9 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
     if not active_goals:
         render_empty_state(
             "No active goals yet",
-            "Create a long-term goal below, then link one-time quest sessions to track progress.",
+            "Create a project from Add to plan, then link one-time sessions to track progress.",
         )
-        return
+        return []
 
     category_names_by_id = {category_id: name for name, category_id in category_options.items()}
     for goal in active_goals:
@@ -441,7 +582,30 @@ def render_goal_progress_section(category_options: dict[str, int]) -> None:
             """,
             unsafe_allow_html=True,
         )
-        render_goal_session_planner(goal)
+        if st.button("Open project", key=f"open_goal_{goal.id}"):
+            st.session_state["selected_goal_detail_id"] = goal.id
+            st.rerun()
+
+    return active_goals
+
+
+def render_goal_detail(active_goals: list) -> None:
+    goals_by_id = {goal.id: goal for goal in active_goals}
+    selected_goal_id = st.session_state.get("selected_goal_detail_id")
+    if selected_goal_id not in goals_by_id:
+        return
+
+    goal = goals_by_id[selected_goal_id]
+    st.divider()
+    header_col, action_col = st.columns([0.76, 0.24], vertical_alignment="center")
+    with header_col:
+        render_section_title("Project Planning", f"Plan multiple sessions for {goal.title}.")
+    with action_col:
+        if st.button("Close project", use_container_width=True, key=f"close_goal_{goal.id}"):
+            st.session_state.pop("selected_goal_detail_id", None)
+            st.rerun()
+
+    render_goal_session_planner(goal)
 
 
 def render_goal_session_planner(goal) -> None:
@@ -623,197 +787,90 @@ def _render_goal_session_plan_preview(preview: dict) -> None:
     total_cols[2].metric("Remaining Unallocated", _format_minutes(preview["remaining_unallocated_minutes"]))
 
 
-def render_goal_creation_form(category_options: dict[str, int]) -> None:
-    with st.expander("Create Goal / Project", expanded=False):
-        st.markdown(
-            """
-            <div class="hq-compact-intro">
-                <div class="hq-compact-title">New long-term goal</div>
-                <div class="hq-compact-body">Create the project container first, then add one-time sessions to track progress.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        form_col, spacer_col = st.columns([0.68, 0.32], gap="large")
-        with form_col:
-            title = st.text_input("Goal Title", placeholder="Portfolio Project", key="new_goal_title")
-            description = st.text_area(
-                "Description / Notes",
-                height=64,
-                placeholder="Optional goal notes",
-                key="new_goal_description",
-            )
-
-            hours_col, minutes_col = st.columns(2)
-            with hours_col:
-                planned_hours = st.number_input(
-                    "Planned Hours",
-                    min_value=0,
-                    value=0,
-                    step=1,
-                    key="new_goal_planned_hours",
-                )
-            with minutes_col:
-                planned_minutes_remainder = st.number_input(
-                    "Planned Minutes",
-                    min_value=0,
-                    max_value=59,
-                    value=0,
-                    step=5,
-                    key="new_goal_planned_minutes",
-                )
-
-            category_labels = list(category_options.keys())
-            selected_category_label = st.selectbox(
-                "Category",
-                category_labels,
-                key="new_goal_category",
-            )
-            selected_category_id = category_options[selected_category_label]
-
-            date_col, target_col = st.columns(2)
-            with date_col:
-                use_start_date = st.checkbox("Set start date", value=True, key="new_goal_use_start")
-                start_date = (
-                    st.date_input("Start Date", value=date.today(), key="new_goal_start_date")
-                    if use_start_date
-                    else None
-                )
-            with target_col:
-                use_target_date = st.checkbox("Set target date", value=False, key="new_goal_use_target")
-                target_end_date = (
-                    st.date_input("Target End Date", value=date.today(), key="new_goal_target_date")
-                    if use_target_date
-                    else None
-                )
-
-            if st.button("Create Goal", type="primary", use_container_width=True, key="create_goal_button"):
-                planned_total_minutes = int(planned_hours) * 60 + int(planned_minutes_remainder)
-                if not title.strip():
-                    st.error("Goal title is required.")
-                else:
-                    try:
-                        create_goal(
-                            title=title,
-                            description=description,
-                            category_id=selected_category_id,
-                            planned_total_minutes=planned_total_minutes,
-                            start_date=start_date,
-                            target_end_date=target_end_date,
-                        )
-                    except ValueError as error:
-                        st.error(str(error))
-                    else:
-                        st.success("Goal created.")
-                        st.rerun()
-        with spacer_col:
-            st.markdown(
-                """
-                <div class="hq-side-note">
-                    <strong>Progress source</strong>
-                    <span>Linked one-time quest sessions update this goal. XP is still awarded only by completed check-ins.</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-
 def render_goal_management(category_options: dict[str, int]) -> None:
     goals = list_goals()
 
     category_names_by_id = {category_id: name for name, category_id in category_options.items()}
-    with st.expander("Manage Goals", expanded=False):
+    with st.expander("Manage Projects", expanded=False):
         if not goals:
             st.markdown(
                 """
                 <div class="hq-empty-compact">
-                    <strong>No goals to manage yet.</strong>
-                    <span>Create a goal first, then lifecycle actions will appear here.</span>
+                    <strong>No projects to manage yet.</strong>
+                    <span>Create a project from Add to plan first.</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
             return
 
-        for goal in goals:
-            history = get_goal_history_summary(goal.id)
-            category = category_names_by_id.get(goal.category_id, "Uncategorized")
-            with st.container():
-                detail_col, action_col = st.columns([0.58, 0.42], vertical_alignment="center")
-                with detail_col:
-                    st.markdown(
-                        f"""
-                        <div class="hq-management-item">
-                            <div class="hq-management-title">{escape(str(goal.title))}</div>
-                            <div class="hq-management-meta">
-                                {escape(str(goal.status))} / {escape(str(category))} /
-                                {int(history['linked_quests_count'])} linked sessions /
-                                {int(history['earned_xp'])} XP earned
-                            </div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+        goals_by_id = {goal.id: goal for goal in goals}
+        selected_goal_id = st.selectbox(
+            "Project",
+            list(goals_by_id),
+            format_func=lambda goal_id: f"{goals_by_id[goal_id].title} / {goals_by_id[goal_id].status}",
+            key="managed_goal_id",
+        )
+        goal = goals_by_id[selected_goal_id]
+        history = get_goal_history_summary(goal.id)
+        category = category_names_by_id.get(goal.category_id, "Uncategorized")
+        st.markdown(
+            f"""
+            <div class="hq-management-item">
+                <div class="hq-management-title">{escape(str(goal.title))}</div>
+                <div class="hq-management-meta">
+                    {escape(str(goal.status))} / {escape(str(category))} /
+                    {int(history['linked_quests_count'])} linked sessions /
+                    {int(history['earned_xp'])} XP earned
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-                with action_col:
-                    action_cols = st.columns(3)
-                    with action_cols[0]:
-                        if goal.status == "Active":
-                            if st.button("Archive", key=f"goal_archive_{goal.id}", use_container_width=True):
-                                archive_goal(goal.id)
-                                st.session_state["goal_status_message"] = (
-                                    "Goal archived. Existing linked quest history was preserved."
-                                )
-                                st.rerun()
-                        elif goal.status == "Completed":
-                            if st.button("Archive", key=f"goal_archive_{goal.id}", use_container_width=True):
-                                archive_goal(goal.id)
-                                st.session_state["goal_status_message"] = (
-                                    "Goal archived. Existing linked quest history was preserved."
-                                )
-                                st.rerun()
-                        else:
-                            if st.button("Reopen", key=f"goal_reopen_{goal.id}", use_container_width=True):
-                                reopen_goal(goal.id)
-                                st.session_state["goal_status_message"] = "Goal reopened."
-                                st.rerun()
+        action_cols = st.columns(3)
+        with action_cols[0]:
+            if goal.status in ("Active", "Completed"):
+                if st.button("Archive", key=f"goal_archive_{goal.id}", use_container_width=True):
+                    archive_goal(goal.id)
+                    st.session_state["goal_status_message"] = "Project archived. Linked session history was preserved."
+                    st.rerun()
+            elif st.button("Reopen", key=f"goal_reopen_{goal.id}", use_container_width=True):
+                reopen_goal(goal.id)
+                st.session_state["goal_status_message"] = "Project reopened."
+                st.rerun()
 
-                    with action_cols[1]:
-                        if goal.status == "Active":
-                            if st.button("Complete", key=f"goal_complete_{goal.id}", use_container_width=True):
-                                complete_goal(goal.id)
-                                st.session_state["goal_status_message"] = (
-                                    "Goal marked as completed. Existing linked quest history was preserved."
-                                )
-                                st.rerun()
-                        elif goal.status == "Completed":
-                            if st.button("Reopen", key=f"goal_reopen_{goal.id}", use_container_width=True):
-                                reopen_goal(goal.id)
-                                st.session_state["goal_status_message"] = "Goal reopened."
-                                st.rerun()
+        with action_cols[1]:
+            if goal.status == "Active":
+                if st.button("Complete", key=f"goal_complete_{goal.id}", use_container_width=True):
+                    complete_goal(goal.id)
+                    st.session_state["goal_status_message"] = "Project marked as completed."
+                    st.rerun()
+            elif goal.status == "Completed":
+                if st.button("Reopen", key=f"goal_reopen_completed_{goal.id}", use_container_width=True):
+                    reopen_goal(goal.id)
+                    st.session_state["goal_status_message"] = "Project reopened."
+                    st.rerun()
 
-                    with action_cols[2]:
-                        confirm_delete = st.checkbox(
-                            "Confirm delete",
-                            key=f"goal_confirm_delete_{goal.id}",
-                        )
-                        if st.button(
-                            "Delete",
-                            key=f"goal_delete_{goal.id}",
-                            use_container_width=True,
-                            disabled=not confirm_delete,
-                        ):
-                            delete_summary = delete_goal_if_unused(goal.id)
-                            if delete_summary["deleted"]:
-                                st.session_state["goal_status_message"] = "Unused goal deleted."
-                            else:
-                                st.session_state["goal_status_message"] = (
-                                    "This goal has linked quest sessions and cannot be deleted safely. "
-                                    "Archive it instead."
-                                )
-                                st.session_state["goal_status_warning"] = True
-                            st.rerun()
+        with action_cols[2]:
+            can_delete = history["linked_quests_count"] == 0
+            confirm_delete = st.checkbox(
+                "Confirm delete",
+                key=f"goal_confirm_delete_{goal.id}",
+                disabled=not can_delete,
+            )
+            if st.button(
+                "Delete",
+                key=f"goal_delete_{goal.id}",
+                use_container_width=True,
+                disabled=not can_delete or not confirm_delete,
+            ):
+                delete_goal_if_unused(goal.id)
+                st.session_state["goal_status_message"] = "Unused project deleted."
+                st.rerun()
+
+        if not can_delete:
+            st.caption("Projects with linked sessions are preserved. Archive them instead of deleting them.")
 
 
 def _ensure_checklist_period_state() -> None:
@@ -833,29 +890,19 @@ def _ensure_checklist_period_state() -> None:
 
 
 def render_recurring_habits(category_options: dict[str, int]) -> None:
-    _ensure_checklist_period_state()
-    selected_month = int(st.session_state["checklist_month"])
-    selected_year = int(st.session_state["checklist_year"])
     category_names_by_id = {category_id: name for name, category_id in category_options.items()}
 
     status_message = st.session_state.pop("recurring_habit_status_message", None)
     if status_message:
         st.success(status_message)
 
-    st.caption("Create routines from Add to plan in the Calendar & Day Plan tab.")
+    st.caption("Create routines from Add to plan, then edit or manage their lifecycle here.")
     with st.container():
-        st.write("**Routines**")
-        st.caption(
-            f"Generate planned days for {month_name[selected_month]} {selected_year}. "
-            "Change the month in Monthly Checklist."
-        )
-        st.caption("Deactivate stops future generation. Existing generated days remain for history.")
-
         habits = list_recurring_habits()
         if not habits:
             render_empty_state(
                 "No routines yet.",
-                "Create a repeating routine from Add to plan in the Calendar & Day Plan tab.",
+                "Create a repeating routine from Add to plan in the Plan tab.",
             )
         else:
             render_recurring_habit_template_list(habits, category_names_by_id)
@@ -881,101 +928,239 @@ def render_recurring_habits(category_options: dict[str, int]) -> None:
                 unsafe_allow_html=True,
             )
 
-            if history_summary["generated_instances_count"] == 0:
-                st.caption("No generated history exists, so this template can be deleted safely.")
-                confirm_delete = st.checkbox(
-                    "Confirm delete unused recurring habit",
-                    key=f"recurring_habit_confirm_delete_{selected_habit.id}",
-                )
-                if st.button(
-                    "Delete Template",
-                    use_container_width=True,
-                    disabled=not confirm_delete,
-                    key="recurring_habit_delete",
-                ):
-                    delete_summary = delete_recurring_habit_if_unused(selected_habit.id)
-                    if delete_summary["deleted"]:
-                        st.session_state["recurring_habit_status_message"] = (
-                            "Recurring habit deleted because it had no generated history."
-                        )
-                    else:
-                        st.session_state["recurring_habit_status_message"] = (
-                            "Recurring habit was not deleted because generated history exists."
-                        )
-                    st.rerun()
-            else:
-                st.info("This habit has generated history, so it will be archived/deactivated instead of deleted.")
-                action_cols = st.columns(2)
-                with action_cols[0]:
-                    if st.button(
-                        "Activate",
-                        use_container_width=True,
-                        disabled=selected_habit.is_active,
-                        key="recurring_habit_activate",
-                    ):
-                        set_recurring_habit_active(selected_habit.id, True)
-                        st.session_state["recurring_habit_status_message"] = "Recurring habit activated."
-                        st.rerun()
-                with action_cols[1]:
-                    if st.button(
-                        "Archive / Deactivate",
-                        use_container_width=True,
-                        disabled=not selected_habit.is_active,
-                        key="recurring_habit_archive",
-                    ):
-                        archive_recurring_habit(selected_habit.id)
-                        st.session_state["recurring_habit_status_message"] = (
-                            "Recurring habit archived. Existing history was preserved."
-                        )
-                        st.rerun()
+            if st.button(
+                "Edit template",
+                use_container_width=True,
+                key=f"edit_recurring_habit_{selected_habit.id}",
+            ):
+                st.session_state["editing_recurring_habit_id"] = selected_habit.id
+                st.rerun()
 
-                if history_summary["removable_future_planned_count"] > 0:
-                    st.caption(
-                        "Remove only future unresolved Planned generated days. "
-                        "Completed, skipped, and failed history will be preserved."
-                    )
-                    confirm_remove = st.checkbox(
-                        "Confirm remove future planned days",
-                        key=f"recurring_habit_confirm_remove_future_{selected_habit.id}",
-                    )
-                    if st.button(
-                        "Remove Future Planned Days",
-                        use_container_width=True,
-                        disabled=not confirm_remove,
-                        key="recurring_habit_remove_future",
-                    ):
-                        removal_summary = remove_future_planned_recurring_instances(selected_habit.id)
-                        removed_count = removal_summary["removed_instances_count"]
-                        if removed_count:
-                            st.session_state["recurring_habit_status_message"] = (
-                                f"Removed {removed_count} future planned days. "
-                                "Completed, skipped, and failed history was preserved."
-                            )
-                        else:
-                            st.session_state["recurring_habit_status_message"] = (
-                                "No removable future planned days found."
-                            )
-                        st.rerun()
-                else:
-                    st.caption("No removable future planned days found.")
+            if st.session_state.get("editing_recurring_habit_id") == selected_habit.id:
+                render_recurring_habit_editor(selected_habit, category_options)
 
-        st.divider()
-        generation_summary = st.session_state.pop("recurring_generation_summary", None)
-        if generation_summary:
-            st.success(
-                "Generated "
-                f"{generation_summary['total_generated']} planned days. "
-                f"{generation_summary['total_skipped_existing']} already existed. "
-                f"{generation_summary['total_eligible']} eligible days checked."
+            render_recurring_habit_lifecycle(selected_habit, history_summary)
+
+
+def render_recurring_habit_editor(habit, category_options: dict[str, int]) -> None:
+    """Render template-only routine editing without touching generated occurrences."""
+    category_names = list(category_options)
+    current_category_name = next(
+        (name for name, category_id in category_options.items() if category_id == habit.category_id),
+        category_names[0],
+    )
+    current_weekdays = deserialize_weekdays(habit.weekdays)
+    if current_weekdays == [0, 1, 2, 3, 4, 5, 6]:
+        current_recurrence = "Every day"
+    elif current_weekdays == [0, 1, 2, 3, 4]:
+        current_recurrence = "Weekdays"
+    else:
+        current_recurrence = "Custom days"
+    key_prefix = f"recurring_habit_editor_{habit.id}"
+
+    with st.expander("Edit routine template", expanded=True):
+        st.caption("Changes apply only when routine days are generated next. Existing days and history stay unchanged.")
+        title = st.text_input("Title", value=habit.title, key=f"{key_prefix}_title")
+        category_name = st.selectbox(
+            "Category",
+            category_names,
+            index=category_names.index(current_category_name),
+            key=f"{key_prefix}_category",
+        )
+        start_date = st.date_input(
+            "Starts on",
+            value=habit.start_date,
+            key=f"{key_prefix}_start_date",
+        )
+        estimated_minutes = int(
+            st.number_input(
+                "Duration (min)",
+                min_value=5,
+                max_value=720,
+                value=int(habit.estimated_minutes),
+                step=5,
+                key=f"{key_prefix}_duration",
             )
+        )
 
-        if st.button("Generate Planned Days for Selected Month", use_container_width=True):
-            try:
-                summary = generate_all_recurring_habits_for_month(selected_year, selected_month)
-            except ValueError as error:
-                st.error(str(error))
-            else:
-                st.session_state["recurring_generation_summary"] = summary
+        set_time = st.checkbox(
+            "Set a time",
+            value=habit.planned_start_time is not None,
+            key=f"{key_prefix}_set_time",
+        )
+        planned_start_time = None
+        planned_end_time = None
+        if set_time:
+            planned_start_time = st.time_input(
+                "Start time",
+                value=habit.planned_start_time or time(9, 0),
+                step=300,
+                key=f"{key_prefix}_start_time",
+            )
+            end_at = datetime.combine(start_date, planned_start_time) + timedelta(minutes=estimated_minutes)
+            planned_end_time = end_at.time()
+            if end_at.date() != start_date:
+                st.error("The selected duration cannot cross midnight.")
+
+        recurrence = st.radio(
+            "Repeat",
+            ["Every day", "Weekdays", "Custom days"],
+            index=["Every day", "Weekdays", "Custom days"].index(current_recurrence),
+            horizontal=True,
+            key=f"{key_prefix}_recurrence",
+        )
+        if recurrence == "Custom days":
+            selected_weekday_names = st.multiselect(
+                "Days",
+                list(WEEKDAY_OPTIONS),
+                default=[name for name, value in WEEKDAY_OPTIONS.items() if value in current_weekdays],
+                key=f"{key_prefix}_weekdays",
+            )
+            weekdays = [WEEKDAY_OPTIONS[name] for name in selected_weekday_names]
+        elif recurrence == "Every day":
+            weekdays = [0, 1, 2, 3, 4, 5, 6]
+        else:
+            weekdays = [0, 1, 2, 3, 4]
+
+        set_end_date = st.checkbox(
+            "Set an end date",
+            value=habit.end_date is not None,
+            key=f"{key_prefix}_set_end_date",
+        )
+        end_date = (
+            st.date_input("Ends on", value=habit.end_date or start_date, key=f"{key_prefix}_end_date")
+            if set_end_date
+            else None
+        )
+        notes = st.text_area(
+            "Notes",
+            value=habit.description or "",
+            height=64,
+            key=f"{key_prefix}_notes",
+        )
+
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            if st.button("Save template", type="primary", use_container_width=True, key=f"{key_prefix}_save"):
+                if set_time and datetime.combine(start_date, planned_start_time) + timedelta(minutes=estimated_minutes) >= datetime.combine(start_date + timedelta(days=1), time.min):
+                    st.error("The selected duration cannot cross midnight.")
+                elif not weekdays:
+                    st.error("Choose at least one day for the routine.")
+                else:
+                    try:
+                        update_recurring_habit_template(
+                            habit.id,
+                            title=title,
+                            category_id=category_options[category_name],
+                            estimated_minutes=estimated_minutes,
+                            recurrence_type="selected_weekdays",
+                            weekdays=weekdays,
+                            start_date=start_date,
+                            end_date=end_date,
+                            description=notes,
+                            planned_start_time=planned_start_time,
+                            planned_end_time=planned_end_time,
+                        )
+                    except ValueError as error:
+                        st.error(str(error))
+                    else:
+                        st.session_state.pop("editing_recurring_habit_id", None)
+                        st.session_state["recurring_habit_status_message"] = (
+                            "Routine template updated. Existing generated days were not changed."
+                        )
+                        st.rerun()
+        with cancel_col:
+            if st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel"):
+                st.session_state.pop("editing_recurring_habit_id", None)
+                st.rerun()
+
+
+def render_recurring_habit_lifecycle(habit, history_summary: dict) -> None:
+    """Keep routine deletion, stopping, cleanup, and resuming in one place."""
+    key_prefix = f"recurring_habit_lifecycle_{habit.id}"
+    with st.expander("Routine lifecycle", expanded=False):
+        if history_summary["generated_instances_count"] == 0:
+            st.caption("This template has no generated days and can be deleted.")
+            confirmed = st.checkbox(
+                "Confirm delete routine",
+                key=f"{key_prefix}_confirm_delete",
+            )
+            if st.button(
+                "Delete routine",
+                use_container_width=True,
+                disabled=not confirmed,
+                key=f"{key_prefix}_delete",
+            ):
+                summary = delete_recurring_habit_if_unused(habit.id)
+                if summary["deleted"]:
+                    st.session_state["recurring_habit_status_message"] = "Routine deleted."
+                else:
+                    st.session_state["recurring_habit_status_message"] = (
+                        "Routine was not deleted because generated history exists."
+                    )
+                st.rerun()
+            return
+
+        removable_count = int(history_summary["removable_future_planned_count"])
+        if habit.is_active:
+            st.caption("Stopping prevents new generation. Existing history is always preserved.")
+            remove_future_planned = st.checkbox(
+                f"Also remove {removable_count} future unresolved planned days",
+                value=False,
+                disabled=removable_count == 0,
+                key=f"{key_prefix}_remove_future",
+            )
+            confirmed = st.checkbox(
+                "Confirm stop routine",
+                key=f"{key_prefix}_confirm_stop",
+            )
+            if st.button(
+                "Stop routine",
+                type="primary",
+                use_container_width=True,
+                disabled=not confirmed,
+                key=f"{key_prefix}_stop",
+            ):
+                summary = stop_recurring_habit(
+                    habit.id,
+                    remove_future_planned=remove_future_planned,
+                )
+                removed_count = summary["removed_instances_count"]
+                st.session_state["recurring_habit_status_message"] = (
+                    f"Routine stopped and {removed_count} future planned days removed."
+                    if remove_future_planned
+                    else "Routine stopped. Existing generated days were kept."
+                )
+                st.rerun()
+            return
+
+        st.caption("This routine is stopped and will not generate new days.")
+        if st.button(
+            "Resume routine",
+            type="primary",
+            use_container_width=True,
+            key=f"{key_prefix}_resume",
+        ):
+            set_recurring_habit_active(habit.id, True)
+            st.session_state["recurring_habit_status_message"] = "Routine resumed."
+            st.rerun()
+
+        if removable_count:
+            st.caption(f"{removable_count} future unresolved planned days remain.")
+            confirmed = st.checkbox(
+                "Confirm remove remaining future planned days",
+                key=f"{key_prefix}_confirm_cleanup",
+            )
+            if st.button(
+                "Remove future planned days",
+                use_container_width=True,
+                disabled=not confirmed,
+                key=f"{key_prefix}_cleanup",
+            ):
+                summary = stop_recurring_habit(habit.id, remove_future_planned=True)
+                st.session_state["recurring_habit_status_message"] = (
+                    f"Removed {summary['removed_instances_count']} future planned days."
+                )
                 st.rerun()
 
 
@@ -1003,6 +1188,7 @@ def render_monthly_checklist() -> None:
         )
         st.session_state["checklist_year"] = int(selected_year)
 
+    _render_routine_generation_action(int(selected_year), selected_month)
     checklist = get_month_checklist(int(selected_year), selected_month)
     _render_checklist_legend()
 
@@ -1020,8 +1206,8 @@ def render_monthly_checklist() -> None:
     _render_checklist_table(checklist)
 
     st.divider()
-    st.write("**Update Daily Status**")
-    st.caption("Choose a quest and day, then apply a checklist status.")
+    st.write("**Adjust Selected Day**")
+    st.caption("Use this for a past day or a goal session. Today's work can be resolved directly in Plan.")
 
     row_lookup = {_checklist_row_id(row): row for row in checklist["rows"]}
     quest_labels = _build_checklist_quest_labels(checklist["rows"])
@@ -1076,16 +1262,23 @@ def render_monthly_checklist() -> None:
         if not cell_is_editable:
             st.warning("This quest is not scheduled for the selected date.")
 
-    action_cols = st.columns(4)
-    actions = (
-        ("Complete", "Completed", "checklist_complete"),
-        ("Skip", "Skipped", "checklist_skip"),
-        ("Fail", "Failed", "checklist_fail"),
-        ("Reset", "Planned", "checklist_reset"),
-    )
-    for column, (label, status, key) in zip(action_cols, actions):
+    if not cell_is_editable:
+        actions = ()
+        action_cols = ()
+    elif display_cell["status"] == "Planned":
+        actions = (
+            ("Complete", "Completed", "checklist_complete", "primary"),
+            ("Skip", "Skipped", "checklist_skip", "secondary"),
+            ("Fail", "Failed", "checklist_fail", "secondary"),
+        )
+        action_cols = st.columns(3)
+    else:
+        actions = (("Reset to Planned", "Planned", "checklist_reset", "secondary"),)
+        action_cols = (st.columns([0.3, 0.7])[0],)
+
+    for column, (label, status, key, button_type) in zip(action_cols, actions):
         with column:
-            if st.button(label, use_container_width=True, disabled=not cell_is_editable, key=key):
+            if st.button(label, type=button_type, use_container_width=True, key=key):
                 try:
                     update_checklist_cell_status(
                         selected_row,
@@ -1104,6 +1297,33 @@ def render_monthly_checklist() -> None:
                 st.rerun()
 
     _render_checklist_delete_action(selected_row, display_cell, selected_checklist_date, cell_is_editable)
+
+
+def _render_routine_generation_action(selected_year: int, selected_month: int) -> None:
+    generation_summary = st.session_state.pop("recurring_generation_summary", None)
+    if generation_summary:
+        st.success(
+            "Generated "
+            f"{generation_summary['total_generated']} planned days. "
+            f"{generation_summary['total_skipped_existing']} already existed."
+        )
+
+    generate_col, copy_col = st.columns([0.35, 0.65], vertical_alignment="center")
+    with generate_col:
+        if st.button(
+            f"Generate routines for {month_name[selected_month]} {selected_year}",
+            use_container_width=True,
+            key="generate_routines_for_review_month",
+        ):
+            try:
+                summary = generate_all_recurring_habits_for_month(selected_year, selected_month)
+            except ValueError as error:
+                st.error(str(error))
+            else:
+                st.session_state["recurring_generation_summary"] = summary
+                st.rerun()
+    with copy_col:
+        st.caption("Creates only missing planned days for active routines. Existing history is never overwritten.")
 
 
 def _render_checklist_legend() -> None:
@@ -1468,6 +1688,9 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
     status_message = st.session_state.pop("plan_status_message", None)
     if status_message:
         st.success(status_message)
+    daily_status_message = st.session_state.pop("daily_status_message", None)
+    if daily_status_message:
+        st.success(daily_status_message)
 
     st.caption("Plan tasks, repeating routines, and project sessions from one place.")
     calendar_events = get_quests_for_calendar()
@@ -1493,79 +1716,94 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
 
     with schedule_col:
         st.write("**Day Schedule**")
-        st.caption("Planned quests ordered by start time.")
-        render_schedule_list(selected_day_quests)
+        st.caption("Update today's work directly, or use Monthly Checklist for the full month.")
+        render_schedule_list(selected_day_quests, st.session_state["selected_date"])
+        render_day_item_editor(selected_day_quests, category_options)
 
     with planner_col:
         st.write("**Add to plan**")
         st.caption("Schedule one task, a repeating routine, or a session for an existing project.")
         active_goals = list_active_goals()
-        draft = render_plan_form(
+        form_result = render_plan_form(
             category_options=category_options,
             active_goals=active_goals,
             selected_date=st.session_state["selected_date"],
             goal_title_by_id={goal.id: goal.title for goal in active_goals},
         )
-        if draft is not None:
+        if form_result is not None:
             try:
-                if draft.is_recurring:
-                    habit = create_recurring_habit(
-                        title=draft.title,
-                        category_id=draft.category_id,
-                        estimated_minutes=draft.estimated_minutes,
-                        recurrence_type="selected_weekdays",
-                        weekdays=draft.weekdays,
-                        start_date=draft.planned_date,
-                        end_date=draft.end_date,
-                        description=draft.notes,
-                        planned_start_time=draft.start_time,
-                        planned_end_time=draft.end_time,
+                if form_result.new_project is not None:
+                    new_project = form_result.new_project
+                    goal = create_goal(
+                        title=new_project.title,
+                        category_id=new_project.category_id,
+                        planned_total_minutes=new_project.planned_total_minutes,
+                        start_date=st.session_state["selected_date"],
+                        target_end_date=new_project.target_end_date,
                     )
-                    if draft.generate_initial_month:
-                        generate_recurring_habit_for_month(
-                            habit.id,
-                            draft.planned_date.year,
-                            draft.planned_date.month,
-                        )
-                    st.session_state["recurring_habit_status_message"] = "Routine created."
+                    st.session_state["plan_goal"] = goal.id
+                    st.session_state.pop("plan_creating_project", None)
+                    st.session_state["plan_status_message"] = "Project created. Add its first session below."
                 else:
-                    create_scheduled_quest(
-                        title=draft.title,
-                        description=draft.notes,
-                        category_id=draft.category_id,
-                        planned_date=draft.planned_date,
-                        start_time=draft.start_time,
-                        end_time=draft.end_time,
-                        estimated_minutes=draft.estimated_minutes,
-                        goal_id=draft.goal_id,
-                    )
-                    st.session_state["plan_status_message"] = "Item added to the plan."
+                    draft = form_result.plan
+                    if draft is None:
+                        return
+                    if draft.is_recurring:
+                        habit = create_recurring_habit(
+                            title=draft.title,
+                            category_id=draft.category_id,
+                            estimated_minutes=draft.estimated_minutes,
+                            recurrence_type="selected_weekdays",
+                            weekdays=draft.weekdays,
+                            start_date=draft.planned_date,
+                            end_date=draft.end_date,
+                            description=draft.notes,
+                            planned_start_time=draft.start_time,
+                            planned_end_time=draft.end_time,
+                        )
+                        if draft.generate_initial_month:
+                            generate_recurring_habit_for_month(
+                                habit.id,
+                                draft.planned_date.year,
+                                draft.planned_date.month,
+                            )
+                        st.session_state["recurring_habit_status_message"] = "Routine created."
+                    else:
+                        create_scheduled_quest(
+                            title=draft.title,
+                            description=draft.notes,
+                            category_id=draft.category_id,
+                            planned_date=draft.planned_date,
+                            start_time=draft.start_time,
+                            end_time=draft.end_time,
+                            estimated_minutes=draft.estimated_minutes,
+                            goal_id=draft.goal_id,
+                        )
+                        st.session_state["plan_status_message"] = "Item added to the plan."
             except ValueError as error:
                 st.error(str(error))
             else:
                 st.rerun()
 
 
-def render_goals_projects_tab(category_options: dict[str, int]) -> None:
-    st.caption("Create long-term goals and monitor linked sessions. Add one session from Add to plan in Calendar & Day Plan.")
+def render_manage_tab(category_options: dict[str, int]) -> None:
+    st.caption("Manage long-running projects and repeating routines outside the daily planning flow.")
     render_section_title(
-        "Goal Progress",
+        "Projects",
         "Track active long-term goals through linked one-time quest sessions.",
     )
-    render_goal_progress_section(category_options)
-    render_goal_creation_form(category_options)
+    active_goals = render_goal_progress_section(category_options)
+    render_goal_detail(active_goals)
     render_goal_management(category_options)
 
-
-def render_recurring_habits_tab(category_options: dict[str, int]) -> None:
-    st.caption("Manage repeating routines and generate their planned days for the selected month.")
+    st.divider()
     render_section_title("Routines", "Create routines from Add to plan, then manage their planned days here.")
     render_recurring_habits(category_options)
 
 
-def render_monthly_checklist_tab() -> None:
-    st.caption("Resolve scheduled quest days while preserving check-in XP idempotency.")
-    render_section_title("Monthly Checklist", "Track daily quest completion for the selected month.")
+def render_monthly_review_tab() -> None:
+    st.caption("Review the selected month, generate routine days, and update history when needed.")
+    render_section_title("Monthly Review", "Track scheduled quest completion for the selected month.")
     render_monthly_checklist()
 
 
@@ -1592,23 +1830,19 @@ pending_selected_date = st.session_state.pop("pending_selected_date", None)
 if pending_selected_date is not None:
     st.session_state["selected_date"] = pending_selected_date
 
-calendar_tab, goals_tab, recurring_tab, checklist_tab = st.tabs(
+plan_tab, manage_tab, review_tab = st.tabs(
     [
-        "Calendar & Day Plan",
-        "Goals / Projects",
-        "Recurring Habits",
-        "Monthly Checklist",
+        "Plan",
+        "Manage",
+        "Monthly Review",
     ]
 )
 
-with calendar_tab:
+with plan_tab:
     render_calendar_day_plan_tab(category_options)
 
-with goals_tab:
-    render_goals_projects_tab(category_options)
+with manage_tab:
+    render_manage_tab(category_options)
 
-with recurring_tab:
-    render_recurring_habits_tab(category_options)
-
-with checklist_tab:
-    render_monthly_checklist_tab()
+with review_tab:
+    render_monthly_review_tab()

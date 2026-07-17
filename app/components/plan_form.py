@@ -42,13 +42,31 @@ class PlanDraft:
         return self.weekdays is not None
 
 
+@dataclass(frozen=True)
+class NewProjectDraft:
+    """Minimal project input created while planning a task."""
+
+    title: str
+    category_id: int
+    planned_total_minutes: int
+    target_end_date: date | None
+
+
+@dataclass(frozen=True)
+class PlanFormResult:
+    """One submitted action from the shared planning surface."""
+
+    plan: PlanDraft | None = None
+    new_project: NewProjectDraft | None = None
+
+
 def render_plan_form(
     category_options: dict[str, int],
     active_goals: list,
     selected_date: date,
     goal_title_by_id: dict[int, str],
     key_prefix: str = "plan",
-) -> PlanDraft | None:
+) -> PlanFormResult | None:
     """Render one planning form for one-time quests, routines, and goal sessions."""
     if hasattr(st, "segmented_control"):
         planning_type = st.segmented_control(
@@ -67,27 +85,85 @@ def render_plan_form(
     planning_type = planning_type or "One time"
     is_recurring = planning_type == "Repeat"
 
+    category_name = st.selectbox(
+        "Category",
+        list(category_options.keys()),
+        key=f"{key_prefix}_category",
+    )
+    category_id = category_options[category_name]
+
     goal_id = None
-    if not is_recurring and active_goals:
-        goal_options = [None] + [goal.id for goal in active_goals]
-        goal_id = st.selectbox(
-            "Project",
-            goal_options,
-            format_func=lambda value: "No project" if value is None else goal_title_by_id[value],
-            key=f"{key_prefix}_goal",
-        )
+    if not is_recurring:
+        project_col, create_col = st.columns([0.72, 0.28])
+        with project_col:
+            goal_options = [None] + [goal.id for goal in active_goals]
+            goal_id = st.selectbox(
+                "Project",
+                goal_options,
+                format_func=lambda value: "No project" if value is None else goal_title_by_id[value],
+                key=f"{key_prefix}_goal",
+            )
+        with create_col:
+            st.write("")
+            if st.button("New project", use_container_width=True, key=f"{key_prefix}_new_project"):
+                st.session_state[f"{key_prefix}_creating_project"] = True
+
+        if st.session_state.get(f"{key_prefix}_creating_project"):
+            st.caption("New project")
+            project_title = st.text_input(
+                "Project name",
+                placeholder="Portfolio project",
+                key=f"{key_prefix}_new_project_title",
+            )
+            with st.expander("Project details", expanded=False):
+                planned_total_minutes = int(
+                    st.number_input(
+                        "Target effort (min)",
+                        min_value=0,
+                        value=0,
+                        step=30,
+                        key=f"{key_prefix}_new_project_effort",
+                    )
+                )
+                set_target_date = st.checkbox(
+                    "Set a target date",
+                    key=f"{key_prefix}_new_project_set_target_date",
+                )
+                target_end_date = (
+                    st.date_input(
+                        "Target date",
+                        value=selected_date,
+                        min_value=selected_date,
+                        key=f"{key_prefix}_new_project_target_date",
+                    )
+                    if set_target_date
+                    else None
+                )
+
+            project_actions = st.columns(2)
+            with project_actions[0]:
+                if st.button("Save project", type="primary", use_container_width=True, key=f"{key_prefix}_save_project"):
+                    if not project_title.strip():
+                        st.error("A project name is required.")
+                    else:
+                        return PlanFormResult(
+                            new_project=NewProjectDraft(
+                                title=project_title,
+                                category_id=category_id,
+                                planned_total_minutes=planned_total_minutes,
+                                target_end_date=target_end_date,
+                            )
+                        )
+            with project_actions[1]:
+                if st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel_project"):
+                    st.session_state.pop(f"{key_prefix}_creating_project", None)
+                    st.rerun()
 
     if goal_id is None:
         title = st.text_input("Title", placeholder="What do you want to plan?", key=f"{key_prefix}_title")
     else:
         title = goal_title_by_id[goal_id]
         st.caption(f"A new session will be added to {title}.")
-
-    category_name = st.selectbox(
-        "Category",
-        list(category_options.keys()),
-        key=f"{key_prefix}_category",
-    )
 
     date_col, time_col, duration_col = st.columns([0.42, 0.29, 0.29])
     with date_col:
@@ -177,16 +253,18 @@ def render_plan_form(
         st.error("Choose at least one day for the routine.")
         return None
 
-    return PlanDraft(
-        title=title,
-        category_id=category_options[category_name],
-        planned_date=planned_date,
-        start_time=start_time,
-        end_time=end_time,
-        estimated_minutes=estimated_minutes,
-        notes=notes,
-        goal_id=goal_id,
-        weekdays=weekdays,
-        end_date=end_date,
-        generate_initial_month=generate_initial_month,
+    return PlanFormResult(
+        plan=PlanDraft(
+            title=title,
+            category_id=category_id,
+            planned_date=planned_date,
+            start_time=start_time,
+            end_time=end_time,
+            estimated_minutes=estimated_minutes,
+            notes=notes,
+            goal_id=goal_id,
+            weekdays=weekdays,
+            end_date=end_date,
+            generate_initial_month=generate_initial_month,
+        )
     )

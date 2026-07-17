@@ -25,6 +25,7 @@ from src.services.quest_service import (
     get_quests_for_day,
     preview_next_goal_session_title,
     quest_to_calendar_event,
+    update_one_time_quest_if_unresolved,
     update_quest_status,
     validate_schedule_times,
 )
@@ -117,6 +118,101 @@ def test_create_scheduled_quest_creates_planned_checkin(session):
     assert checkin.status == "Planned"
     assert checkin.xp_awarded == 0
     assert checkin.checkin_date == date(2026, 6, 26)
+
+
+def test_update_one_time_quest_moves_its_planned_checkin_and_recalculates_xp(session):
+    category = session.query(Category).one()
+    learning = Category(name="Learning", description="Learning quests")
+    session.add(learning)
+    session.commit()
+    quest = create_scheduled_quest(
+        title="Read",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    updated = update_one_time_quest_if_unresolved(
+        quest.id,
+        title="Read chapter two",
+        description="Focus on notes",
+        category_id=learning.id,
+        planned_date=date(2026, 6, 27),
+        start_time=time(10, 0),
+        end_time=time(11, 30),
+        session=session,
+    )
+
+    checkin = session.query(QuestCheckin).filter_by(quest_id=quest.id).one()
+    assert updated.title == "Read chapter two"
+    assert updated.category_id == learning.id
+    assert updated.due_date == date(2026, 6, 27)
+    assert updated.planned_start_at == datetime(2026, 6, 27, 10, 0)
+    assert updated.planned_end_at == datetime(2026, 6, 27, 11, 30)
+    assert updated.estimated_minutes == 90
+    assert updated.xp_reward == 30
+    assert checkin.checkin_date == date(2026, 6, 27)
+    assert checkin.status == "Planned"
+
+
+def test_update_one_time_quest_rejects_resolved_history(session):
+    category = session.query(Category).one()
+    quest = create_scheduled_quest(
+        title="Read",
+        category_id=category.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+    complete_checkin(quest.id, date(2026, 6, 26), session=session)
+
+    with pytest.raises(ValueError, match="cannot be edited"):
+        update_one_time_quest_if_unresolved(
+            quest.id,
+            title="Changed",
+            category_id=category.id,
+            planned_date=date(2026, 6, 27),
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            session=session,
+        )
+
+
+def test_update_goal_session_keeps_its_generated_title(session):
+    category = session.query(Category).one()
+    goal = Goal(
+        title="Portfolio Project",
+        category_id=category.id,
+        planned_total_minutes=120,
+        status="Active",
+    )
+    session.add(goal)
+    session.commit()
+    quest = create_scheduled_quest(
+        title="Ignored title",
+        category_id=category.id,
+        goal_id=goal.id,
+        planned_date=date(2026, 6, 26),
+        start_time=time(9, 0),
+        end_time=time(10, 0),
+        session=session,
+    )
+
+    updated = update_one_time_quest_if_unresolved(
+        quest.id,
+        title="Different title",
+        category_id=category.id,
+        planned_date=date(2026, 6, 27),
+        start_time=time(11, 0),
+        end_time=time(12, 0),
+        session=session,
+    )
+
+    assert updated.title == "Portfolio Project Session 1"
+    assert updated.goal_session_number == 1
 
 
 def test_create_scheduled_quest_checkin_is_not_duplicated_by_ensure_checkin(session):

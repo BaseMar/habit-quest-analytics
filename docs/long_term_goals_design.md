@@ -11,12 +11,13 @@ Current implementation status:
   `Quest.goal_session_number`.
 - Goal progress is derived from linked quest sessions and
   `QuestCheckin.xp_awarded`.
-- Quest Planner includes a compact goal creation form.
+- Quest Planner creates a compact project inline from the unified Add to plan
+  form.
 - Quest Planner includes read-only active goal progress cards.
-- Active goal cards include a compact Add Session flow for planned one-time
-  quest sessions linked to that goal.
-- Active goal cards include a Goal Session Planner for previewing and bulk
-  creating multiple planned one-time sessions.
+- The unified Add to plan form can create a project inline and add planned
+  one-time quest sessions linked to it.
+- A selected project detail includes a Goal Session Planner for previewing and
+  bulk creating multiple planned one-time sessions.
 - Goal session titles are generated automatically as
   `{Goal Title} Session {N}`.
 - Quest Planner includes compact lifecycle actions to archive, complete, reopen,
@@ -171,11 +172,11 @@ Current backend/minimal UI behavior:
   Planner.
 - Goal progress cards show completed/planned effort, progress percentage,
   earned/expected XP, session counts, category, status, and target date.
-- Active goal cards can quick-add a normal one-time scheduled quest session for
-  that goal. The session creates a normal planned `QuestCheckin` and awards no
-  XP until completed.
-- The quick-add flow shows a read-only preview of the generated session title
-  instead of asking the user to name the session manually.
+- The unified Add to plan form can select an active project or create one
+  inline. A selected project creates a normal one-time scheduled quest session
+  with a planned `QuestCheckin` and awards no XP until completed.
+- Project-linked sessions use generated session titles instead of asking the
+  user to name each session manually.
 - Goal/project creation and linked goal sessions reject missing categories.
 - A compact Manage Goals section supports Archive, Complete, Reopen, and Delete.
 - Delete is allowed only for goals with no linked quests; goals with linked
@@ -187,7 +188,7 @@ Current backend/minimal UI behavior:
 
 Goal Session Planner behavior:
 
-- The planner is opened explicitly from an active goal card.
+- The planner is opened explicitly from a selected project detail.
 - It does not generate sessions on page load.
 - The user enters session duration, start date, selected weekdays, start time,
   optional planning end date, and whether a shorter final session is allowed.
@@ -221,7 +222,7 @@ Rules:
 Example flow:
 
 1. Create Goal: Portfolio Project, 20h total.
-2. Open Plan Multiple Sessions.
+2. Open the project, then select Plan Multiple Sessions.
 3. Preview 2h sessions on Monday, Wednesday, and Friday.
 4. Confirm generation of 10 separate planned quest sessions.
 5. Complete sessions in Monthly Checklist.
@@ -315,7 +316,7 @@ Rules:
 4. `feat: add goal progress UI in Quest Planner` - implemented.
 5. `feat: add goal creation UI in Quest Planner` - implemented.
 6. `feat: add goal lifecycle actions in Quest Planner` - implemented.
-7. `feat: add goal session quick-add flow` - implemented.
+7. `feat: add unified one-time goal session flow` - implemented.
 8. `feat: add goal session planner` - implemented.
 9. `feat: add goal analytics` - implemented in Habit Analytics.
 10. `docs: update long-term goals documentation`

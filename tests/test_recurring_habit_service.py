@@ -22,6 +22,8 @@ from src.services.recurring_habit_service import (
     remove_future_planned_recurring_instances,
     serialize_weekdays,
     set_recurring_habit_active,
+    stop_recurring_habit,
+    update_recurring_habit_template,
     validate_weekdays,
 )
 
@@ -224,6 +226,83 @@ def test_set_recurring_habit_active_rejects_missing_habit(session):
         set_recurring_habit_active(999, False, session=session)
 
 
+def test_update_recurring_habit_template_updates_future_generation_settings(session):
+    habit = _create_habit(
+        session,
+        title="Gym Workout",
+        weekdays=[2],
+        planned_start_time=time(9, 0),
+        planned_end_time=time(10, 0),
+    )
+
+    updated = update_recurring_habit_template(
+        habit.id,
+        title="Morning Run",
+        category_id=_category_id(session),
+        estimated_minutes=45,
+        recurrence_type="selected_weekdays",
+        weekdays=[0, 4],
+        start_date=date(2026, 7, 10),
+        end_date=date(2026, 8, 31),
+        description="Easy pace",
+        planned_start_time=time(7, 30),
+        planned_end_time=time(8, 15),
+        session=session,
+    )
+
+    assert updated.title == "Morning Run"
+    assert updated.description == "Easy pace"
+    assert updated.estimated_minutes == 45
+    assert updated.xp_reward == 15
+    assert deserialize_weekdays(updated.weekdays) == [0, 4]
+    assert updated.start_date == date(2026, 7, 10)
+    assert updated.end_date == date(2026, 8, 31)
+    assert updated.planned_start_time == time(7, 30)
+    assert updated.planned_end_time == time(8, 15)
+
+
+def test_update_recurring_habit_template_keeps_generated_history_unchanged(session):
+    habit = _create_habit(session, title="Gym Workout", weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    generated_quest = session.query(Quest).order_by(Quest.due_date).first()
+
+    update_recurring_habit_template(
+        habit.id,
+        title="Morning Run",
+        category_id=_category_id(session),
+        estimated_minutes=45,
+        recurrence_type="selected_weekdays",
+        weekdays=[0, 4],
+        start_date=date(2026, 7, 1),
+        description="Easy pace",
+        session=session,
+    )
+    session.refresh(generated_quest)
+
+    assert generated_quest.title == "Gym Workout"
+    assert generated_quest.description == "Strength training"
+    assert generated_quest.estimated_minutes == 60
+    assert generated_quest.xp_reward == 20
+
+
+def test_update_recurring_habit_template_rejects_invalid_time_window(session):
+    habit = _create_habit(session)
+
+    with pytest.raises(ValueError, match="End time must be after start time"):
+        update_recurring_habit_template(
+            habit.id,
+            title="Gym Workout",
+            category_id=_category_id(session),
+            estimated_minutes=60,
+            recurrence_type="selected_weekdays",
+            weekdays=[0],
+            start_date=date(2026, 7, 1),
+            planned_start_time=time(10, 0),
+            planned_end_time=time(9, 0),
+            session=session,
+        )
+
+
 def test_delete_unused_recurring_habit_removes_template_from_list(session):
     habit = _create_habit(session)
 
@@ -261,6 +340,39 @@ def test_archive_recurring_habit_with_history_preserves_generated_rows(session):
     assert session.query(RecurringHabitInstance).count() == 5
     assert session.query(Quest).count() == 5
     assert session.query(QuestCheckin).count() == 5
+
+
+def test_stop_recurring_habit_can_remove_only_future_unresolved_days(session):
+    habit = _create_habit(session, weekdays=[0, 1, 2, 3, 4, 5, 6])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+    _complete_instance_on(session, date(2026, 7, 10))
+    _skip_instance_on(session, date(2026, 7, 11))
+
+    summary = stop_recurring_habit(
+        habit.id,
+        remove_future_planned=True,
+        today=date(2026, 7, 10),
+        session=session,
+    )
+    session.refresh(habit)
+
+    assert habit.is_active is False
+    assert summary["removed_instances_count"] == 20
+    assert _instance_on(session, date(2026, 7, 10)) is not None
+    assert _instance_on(session, date(2026, 7, 11)) is not None
+    assert _instance_on(session, date(2026, 7, 12)) is None
+
+
+def test_stop_recurring_habit_without_cleanup_preserves_future_planned_days(session):
+    habit = _create_habit(session, weekdays=[2])
+    generate_recurring_habit_for_month(habit.id, 2026, 7, session=session)
+
+    summary = stop_recurring_habit(habit.id, today=date(2026, 7, 1), session=session)
+    session.refresh(habit)
+
+    assert habit.is_active is False
+    assert summary["removed_instances_count"] == 0
+    assert session.query(RecurringHabitInstance).count() == 5
 
 
 def test_create_recurring_habit_does_not_create_quest_rows(session):
