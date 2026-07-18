@@ -20,30 +20,10 @@ def apply_character_profile_styles() -> None:
     st.markdown(
         """
         <style>
-        .block-container {
-            padding-top: 1.7rem;
-        }
-
-        .hq-page-header {
-            margin-bottom: 0.85rem;
-            padding-top: 0.3rem;
-        }
-
-        .hq-section-title {
-            margin-top: 1.05rem;
-            margin-bottom: 0.18rem;
-        }
-
-        .hq-section-description {
-            margin-bottom: 0.55rem;
-        }
-
         .hq-hero-avatar-placeholder {
             align-items: center;
             aspect-ratio: 1;
-            background:
-                linear-gradient(135deg, var(--hq-surface), var(--hq-surface-elevated)),
-                radial-gradient(circle at center, var(--hq-accent-soft), transparent 60%);
+            background: var(--hq-surface-elevated);
             border: 1px dashed var(--hq-accent-border);
             border-radius: 8px;
             color: var(--hq-text-secondary);
@@ -95,7 +75,7 @@ def apply_character_profile_styles() -> None:
             border: 1px solid var(--hq-accent-border);
             border-radius: 6px;
             box-shadow: none;
-            color: #ffffff;
+            color: var(--hq-accent);
             display: inline-flex;
             font-size: 0.78rem;
             font-weight: 850;
@@ -129,7 +109,7 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-explainer {
-            background: linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: 8px;
             color: var(--hq-text-secondary);
@@ -410,7 +390,7 @@ def render_rpg_stats_section(profile: dict) -> None:
                 background: {tokens["muted_surface"]};
                 border: 1px solid {tokens["border"]};
                 border-radius: 999px;
-                box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.38);
+                box-shadow: none;
                 height: 10px;
                 overflow: hidden;
                 width: 100%;
@@ -572,9 +552,9 @@ def render_how_stats_are_calculated() -> None:
 apply_theme()
 apply_character_profile_styles()
 render_page_header(
+    "Your progress",
     "Character Profile",
-    "Character Profile",
-    "A compact RPG character sheet for XP, level progression, and stat growth.",
+    "Follow XP, levels, and the categories where your completed work is growing.",
 )
 
 init_db()

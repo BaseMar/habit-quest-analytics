@@ -22,17 +22,20 @@ def render_sidebar_brand() -> None:
         """
         <div class="hq-sidebar-brand">
             <div class="hq-sidebar-brand-title">Habit Quest Analytics</div>
-            <div class="hq-sidebar-brand-caption">RPG habit planner</div>
+            <div class="hq-sidebar-brand-caption">Personal planner</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-apply_theme()
-render_sidebar_brand()
-render_appearance_controls()
+def render_sidebar_navigation(pages: list) -> None:
+    """Render navigation below the fixed sidebar branding."""
+    for page in pages:
+        st.sidebar.page_link(page)
 
+
+apply_theme()
 pages = [
     st.Page(
         "pages/1_Dashboard.py",
@@ -67,5 +70,8 @@ pages = [
     ),
 ]
 
-current_page = st.navigation(pages, position="sidebar", expanded=True)
+current_page = st.navigation(pages, position="hidden")
+render_sidebar_brand()
+render_sidebar_navigation(pages)
+render_appearance_controls()
 current_page.run()

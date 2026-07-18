@@ -17,9 +17,9 @@ from src.ui import apply_theme, render_page_header
 
 apply_theme()
 render_page_header(
-    "Project & Routine Management",
+    "Manage your system",
     "Projects & Routines",
-    "Manage long-term projects, recurring templates, and future routine schedules.",
+    "Review projects, maintain routines, and generate the future schedule when you need it.",
 )
 
 init_db()

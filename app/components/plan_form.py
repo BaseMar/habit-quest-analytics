@@ -164,31 +164,27 @@ def render_plan_form(
         st.caption(f"A new session will be added to {title}.")
 
     with st.expander("Schedule details", expanded=is_recurring):
-        date_col, time_col, duration_col = st.columns([0.42, 0.29, 0.29])
-        with date_col:
-            planned_date = st.date_input(
-                "Starts on" if is_recurring else "Date",
-                value=selected_date,
-                key=f"{key_prefix}_date",
+        planned_date = st.date_input(
+            "Starts on" if is_recurring else "Date",
+            value=selected_date,
+            key=f"{key_prefix}_date",
+        )
+        start_time = st.time_input(
+            "Start time",
+            value=time(9, 0),
+            step=300,
+            key=f"{key_prefix}_start_time",
+        )
+        estimated_minutes = int(
+            st.number_input(
+                "Duration (min)",
+                min_value=5,
+                max_value=720,
+                value=60,
+                step=5,
+                key=f"{key_prefix}_duration",
             )
-        with time_col:
-            start_time = st.time_input(
-                "Start time",
-                value=time(9, 0),
-                step=300,
-                key=f"{key_prefix}_start_time",
-            )
-        with duration_col:
-            estimated_minutes = int(
-                st.number_input(
-                    "Duration (min)",
-                    min_value=5,
-                    max_value=720,
-                    value=60,
-                    step=5,
-                    key=f"{key_prefix}_duration",
-                )
-            )
+        )
 
     end_at = end_at_for_duration(planned_date, start_time, estimated_minutes)
     end_time = end_at.time()
@@ -225,11 +221,10 @@ def render_plan_form(
             )
     with st.expander("Notes", expanded=False):
         notes = st.text_area(
-            "Notes",
+            "Notes (optional)",
             height=64,
             placeholder="Optional details",
             key=f"{key_prefix}_notes",
-            label_visibility="collapsed",
         )
 
     action_label = "Create routine" if is_recurring else "Add to plan"

@@ -167,6 +167,24 @@ def get_command_center_data(today: date | None = None, session=None) -> dict:
             session.close()
 
 
+def get_command_center_items_for_date(review_date: date, session=None) -> list[dict]:
+    """Return action-ready check-ins for a single Command Center review date."""
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        _ensure_legacy_command_center_checkins(session, date.today())
+        checkins = (
+            session.query(QuestCheckin)
+            .options(joinedload(QuestCheckin.quest).joinedload(Quest.category))
+            .filter(QuestCheckin.checkin_date == review_date)
+            .all()
+        )
+        return build_operational_checkin_rows(checkins)
+    finally:
+        if owns_session:
+            session.close()
+
+
 def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
     """Return prepared dataframes for the Habit Analytics page."""
     today = today or date.today()

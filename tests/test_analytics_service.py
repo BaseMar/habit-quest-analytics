@@ -17,6 +17,7 @@ from src.services.analytics_service import (
     build_xp_by_day,
     calculate_character_title,
     get_command_center_data,
+    get_command_center_items_for_date,
     get_character_profile_data,
     get_dashboard_kpis,
     get_goal_analytics_summary,
@@ -425,6 +426,35 @@ def test_get_command_center_data_counts_checkin_status_kpis(session):
         "Failed": 1,
         "Skipped": 1,
     }
+
+
+def test_get_command_center_items_for_date_returns_only_requested_day(session):
+    category = _add_category(session, "Work")
+    reviewed_quest = _add_quest(
+        session,
+        "Review report",
+        xp_reward=75,
+        category=category,
+        planned_start_at=datetime(2026, 6, 24, 9, 0),
+        planned_end_at=datetime(2026, 6, 24, 10, 0),
+    )
+    other_quest = _add_quest(session, "Other day", xp_reward=30)
+    _add_checkin(session, reviewed_quest, date(2026, 6, 24), "Completed", xp_awarded=75)
+    _add_checkin(session, other_quest, date(2026, 6, 25), "Planned")
+
+    result = get_command_center_items_for_date(date(2026, 6, 24), session=session)
+
+    assert result == [
+        {
+            "quest_id": reviewed_quest.id,
+            "checkin_date": date(2026, 6, 24),
+            "time": "09:00 - 10:00",
+            "title": "Review report",
+            "category": "Work",
+            "status": "Completed",
+            "xp": 75,
+        }
+    ]
 
 
 def test_command_center_skipped_checkins_do_not_count_as_operational_kpis(session):

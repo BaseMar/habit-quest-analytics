@@ -40,15 +40,12 @@ def render_project_routine_workspace(category_options: dict[str, int], selected_
     projects_tab, routines_tab = st.tabs(["Projects", "Routines"])
 
     with projects_tab:
-        st.caption("Review one project at a time, then manage its sessions and lifecycle in the same workspace.")
-        render_section_title("Projects", "Track project progress and schedule linked one-time sessions.")
+        render_section_title("Projects", "Choose one project to review its progress, sessions, and lifecycle.")
         _render_project_workspace(category_options, selected_date)
 
     with routines_tab:
-        st.caption("Create routines in Planner, then manage templates and future planned days here.")
         render_section_title("Routine schedule", "Generate missing days only for the month you select.")
         _render_routine_generation_controls()
-        st.divider()
         render_section_title("Routines", "Edit a template or change its lifecycle without changing history.")
         _render_recurring_habits(category_options)
 
@@ -138,7 +135,7 @@ def _render_goal_session_planner(goal, selected_date: date) -> None:
     preview_key = f"{planner_key}_preview"
     config_key = f"{planner_key}_config"
 
-    with st.expander("Plan Multiple Sessions", expanded=False):
+    with st.expander("Plan sessions", expanded=False):
         session_duration_minutes = int(st.number_input("Session duration (min)", min_value=5, max_value=720, value=120, step=5, key=f"{planner_key}_duration"))
         try:
             planning_summary = get_goal_session_planning_summary(goal.id, session_duration_minutes=session_duration_minutes)
@@ -146,11 +143,12 @@ def _render_goal_session_planner(goal, selected_date: date) -> None:
             st.error(str(error))
             return
 
-        metric_cols = st.columns(4)
-        metric_cols[0].metric("Goal Effort", _format_minutes(planning_summary["planned_total_minutes"]))
-        metric_cols[1].metric("Completed", _format_minutes(planning_summary["completed_minutes"]))
-        metric_cols[2].metric("Already Planned", _format_minutes(planning_summary["currently_planned_minutes"]))
-        metric_cols[3].metric("Still To Schedule", _format_minutes(planning_summary["effort_to_schedule_minutes"]))
+        first_metric_row = st.columns(2)
+        first_metric_row[0].metric("Goal Effort", _format_minutes(planning_summary["planned_total_minutes"]))
+        first_metric_row[1].metric("Completed", _format_minutes(planning_summary["completed_minutes"]))
+        second_metric_row = st.columns(2)
+        second_metric_row[0].metric("Already Planned", _format_minutes(planning_summary["currently_planned_minutes"]))
+        second_metric_row[1].metric("Still To Schedule", _format_minutes(planning_summary["effort_to_schedule_minutes"]))
 
         start_date = st.date_input("Start Date", value=max(selected_date, goal.start_date or date.min), key=f"{planner_key}_start_date")
         selected_weekday_names = st.multiselect("Selected Weekdays", list(WEEKDAY_OPTIONS), default=["Monday", "Wednesday", "Friday"], key=f"{planner_key}_weekdays")

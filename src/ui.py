@@ -33,69 +33,48 @@ class ThemeTokens(TypedDict):
 THEME_MODE_KEY = "hq_theme_mode"
 ACCENT_PRESET_KEY = "hq_accent_preset"
 
-THEME_MODES = ("Dark", "Light")
+THEME_MODES = ("Light", "Dark")
 ACCENT_PRESETS = {
-    "Violet": {
-        "accent": "#8B5CF6",
-        "accent_soft_dark": "rgba(139, 92, 246, 0.18)",
-        "accent_soft_light": "rgba(139, 92, 246, 0.12)",
-        "accent_border_dark": "rgba(167, 139, 250, 0.42)",
-        "accent_border_light": "rgba(124, 58, 237, 0.28)",
-    },
-    "Cyan": {
-        "accent": "#0891B2",
-        "accent_soft_dark": "rgba(8, 145, 178, 0.2)",
-        "accent_soft_light": "rgba(8, 145, 178, 0.12)",
-        "accent_border_dark": "rgba(34, 211, 238, 0.42)",
-        "accent_border_light": "rgba(8, 145, 178, 0.28)",
-    },
-    "Emerald": {
-        "accent": "#10B981",
-        "accent_soft_dark": "rgba(16, 185, 129, 0.18)",
-        "accent_soft_light": "rgba(16, 185, 129, 0.12)",
-        "accent_border_dark": "rgba(52, 211, 153, 0.4)",
-        "accent_border_light": "rgba(5, 150, 105, 0.28)",
-    },
-    "Rose": {
-        "accent": "#E11D48",
-        "accent_soft_dark": "rgba(225, 29, 72, 0.18)",
-        "accent_soft_light": "rgba(225, 29, 72, 0.11)",
-        "accent_border_dark": "rgba(251, 113, 133, 0.4)",
-        "accent_border_light": "rgba(225, 29, 72, 0.28)",
+    "Blue": {
+        "accent": "#2563EB",
+        "accent_soft_dark": "rgba(96, 165, 250, 0.16)",
+        "accent_soft_light": "#EFF6FF",
+        "accent_border_dark": "rgba(96, 165, 250, 0.36)",
+        "accent_border_light": "#BFDBFE",
     },
 }
 
 BASE_TOKENS = {
     "Dark": {
-        "background": "#0B1020",
+        "background": "#111827",
         "background_alt": "#111827",
-        "surface": "#151C2B",
-        "surface_elevated": "#1B2535",
-        "border": "rgba(148, 163, 184, 0.18)",
-        "text_primary": "#F8FAFC",
-        "text_secondary": "#A5AFBF",
+        "surface": "#182234",
+        "surface_elevated": "#223047",
+        "border": "rgba(148, 163, 184, 0.2)",
+        "text_primary": "#F3F6FA",
+        "text_secondary": "#AEB9C9",
         "success": "#22C55E",
         "warning": "#F59E0B",
         "danger": "#EF4444",
         "info": "#38BDF8",
-        "shadow": "0 10px 26px rgba(2, 6, 23, 0.22)",
-        "input_background": "rgba(15, 23, 42, 0.66)",
-        "muted_surface": "rgba(148, 163, 184, 0.08)",
-        "chart_grid": "rgba(148, 163, 184, 0.14)",
+        "shadow": "0 1px 2px rgba(2, 6, 23, 0.24)",
+        "input_background": "#182234",
+        "muted_surface": "rgba(148, 163, 184, 0.1)",
+        "chart_grid": "rgba(148, 163, 184, 0.16)",
     },
     "Light": {
-        "background": "#F7F8FA",
-        "background_alt": "#EEF2F6",
+        "background": "#F6F7F9",
+        "background_alt": "#F6F7F9",
         "surface": "#FFFFFF",
         "surface_elevated": "#F8FAFC",
-        "border": "rgba(100, 116, 139, 0.16)",
-        "text_primary": "#111827",
-        "text_secondary": "#5B6472",
+        "border": "#E2E8F0",
+        "text_primary": "#18212F",
+        "text_secondary": "#64748B",
         "success": "#15803D",
         "warning": "#B45309",
         "danger": "#DC2626",
         "info": "#0369A1",
-        "shadow": "0 8px 22px rgba(15, 23, 42, 0.07)",
+        "shadow": "0 1px 2px rgba(15, 23, 42, 0.04)",
         "input_background": "#FFFFFF",
         "muted_surface": "rgba(15, 23, 42, 0.035)",
         "chart_grid": "rgba(100, 116, 139, 0.16)",
@@ -106,7 +85,7 @@ BASE_TOKENS = {
 TEXT_MUTED = "#9CA3AF"
 SURFACE = "#111827"
 SURFACE_LIGHT = "#1F2937"
-PRIMARY = "#8B5CF6"
+PRIMARY = "#2563EB"
 SUCCESS = "#22C55E"
 WARNING = "#F59E0B"
 DANGER = "#EF4444"
@@ -114,11 +93,11 @@ INFO = "#38BDF8"
 
 
 def _safe_theme_mode(value: str | None) -> str:
-    return value if value in THEME_MODES else "Dark"
+    return value if value in THEME_MODES else "Light"
 
 
 def _safe_accent_preset(value: str | None) -> str:
-    return value if value in ACCENT_PRESETS else "Violet"
+    return value if value in ACCENT_PRESETS else "Blue"
 
 
 def get_theme_tokens() -> ThemeTokens:
@@ -157,16 +136,10 @@ def render_appearance_controls() -> None:
     """Render app-wide appearance controls in the sidebar."""
     st.sidebar.markdown('<div class="hq-sidebar-section-title">Appearance</div>', unsafe_allow_html=True)
     st.sidebar.radio(
-        "Theme Mode",
+        "Theme",
         options=list(THEME_MODES),
         key=THEME_MODE_KEY,
         horizontal=True,
-        label_visibility="visible",
-    )
-    st.sidebar.selectbox(
-        "Accent Preset",
-        options=list(ACCENT_PRESETS),
-        key=ACCENT_PRESET_KEY,
         label_visibility="visible",
     )
 
@@ -197,24 +170,7 @@ def apply_global_styles() -> None:
         for index in (0, 2, 4)
     )
     is_dark = tokens["mode"] == "Dark"
-    if is_dark:
-        app_background = (
-            f"radial-gradient(circle at 8% 0%, {tokens['accent_soft']}, transparent 28rem), "
-            "linear-gradient(135deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px), "
-            f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 100%)"
-        )
-    else:
-        app_background = (
-            f"radial-gradient(circle at 8% 0%, {tokens['accent_soft']}, transparent 26rem), "
-            "linear-gradient(135deg, rgba(15, 23, 42, 0.028) 0 1px, transparent 1px), "
-            f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 100%)"
-        )
-    app_background_size = "auto, 42px 42px, auto"
-    sidebar_background = (
-        f"linear-gradient(180deg, {tokens['background']} 0%, {tokens['background_alt']} 100%)"
-        if is_dark
-        else "linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 100%)"
-    )
+    sidebar_background = tokens["surface"]
 
     st.markdown(
         f"""
@@ -260,21 +216,8 @@ def apply_global_styles() -> None:
             --text-color: var(--hq-text-primary);
             --border-color: var(--hq-border);
             --input-background-color: var(--hq-input-background);
-            background: {app_background};
-            background-attachment: fixed;
-            background-size: {app_background_size};
+            background: var(--hq-background);
             color: var(--hq-text-primary);
-        }}
-
-        .stApp::before {{
-            content: "";
-            inset: 0;
-            pointer-events: none;
-            position: fixed;
-            z-index: 0;
-            background:
-                linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.025), transparent);
-            opacity: {"0.45" if is_dark else "0.34"};
         }}
 
         .stApp > header,
@@ -285,12 +228,13 @@ def apply_global_styles() -> None:
         }}
 
         .block-container {{
-            max-width: 1480px;
-            padding: 2rem 2rem 3rem;
+            max-width: 1360px;
+            padding: 1.5rem 2rem 3rem;
         }}
 
         @media (max-width: 768px) {{
             .block-container {{
+                padding-top: 1.1rem;
                 padding-left: 1rem;
                 padding-right: 1rem;
             }}
@@ -325,7 +269,7 @@ def apply_global_styles() -> None:
         }}
 
         section[data-testid="stSidebar"] > div {{
-            padding-top: 1.1rem;
+            padding-top: 0.9rem;
         }}
 
         .hq-sidebar-brand {{
@@ -334,8 +278,8 @@ def apply_global_styles() -> None:
             border-bottom: 1px solid var(--hq-border);
             border-radius: 0;
             box-shadow: none;
-            margin: 0.2rem 0 1rem;
-            padding: 0.45rem 0.15rem 0.9rem;
+            margin: 0.15rem 0 0.8rem;
+            padding: 0.35rem 0.15rem 0.75rem;
         }}
 
         .hq-sidebar-brand-title {{
@@ -374,13 +318,13 @@ def apply_global_styles() -> None:
         section[data-testid="stSidebar"] [data-testid="stPageLink"] a,
         section[data-testid="stSidebar"] a[href^="/"] {{
             align-items: center;
-            background: var(--hq-muted-surface);
+            background: transparent;
             border: 0;
             border-left: 3px solid transparent;
             border-radius: 6px !important;
             color: var(--hq-text-secondary) !important;
-            min-height: 42px;
-            padding: 0.68rem 0.78rem !important;
+            min-height: 40px;
+            padding: 0.58rem 0.72rem !important;
             text-decoration: none;
             transition:
                 background-color 160ms ease,
@@ -394,7 +338,7 @@ def apply_global_styles() -> None:
         section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover,
         section[data-testid="stSidebar"] [data-testid="stPageLink"] a:hover,
         section[data-testid="stSidebar"] a[href^="/"]:hover {{
-            background: var(--hq-surface-elevated);
+            background: var(--hq-muted-surface);
             border-left-color: var(--hq-accent);
             box-shadow: none;
             color: var(--hq-text-primary) !important;
@@ -406,9 +350,7 @@ def apply_global_styles() -> None:
         section[data-testid="stSidebar"] [data-testid="stPageLink"] a[aria-current="page"],
         section[data-testid="stSidebar"] a[aria-current="page"],
         section[data-testid="stSidebar"] a[data-active="true"] {{
-            background:
-                linear-gradient(90deg, var(--hq-accent-soft), transparent 82%),
-                var(--hq-muted-surface);
+            background: var(--hq-accent-soft);
             border-left-color: var(--hq-accent);
             box-shadow: none;
             color: var(--hq-text-primary) !important;
@@ -424,16 +366,16 @@ def apply_global_styles() -> None:
         }}
 
         .hq-page-header {{
-            margin-bottom: 1.35rem;
-            padding-top: 0.85rem;
+            margin-bottom: 1.1rem;
+            padding-top: 0.35rem;
         }}
 
         h1,
         .hq-page-title {{
             color: var(--hq-text-primary) !important;
-            font-size: 2rem !important;
-            font-weight: 760 !important;
-            line-height: 1.18 !important;
+            font-size: 1.8rem !important;
+            font-weight: 740 !important;
+            line-height: 1.2 !important;
             margin-bottom: 0.35rem !important;
             letter-spacing: 0;
         }}
@@ -463,16 +405,16 @@ def apply_global_styles() -> None:
         .hq-page-subtitle {{
             color: var(--hq-text-secondary);
             font-size: 1rem;
-            line-height: 1.6;
+            line-height: 1.5;
             margin-bottom: 0;
             max-width: 920px;
         }}
 
         .hq-section-title {{
             color: var(--hq-text-primary);
-            font-size: 1.12rem;
-            font-weight: 720;
-            margin-top: 1.6rem;
+            font-size: 1.05rem;
+            font-weight: 740;
+            margin-top: 1.4rem;
             margin-bottom: 0.25rem;
         }}
 
@@ -487,8 +429,8 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
-            padding: 1rem 1.05rem;
+            box-shadow: none;
+            padding: 0.85rem 0.95rem;
         }}
 
         div[data-testid="stMetricLabel"] p {{
@@ -532,7 +474,7 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             margin: 0.35rem 0 1rem;
             max-height: 430px;
             overflow: auto;
@@ -636,7 +578,7 @@ def apply_global_styles() -> None:
         }}
 
         div[data-testid="stVerticalBlockBorderWrapper"] {{
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
         }}
 
         div[data-testid="stVerticalBlockBorderWrapper"] > div {{
@@ -825,7 +767,7 @@ def apply_global_styles() -> None:
 
         .stTabs [aria-selected="true"]::after {{
             background: var(--hq-accent);
-            box-shadow: 0 -2px 14px var(--hq-accent);
+            box-shadow: none;
         }}
 
         .stTabs [data-baseweb="tab-highlight"] {{
@@ -862,9 +804,7 @@ def apply_global_styles() -> None:
         button[kind="secondary"]:hover,
         div[data-testid="stButton"] button:hover,
         div[data-testid="stFormSubmitButton"] button:hover {{
-            background:
-                linear-gradient(180deg, var(--hq-accent-soft), transparent 120%),
-                var(--hq-surface-elevated) !important;
+            background: var(--hq-muted-surface) !important;
             border-color: var(--hq-accent-border) !important;
             transform: none;
         }}
@@ -919,9 +859,7 @@ def apply_global_styles() -> None:
         }}
 
         div[data-baseweb="select"] > div:hover {{
-            background:
-                linear-gradient(90deg, var(--hq-accent-soft), transparent 68%),
-                var(--hq-input-background) !important;
+            background: var(--hq-input-background) !important;
         }}
 
         div[data-baseweb="select"] > div:focus-within,
@@ -1183,11 +1121,10 @@ def apply_global_styles() -> None:
         .hq-card,
         .hq-empty-state,
         .hq-metric-card {{
-            background:
-                linear-gradient(180deg, var(--hq-surface), var(--hq-surface-elevated));
+            background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
         }}
 
         .hq-card {{
@@ -1210,6 +1147,7 @@ def apply_global_styles() -> None:
         .hq-empty-state {{
             padding: 1rem 1.1rem;
             margin: 0.65rem 0 0.9rem;
+            border-left: 3px solid var(--hq-accent);
         }}
 
         .hq-empty-state .hq-empty-body {{
@@ -1246,6 +1184,11 @@ def apply_global_styles() -> None:
         .hq-empty-body {{
             color: var(--hq-text-secondary);
             line-height: 1.45;
+        }}
+
+        div[data-testid="stButton"] button,
+        div[data-testid="stFormSubmitButton"] button {{
+            min-height: 38px;
         }}
 
         .hq-metric-card {{
@@ -1288,7 +1231,7 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             overflow: hidden;
         }}
 
@@ -1296,7 +1239,7 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             margin-bottom: 0.9rem;
             padding: 0.65rem 0.75rem 0.35rem;
         }}
@@ -1305,7 +1248,7 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             margin: 0.65rem 0;
             padding: 0.9rem 1rem;
         }}
@@ -1421,9 +1364,7 @@ def apply_global_styles() -> None:
         }}
 
         .hq-side-note {{
-            background:
-                linear-gradient(180deg, var(--hq-accent-soft), transparent 135%),
-                var(--hq-muted-surface);
+            background: var(--hq-accent-soft);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
             color: var(--hq-text-secondary);
@@ -1473,7 +1414,7 @@ def apply_global_styles() -> None:
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
             border-radius: var(--hq-radius);
-            box-shadow: var(--hq-shadow);
+            box-shadow: none;
             margin: 0.45rem 0 0.9rem;
             padding: 0.85rem 0.95rem;
         }}
@@ -1492,6 +1433,36 @@ def apply_global_styles() -> None:
             font-size: 1rem;
             font-weight: 740;
             line-height: 1.35;
+        }}
+
+        .planner-day-summary {{
+            display: grid;
+            gap: 0.5rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin: 0.7rem 0 0.9rem;
+        }}
+
+        .planner-day-stat {{
+            background: var(--hq-surface-elevated);
+            border: 1px solid var(--hq-border);
+            border-radius: 6px;
+            display: grid;
+            gap: 0.12rem;
+            padding: 0.55rem 0.62rem;
+        }}
+
+        .planner-day-stat span {{
+            color: var(--hq-text-secondary);
+            font-size: 0.72rem;
+            font-weight: 720;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }}
+
+        .planner-day-stat strong {{
+            color: var(--hq-text-primary);
+            font-size: 0.92rem;
+            line-height: 1.25;
         }}
 
         .hq-legend-row {{
@@ -1590,6 +1561,31 @@ def apply_global_styles() -> None:
             border-radius: 0;
             box-shadow: none;
             padding: 0;
+        }}
+
+        @media (max-width: 768px) {{
+            h1,
+            .hq-page-title {{
+                font-size: 1.55rem !important;
+            }}
+
+            .hq-page-subtitle {{
+                font-size: 0.92rem;
+            }}
+
+            .hq-section-title {{
+                margin-top: 1.2rem;
+            }}
+
+            .hq-empty-state {{
+                padding: 0.85rem 0.9rem;
+            }}
+
+            .stTabs [data-baseweb="tab"] {{
+                min-height: 40px;
+                padding-left: 0.72rem;
+                padding-right: 0.72rem;
+            }}
         }}
         </style>
         """,

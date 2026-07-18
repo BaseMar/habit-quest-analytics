@@ -156,7 +156,7 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
             background: var(--hq-surface);
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+            box-shadow: none;
         }
         .fc .fc-scrollgrid-section > td,
         .fc .fc-scrollgrid-section-liquid > td {
@@ -307,33 +307,31 @@ def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
 
 def render_schedule_list(quests: list) -> None:
     if not quests:
-        st.info("No tasks planned for this day.")
+        render_empty_state("No work planned", "Add a task, routine, or project session for this day.")
         return
 
     for quest in quests:
         status = _display_status(quest)
-        row_cols = st.columns([0.16, 0.44, 0.12, 0.28], vertical_alignment="center")
-        with row_cols[0]:
-            st.caption(_format_time_range(quest))
-        with row_cols[1]:
-            st.write(f"**{quest.title}**")
-            st.caption(f"{_category_name(quest)} / {status}")
-            if status == "Planned" and quest.recurring_habit_instance is None:
-                if st.button("Edit", key=f"edit_day_quest_{quest.id}"):
-                    st.session_state.pop("deleting_day_quest_id", None)
-                    st.session_state["editing_day_quest_id"] = quest.id
-                    st.rerun()
-        with row_cols[2]:
-            st.caption(f"{int(quest.xp_reward or 0)} XP")
-        with row_cols[3]:
-            if status == "Planned":
-                if st.button("Remove", key=f"remove_day_quest_{quest.id}"):
-                    st.session_state.pop("editing_day_quest_id", None)
-                    st.session_state["deleting_day_quest_id"] = quest.id
-                    st.rerun()
-            else:
-                st.caption("Manage status in Command Center.")
-        st.divider()
+        with st.container(border=True):
+            row_cols = st.columns([0.18, 0.5, 0.32], vertical_alignment="center")
+            with row_cols[0]:
+                st.caption(_format_time_range(quest))
+            with row_cols[1]:
+                st.write(f"**{quest.title}**")
+                st.caption(f"{_category_name(quest)} / {status} / {int(quest.xp_reward or 0)} XP")
+                if status == "Planned" and quest.recurring_habit_instance is None:
+                    if st.button("Edit", key=f"edit_day_quest_{quest.id}"):
+                        st.session_state.pop("deleting_day_quest_id", None)
+                        st.session_state["editing_day_quest_id"] = quest.id
+                        st.rerun()
+            with row_cols[2]:
+                if status == "Planned":
+                    if st.button("Remove", key=f"remove_day_quest_{quest.id}", use_container_width=True):
+                        st.session_state.pop("editing_day_quest_id", None)
+                        st.session_state["deleting_day_quest_id"] = quest.id
+                        st.rerun()
+                else:
+                    st.caption("Status in Command Center")
 
 
 def render_day_item_editor(quests: list, category_options: dict[str, int]) -> None:
@@ -514,11 +512,17 @@ def render_day_summary(quests: list) -> None:
     planned_minutes = sum(_quest_duration_minutes(quest) for quest in quests)
     planned_xp = sum(quest.xp_reward or 0 for quest in quests)
     completed_count = sum(1 for quest in quests if _display_status(quest).strip().lower() == "completed")
-    quest_col, time_col, xp_col, complete_col = st.columns(4)
-    quest_col.metric("Tasks", f"{quest_count} {_pluralize('task', quest_count)}")
-    time_col.metric("Planned Time", _format_minutes(planned_minutes))
-    xp_col.metric("Planned XP", f"{planned_xp} XP")
-    complete_col.metric("Completed", completed_count)
+    metrics = (
+        ("Tasks", str(quest_count)),
+        ("Planned time", _format_minutes(planned_minutes)),
+        ("Planned XP", f"{planned_xp} XP"),
+        ("Completed", str(completed_count)),
+    )
+    metric_html = "".join(
+        f'<div class="planner-day-stat"><span>{escape(label)}</span><strong>{escape(value)}</strong></div>'
+        for label, value in metrics
+    )
+    st.markdown(f'<div class="planner-day-summary">{metric_html}</div>', unsafe_allow_html=True)
 
 
 def _ensure_checklist_period_state() -> None:
@@ -759,96 +763,90 @@ def render_calendar_day_plan_tab(category_options: dict[str, int]) -> None:
     status_message = st.session_state.pop("plan_status_message", None)
     if status_message:
         st.success(status_message)
-    st.caption("Plan tasks, repeating routines, and project sessions from one place.")
     calendar_events = get_quests_for_calendar()
-
-    render_section_title("Calendar", "Review planned items and select a day to build its schedule.")
-    with st.container():
-        render_calendar(calendar_events, st.session_state["selected_date"])
-
     selected_day_quests = get_quests_for_day(st.session_state["selected_date"])
 
-    render_section_title("Selected Day Board")
-    with st.container():
-        header_left, header_right = st.columns([0.68, 0.32], vertical_alignment="center")
+    calendar_col, day_col = st.columns([0.62, 0.38], gap="large")
+    with calendar_col:
+        render_section_title("Calendar", "Select a date to review or plan work.")
+        render_calendar(calendar_events, st.session_state["selected_date"])
+
+    with day_col:
+        render_section_title("Selected day")
+        header_left, header_right = st.columns([0.62, 0.38], vertical_alignment="center")
         with header_left:
             st.subheader(_format_selected_date(st.session_state["selected_date"]))
-            st.caption("Daily plan for the selected calendar date.")
+            st.caption("Plan and review the work for this date.")
         with header_right:
             st.date_input("Selected date", key="selected_date")
 
         render_day_summary(selected_day_quests)
-
-        schedule_col, planner_col = st.columns([0.6, 0.4], gap="large")
-
-    with schedule_col:
-        st.write("**Planned work**")
+        st.write("**Schedule**")
         render_schedule_list(selected_day_quests)
         render_day_item_editor(selected_day_quests, category_options)
         render_day_item_delete_action(selected_day_quests)
 
-    with planner_col:
-        st.write("**Add to plan**")
-        active_goals = list_active_goals()
-        form_result = render_plan_form(
-            category_options=category_options,
-            active_goals=active_goals,
-            selected_date=st.session_state["selected_date"],
-            goal_title_by_id={goal.id: goal.title for goal in active_goals},
-        )
-        if form_result is not None:
-            try:
-                if form_result.new_project is not None:
-                    new_project = form_result.new_project
-                    goal = create_goal(
-                        title=new_project.title,
-                        category_id=new_project.category_id,
-                        planned_total_minutes=new_project.planned_total_minutes,
-                        start_date=st.session_state["selected_date"],
-                        target_end_date=new_project.target_end_date,
-                    )
-                    st.session_state["plan_goal"] = goal.id
-                    st.session_state.pop("plan_creating_project", None)
-                    st.session_state["plan_status_message"] = "Project created. Add its first session below."
-                else:
-                    draft = form_result.plan
-                    if draft is None:
-                        return
-                    if draft.is_recurring:
-                        habit = create_recurring_habit(
-                            title=draft.title,
-                            category_id=draft.category_id,
-                            estimated_minutes=draft.estimated_minutes,
-                            recurrence_type="selected_weekdays",
-                            weekdays=draft.weekdays,
-                            start_date=draft.planned_date,
-                            end_date=draft.end_date,
-                            description=draft.notes,
-                            planned_start_time=draft.start_time,
-                            planned_end_time=draft.end_time,
+        with st.expander("Add item", expanded=not selected_day_quests):
+            active_goals = list_active_goals()
+            form_result = render_plan_form(
+                category_options=category_options,
+                active_goals=active_goals,
+                selected_date=st.session_state["selected_date"],
+                goal_title_by_id={goal.id: goal.title for goal in active_goals},
+            )
+            if form_result is not None:
+                try:
+                    if form_result.new_project is not None:
+                        new_project = form_result.new_project
+                        goal = create_goal(
+                            title=new_project.title,
+                            category_id=new_project.category_id,
+                            planned_total_minutes=new_project.planned_total_minutes,
+                            start_date=st.session_state["selected_date"],
+                            target_end_date=new_project.target_end_date,
                         )
-                        generate_recurring_habit_for_month(
-                            habit.id,
-                            draft.planned_date.year,
-                            draft.planned_date.month,
-                        )
-                        st.session_state["plan_status_message"] = "Routine created and added to this month's plan."
+                        st.session_state["plan_goal"] = goal.id
+                        st.session_state.pop("plan_creating_project", None)
+                        st.session_state["plan_status_message"] = "Project created. Add its first session below."
                     else:
-                        create_scheduled_quest(
-                            title=draft.title,
-                            description=draft.notes,
-                            category_id=draft.category_id,
-                            planned_date=draft.planned_date,
-                            start_time=draft.start_time,
-                            end_time=draft.end_time,
-                            estimated_minutes=draft.estimated_minutes,
-                            goal_id=draft.goal_id,
-                        )
-                        st.session_state["plan_status_message"] = "Item added to the plan."
-            except ValueError as error:
-                st.error(str(error))
-            else:
-                st.rerun()
+                        draft = form_result.plan
+                        if draft is None:
+                            return
+                        if draft.is_recurring:
+                            habit = create_recurring_habit(
+                                title=draft.title,
+                                category_id=draft.category_id,
+                                estimated_minutes=draft.estimated_minutes,
+                                recurrence_type="selected_weekdays",
+                                weekdays=draft.weekdays,
+                                start_date=draft.planned_date,
+                                end_date=draft.end_date,
+                                description=draft.notes,
+                                planned_start_time=draft.start_time,
+                                planned_end_time=draft.end_time,
+                            )
+                            generate_recurring_habit_for_month(
+                                habit.id,
+                                draft.planned_date.year,
+                                draft.planned_date.month,
+                            )
+                            st.session_state["plan_status_message"] = "Routine created and added to this month's plan."
+                        else:
+                            create_scheduled_quest(
+                                title=draft.title,
+                                description=draft.notes,
+                                category_id=draft.category_id,
+                                planned_date=draft.planned_date,
+                                start_time=draft.start_time,
+                                end_time=draft.end_time,
+                                estimated_minutes=draft.estimated_minutes,
+                                goal_id=draft.goal_id,
+                            )
+                            st.session_state["plan_status_message"] = "Item added to the plan."
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.rerun()
 
 
 def render_monthly_review_tab() -> None:
@@ -859,9 +857,9 @@ def render_monthly_review_tab() -> None:
 
 apply_theme()
 render_page_header(
-    "Daily Planning",
+    "Plan your day",
     "Quest Planner",
-    "Build the calendar for one-time tasks, routines, and project sessions.",
+    "Schedule one-time tasks, routines, and project sessions in one place.",
 )
 
 init_db()

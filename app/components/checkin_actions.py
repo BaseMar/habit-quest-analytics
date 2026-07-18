@@ -28,7 +28,18 @@ def render_checkin_status_actions(
     if not actions:
         return None
 
-    action_columns = st.columns(3) if len(actions) == 3 else (st.columns([0.3, 0.7])[0],)
+    if len(actions) == 1:
+        label, next_status, button_type = actions[0]
+        if st.button(
+            label,
+            type=button_type,
+            use_container_width=True,
+            key=f"{key_prefix}_{next_status}",
+        ):
+            return label, next_status
+        return None
+
+    action_columns = st.columns(3)
     for action_column, (label, next_status, button_type) in zip(action_columns, actions):
         with action_column:
             if st.button(

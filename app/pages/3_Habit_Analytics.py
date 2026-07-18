@@ -102,7 +102,7 @@ def render_category_chart(quests_by_category) -> None:
         x="Category",
         y="Count",
         title="Check-ins by Category",
-        color_discrete_sequence=[tokens["success"]],
+        color_discrete_sequence=[tokens["accent"]],
     )
     fig.update_layout(xaxis_title="Category", yaxis_title="Check-in Count", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
@@ -125,7 +125,7 @@ def render_weekday_chart(completion_rate_by_weekday) -> None:
         y="Completion Rate",
         title="Completion Rate by Weekday",
         hover_data=hover_columns,
-        color_discrete_sequence=[tokens["warning"]],
+        color_discrete_sequence=[tokens["accent"]],
         category_orders={
             "Weekday": [
                 "Monday",
@@ -331,7 +331,7 @@ def render_goal_progress_visual(goal_table: pd.DataFrame, progress_dataset: pd.D
         value_name="Minutes",
     )
     tokens = get_theme_tokens()
-    remaining_color = "rgba(8, 145, 178, 0.28)" if tokens["mode"] == "Light" else "rgba(148, 163, 184, 0.28)"
+    remaining_color = "#CBD5E1" if tokens["mode"] == "Light" else "#475569"
     chart_data["Label"] = chart_data["Minutes"].map(lambda value: _format_minutes(int(value)) if int(value) else "")
     fig = px.bar(
         chart_data,
@@ -557,15 +557,15 @@ def render_goal_analytics() -> None:
 
 apply_theme()
 render_page_header(
-    "Analytics",
+    "Review progress",
     "Habit Analytics",
-    "Review quest trends, goal progress, consistency, categories, and weekly performance.",
+    "See current habit consistency and project progress without leaving your planning workflow.",
 )
 
 init_db()
 analytics = get_habit_analytics_data()
 
-activity_tab, goals_tab = st.tabs(["Activity Overview", "Projects"])
+activity_tab, goals_tab = st.tabs(["Habits", "Projects"])
 
 with activity_tab:
     render_activity_overview(analytics)
