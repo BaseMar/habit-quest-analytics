@@ -292,8 +292,8 @@ def render_goal_analytics_filters() -> tuple[tuple[str, ...] | str, int | None]:
 def render_goal_kpis(summary: dict) -> None:
     metric_cols = st.columns(6)
     metrics = (
-        ("Active Goals", summary["active_goals"]),
-        ("Completed Goals", summary["completed_goals"]),
+        ("Active Projects", summary["active_goals"]),
+        ("Completed Projects", summary["completed_goals"]),
         ("Planned Effort", _format_minutes(summary["planned_effort_minutes"])),
         ("Completed Effort", _format_minutes(summary["completed_effort_minutes"])),
         ("Overall Progress", _format_percent(summary["overall_progress_percent"])),
@@ -316,59 +316,7 @@ def render_compact_goal_empty_state(title: str, message: str) -> None:
     )
 
 
-def render_single_goal_progress_card(goal_row: dict) -> None:
-    progress = max(0, min(float(goal_row["Progress Percent"]), 100))
-    target = goal_row["Target Date"]
-    target_label = target.isoformat() if hasattr(target, "isoformat") else "No target date"
-    planned_minutes = int(goal_row["Planned Minutes"])
-    progress_effort_label = (
-        f"{_format_minutes(int(goal_row['Completed Minutes']))} / {_format_optional_minutes(planned_minutes)}"
-    )
-    sessions = (
-        f"{int(goal_row['Completed Sessions'])} completed / "
-        f"{int(goal_row['Planned Sessions'])} planned"
-        + (f" / {int(goal_row['Skipped Sessions'])} skipped" if int(goal_row["Skipped Sessions"]) else "")
-        + (f" / {int(goal_row['Failed Sessions'])} failed" if int(goal_row["Failed Sessions"]) else "")
-    )
-    st.markdown(
-        f"""
-        <div class="hq-progress-card">
-            <div class="hq-progress-card-header">
-                <div>
-                    <div class="hq-progress-title">{escape(str(goal_row["Goal"]))}</div>
-                    <div class="hq-progress-meta">
-                        {escape(str(goal_row["Status"]))} / {escape(str(goal_row["Category"]))} / Target: {escape(target_label)}
-                    </div>
-                </div>
-                <div>
-                    <div class="hq-progress-value">
-                        {escape(progress_effort_label)}
-                    </div>
-                    <div class="hq-progress-caption">{escape(_format_percent(progress))} complete</div>
-                </div>
-            </div>
-            <div class="hq-progress-track">
-                <div class="hq-progress-fill" style="width: {progress:.2f}%"></div>
-            </div>
-            <div class="hq-progress-footer">
-                <div class="hq-progress-caption">
-                    {escape(_format_minutes(int(goal_row["Remaining Minutes"])))} remaining / {int(goal_row["Earned XP"])} XP earned
-                </div>
-                <div>
-                    <span class="hq-progress-pill">{escape(sessions)}</span>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def render_goal_progress_visual(goal_table: pd.DataFrame, progress_dataset: pd.DataFrame) -> None:
-    if len(goal_table) == 1:
-        render_single_goal_progress_card(goal_table.iloc[0].to_dict())
-        return
-
     if progress_dataset.empty:
         render_compact_goal_empty_state(
             "No goals match these filters",
@@ -563,16 +511,16 @@ def render_goal_comparison_table(goal_table: pd.DataFrame) -> None:
 
 def render_goal_analytics() -> None:
     render_section_title(
-        "Goal Analytics",
-        "Long-term goal progress derived from linked one-time quest sessions and check-in XP.",
+        "Project Analysis",
+        "Compare long-term project effort and outcomes derived from linked sessions and check-in XP.",
     )
     statuses, category_id = render_goal_analytics_filters()
     summary = get_goal_analytics_summary(statuses=statuses, category_id=category_id)
 
     if not summary["has_goals"]:
         render_empty_state(
-            "No goals yet",
-            "Create goals in Quest Planner > Goals / Projects, then add linked sessions to track analytics.",
+            "No projects yet",
+            "Create projects in Projects & Routines, then add linked sessions in Quest Planner.",
         )
         return
 
@@ -583,21 +531,13 @@ def render_goal_analytics() -> None:
     trend_dataset = get_goal_completed_minutes_by_week(statuses=statuses, category_id=category_id)
     goal_table = summary["goal_table"]
 
-    render_section_title("Progress", "Completed and remaining effort for the selected goals.")
-
-    if len(goal_table) == 1:
-        layout_col, outcome_col = st.columns([0.6, 0.4], gap="large")
-        with layout_col:
-            render_goal_progress_visual(goal_table, progress_dataset)
-        with outcome_col:
-            render_goal_session_outcomes(status_dataset)
-    else:
-        render_goal_progress_visual(goal_table, progress_dataset)
+    render_section_title("Project Comparison", "Compare completed and remaining effort across the selected projects.")
+    render_goal_progress_visual(goal_table, progress_dataset)
 
     if summary["linked_sessions_count"] == 0:
         render_compact_goal_empty_state(
             "No linked sessions yet",
-            "Goal KPIs and details are visible. Add sessions in Quest Planner to populate XP, outcomes, and weekly trend charts.",
+            "Add sessions in Quest Planner to populate project outcomes and weekly effort trends.",
         )
     else:
         if len(goal_table) > 1:
@@ -606,6 +546,8 @@ def render_goal_analytics() -> None:
                 render_goal_xp_chart(goal_table)
             with status_col:
                 render_goal_session_outcomes(status_dataset)
+        else:
+            render_goal_session_outcomes(status_dataset)
 
         render_section_title("Effort Trend", "Completed linked goal effort grouped by check-in week.")
         render_goal_effort_trend(trend_dataset)
@@ -623,7 +565,7 @@ render_page_header(
 init_db()
 analytics = get_habit_analytics_data()
 
-activity_tab, goals_tab = st.tabs(["Activity Overview", "Goals / Projects"])
+activity_tab, goals_tab = st.tabs(["Activity Overview", "Projects"])
 
 with activity_tab:
     render_activity_overview(analytics)

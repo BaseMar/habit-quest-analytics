@@ -7,13 +7,13 @@ The MVP proves the core loop: plan quests, track daily completion, earn XP, leve
 The current usable version includes:
 
 - calendar-based scheduled quest creation,
-- daily quest completion through Monthly Checklist check-ins,
-- recurring habit templates with explicit planned-day generation,
+- daily quest completion through Command Center check-ins,
+- recurring habit templates with creation-month and future-month planned-day generation,
 - categories for organizing work,
 - time-based XP for new scheduled quests and recurring habit templates,
 - XP rewards stored per completed check-in,
 - player profile with XP, nonlinear level, avatar, and RPG stat levels,
-- Command Center operational KPIs,
+- Command Center operational actions and KPIs,
 - Habit Analytics trends and consistency metrics,
 - local SQLite persistence,
 - pytest coverage for business rules.
@@ -30,14 +30,14 @@ The current usable version includes:
 
 ## App Sections
 
-- `Home Base` - onboarding, quick start, app map, and local-first MVP note.
-- `Command Center` - read-only operational overview using daily check-ins.
-- `Quest Planner` - `Plan` for the calendar, direct daily status actions, and
-  unified planning form; `Manage` for projects and routines; and `Monthly
-  Review` for the checklist, selected-month routine generation, and historical
-  status updates on scheduled days.
-- `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency, planned minutes, and insights.
-- `Character Profile` - avatar, XP, level, completed quest days, RPG stats, radar chart, and achievements placeholder.
+- `Command Center` - default daily workspace for today's and overdue check-in status actions.
+- `Planner` - calendar, unified planning form, selected-day editing/removal of
+  unresolved work, and read-only Monthly Review.
+- `Projects & Routines` - project workspace and lifecycle, bulk project-session
+  planning, routine templates, and future-month routine generation.
+- `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency,
+  planned minutes, project comparison, and insights.
+- `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
 
 ## User-Facing Language
 
@@ -100,10 +100,9 @@ Status: implemented v1.
 - Add `QuestCheckin` model with unique `quest_id + checkin_date`.
 - Create planned check-ins for scheduled quests.
 - Build monthly checklist data with rows as quests and columns as days.
-- Render a compact matrix preview in Quest Planner.
-- Allow Complete, Skip, Fail, and Reset actions for a selected quest/date.
-- Block status updates for unscheduled/blank cells so the Monthly Checklist
-  cannot create check-ins for dates where the quest is not scheduled/generated.
+- Render a compact read-only matrix preview in Planner.
+- Keep status transitions in Command Center, where only existing today's and
+  overdue scheduled check-ins can be resolved.
 - Keep XP idempotent with `QuestCheckin.xp_awarded`.
 
 Not implemented:
@@ -111,7 +110,7 @@ Not implemented:
 - fully editable 31-column widget grid,
 - automatic app-level stale planned failure.
 
-### Phase 4: Command Center Metrics
+### Phase 4: Command Center
 
 Status: implemented with check-ins.
 
@@ -120,7 +119,8 @@ Status: implemented with check-ins.
 - Overdue counts planned check-ins before today.
 - Failed counts failed check-ins through today.
 - Today's Focus reads parent quest metadata and `QuestCheckin.status`.
-- Command Center remains read-only.
+- Command Center is the single operational surface for today's and overdue
+  check-in status actions.
 
 ### Phase 5: Habit Analytics
 
@@ -153,7 +153,6 @@ Legacy quest-based fallback remains only for databases with no check-ins.
 
 ## Future Features Outside MVP
 
-- Long-term Goals / Projects.
 - True N-times-per-week recurring habit scheduling.
 - PostgreSQL / production persistence.
 - Authentication and user-specific data isolation.

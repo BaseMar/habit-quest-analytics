@@ -164,26 +164,19 @@ Important:
 
 Monthly Checklist lives in Quest Planner.
 
-Current v1 structure:
+Current structure:
 
 - Section title: `Monthly Review`.
-- Subtitle: `Track daily quest completion and generate routine days for the selected month.`
+- Subtitle: `View the planned and completed work for the selected month.`
 - Month selector.
 - Year selector.
-- Explicit missing-routine generation action next to the selected period.
 - Status legend.
 - Matrix preview:
   - rows are quests, recurring habits, or goals/projects,
   - columns are days of the month,
   - cells show simple status symbols.
-- Selected quest/date action controls:
-  - select quest,
-  - select only dates that are scheduled/generated for that quest,
-  - view current status,
-  - show locked/not-scheduled state for blank cells,
-  - select a concrete goal session when a goal/date contains multiple sessions,
-  - Planned scheduled/generated cells offer Complete, Skip, and Fail.
-  - Resolved scheduled/generated cells offer Reset to Planned.
+- The matrix is read-only. Daily status actions belong to Command Center and
+  future-month routine generation belongs to Projects & Routines.
 
 Goal row display:
 
@@ -192,30 +185,24 @@ Goal row display:
 - Mixed statuses show compact counts, such as `C1 F1`.
 - These markers are presentation only; no check-ins are merged.
 
-V1 intentionally avoids a fragile fully editable 31-column widget grid. The matrix preview plus selected quest/date controls is simpler, more reliable in Streamlit, and easier to test.
+The matrix intentionally avoids a fragile fully editable 31-column widget grid.
+It is a compact monthly history and planning view.
 
 ## Quest Planner Impact
 
-Quest Planner is the planning and checklist surface.
+Planner is the calendar and planning surface.
 
 Current behavior:
 
 - Calendar planning and the New Quest form remain.
 - Creating a scheduled quest creates a planned check-in for the scheduled date.
-- Selected Day Schedule provides direct Complete, Skip, and Fail actions for
-  planned work on the selected date, plus Reset for resolved work.
-- Monthly Checklist remains the full month-level completion, status-history,
-  and multi-session goal workflow.
+- Selected Day Schedule edits or removes unresolved planned work only.
+- Monthly Review remains a read-only month-level history and planning matrix.
 - The old Maintenance, Quest Ledger, and Legacy Status Controls UI were removed.
 - Calendar events display check-in status for the event date when available.
-- Selected Day Schedule displays check-in status for the selected date and
-  updates the existing scheduled check-in through the same status service.
-- Blank/not-scheduled Monthly Checklist cells cannot create check-ins through
-  status updates.
-- Goal-linked sessions are grouped visually into one goal row, but status
-  updates still target one underlying `QuestCheckin`.
-- Safe delete controls are available only for unresolved scheduled/generated
-  cells.
+- Selected Day Schedule displays the check-in status for the selected date.
+- Goal-linked sessions are grouped visually into one project row.
+- Safe deletion is available from the selected-day plan for unresolved work.
 - `Quest.status` is not synchronized from check-in status.
 
 ## Command Center Impact
@@ -230,7 +217,8 @@ Current behavior:
 - `Failed` counts failed check-ins through today.
 - `Overdue` means unresolved planned check-ins before today.
 - Skipped remains separate from failed.
-- Command Center is read-only and does not expose status action buttons.
+- Command Center exposes Complete, Skip, Fail, and Reset for today's and
+  overdue planned check-ins.
 
 ## Habit Analytics Impact
 

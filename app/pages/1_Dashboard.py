@@ -9,13 +9,15 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.database.db import init_db
+from app.components.checkin_actions import render_checkin_status_actions
 from src.services.analytics_service import get_command_center_data
+from src.services.checklist_service import update_checkin_status
 from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
 
 
 def render_mission_brief(command_center: dict) -> None:
     today_count = len(command_center["today_quests"])
-    attention_count = command_center["overdue_quests"] + command_center["failed_quests"]
+    attention_count = command_center["overdue_quests"]
 
     if today_count == 0:
         message = "No quest check-ins planned for today. Schedule quests in Quest Planner to start today's mission."
@@ -28,7 +30,7 @@ def render_mission_brief(command_center: dict) -> None:
     if command_center["overdue_quests"] > 0:
         overdue_note = (
             f"<div class=\"command-brief-note\">"
-            f"{command_center['overdue_quests']} overdue check-ins need review in Quest Planner."
+            f"{command_center['overdue_quests']} overdue check-ins need review below."
             f"</div>"
         )
 
@@ -44,28 +46,37 @@ def render_mission_brief(command_center: dict) -> None:
     )
 
 
-def render_todays_focus(today_quests: list[dict]) -> None:
-    if not today_quests:
+def render_work_items(items: list[dict], empty_title: str, empty_message: str, key_prefix: str) -> None:
+    if not items:
         render_empty_state(
-            "No quest check-ins planned for today",
-            "Schedule quests in Quest Planner to build today's focus.",
+            empty_title,
+            empty_message,
         )
         return
 
-    rows = "".join(
-        (
-            '<div class="command-focus-row">'
-            f'<div class="command-focus-time">{escape(str(quest["Time"]))}</div>'
-            '<div class="command-focus-main">'
-            f'<div class="command-focus-title">{escape(str(quest["Title"]))}</div>'
-            f'<div class="command-focus-meta">{escape(str(quest["Category"]))} / {escape(str(quest["Status"]))}</div>'
-            "</div>"
-            f'<div class="command-focus-xp">{escape(str(quest["XP"]))}</div>'
-            "</div>"
-        )
-        for quest in today_quests
-    )
-    st.markdown(f'<div class="command-focus-list">{rows}</div>', unsafe_allow_html=True)
+    for item in items:
+        details_col, xp_col, action_col = st.columns([0.62, 0.1, 0.28], vertical_alignment="center")
+        with details_col:
+            time_label = item["time"] if item["time"] != "Not scheduled" else "Any time"
+            st.write(f"**{item['title']}**")
+            st.caption(f"{item['checkin_date']:%a, %b %d} / {time_label} / {item['category']} / {item['status']}")
+        with xp_col:
+            st.caption(f"{item['xp']} XP")
+        with action_col:
+            action = render_checkin_status_actions(
+                item["status"],
+                key_prefix=f"{key_prefix}_{item['quest_id']}_{item['checkin_date'].isoformat()}",
+            )
+            if action is not None:
+                label, next_status = action
+                try:
+                    update_checkin_status(item["quest_id"], item["checkin_date"], next_status)
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.session_state["command_status_message"] = f"{label} saved for {item['title']}."
+                    st.rerun()
+        st.divider()
 
 
 def render_status_kpis(command_center: dict) -> None:
@@ -181,53 +192,6 @@ def render_status_kpis(command_center: dict) -> None:
                 margin-top: 0.35rem;
             }}
 
-            .command-focus-list {{
-                border: 1px solid var(--hq-border);
-                border-radius: 8px;
-                overflow: hidden;
-                background: var(--hq-surface);
-                box-shadow: var(--hq-shadow);
-            }}
-
-            .command-focus-row {{
-                align-items: center;
-                display: grid;
-                gap: 0.85rem;
-                grid-template-columns: minmax(86px, 0.22fr) minmax(0, 1fr) minmax(72px, 0.16fr);
-                min-height: 64px;
-                padding: 0.72rem 0.9rem;
-            }}
-
-            .command-focus-row + .command-focus-row {{
-                border-top: 1px solid var(--hq-border);
-            }}
-
-            .command-focus-time {{
-                color: var(--hq-text-secondary);
-                font-size: 0.88rem;
-                font-weight: 720;
-            }}
-
-            .command-focus-title {{
-                color: var(--hq-text-primary);
-                font-weight: 720;
-                line-height: 1.25;
-            }}
-
-            .command-focus-meta {{
-                color: var(--hq-text-secondary);
-                font-size: 0.82rem;
-                line-height: 1.3;
-                margin-top: 0.16rem;
-            }}
-
-            .command-focus-xp {{
-                color: var(--hq-text-primary);
-                font-size: 0.92rem;
-                font-weight: 740;
-                text-align: right;
-            }}
-
             @media (max-width: 900px) {{
                 .command-status-row {{
                     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -239,13 +203,6 @@ def render_status_kpis(command_center: dict) -> None:
                     grid-template-columns: 1fr;
                 }}
 
-                .command-focus-row {{
-                    grid-template-columns: 1fr;
-                }}
-
-                .command-focus-xp {{
-                    text-align: left;
-                }}
             }}
         </style>
         <div class="command-status-row">
@@ -272,10 +229,27 @@ if not command_center["has_quests"]:
         "Create a quest in Quest Planner to start today's mission.",
     )
 else:
+    status_message = st.session_state.pop("command_status_message", None)
+    if status_message:
+        st.success(status_message)
+
     render_status_kpis(command_center)
     render_mission_brief(command_center)
 
-    render_section_title("Today's Focus", "Today's planned quest check-ins. Manage status updates in Quest Planner.")
-    render_todays_focus(command_center["today_quests"])
+    render_section_title("Today's Focus", "Complete, skip, fail, or reset today's planned work here.")
+    render_work_items(
+        command_center["today_work_items"],
+        "No work planned for today",
+        "Schedule tasks in Quest Planner to build today's focus.",
+        "command_today",
+    )
+
+    render_section_title("Needs Attention", "Resolve overdue planned work before it becomes invisible in the day-to-day flow.")
+    render_work_items(
+        command_center["attention_items"],
+        "No overdue planned work",
+        "Your previous planned work has been resolved.",
+        "command_attention",
+    )
 
 st.caption("Data source: local SQLite quest check-in records.")

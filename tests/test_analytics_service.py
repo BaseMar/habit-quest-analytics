@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from src.database.models import Base, Category, Goal, Quest, QuestCheckin
 from src.services.analytics_service import (
     build_character_activity_stats,
+    build_operational_checkin_rows,
     build_today_focus_rows,
     build_status_counts,
     build_xp_by_rpg_stat,
@@ -495,6 +496,31 @@ def test_build_today_focus_rows_sorts_by_planned_start_at_then_title(session):
         "Later scheduled",
         "All day task",
         "Alpha all day",
+    ]
+
+
+def test_build_operational_checkin_rows_includes_status_action_data(session):
+    category = _add_category(session, "Work")
+    quest = _add_quest(
+        session,
+        "Resolve report",
+        xp_reward=75,
+        planned_start_at=datetime(2026, 6, 26, 9, 0),
+        planned_end_at=datetime(2026, 6, 26, 10, 0),
+        category=category,
+    )
+    checkin = _add_checkin(session, quest, date(2026, 6, 25), "Planned")
+
+    assert build_operational_checkin_rows([checkin]) == [
+        {
+            "quest_id": quest.id,
+            "checkin_date": date(2026, 6, 25),
+            "time": "09:00 - 10:00",
+            "title": "Resolve report",
+            "category": "Work",
+            "status": "Planned",
+            "xp": 75,
+        }
     ]
 
 

@@ -159,6 +159,8 @@ def get_command_center_data(today: date | None = None, session=None) -> dict:
             "weekly_completion_rate": calculate_completion_rate(completed_this_week, len(weekly_checkins)),
             "status_counts": status_counts,
             "today_quests": build_today_focus_rows(today_checkins),
+            "today_work_items": build_operational_checkin_rows(today_checkins),
+            "attention_items": build_operational_checkin_rows(overdue_checkins),
         }
     finally:
         if owns_session:
@@ -757,6 +759,32 @@ def build_today_focus_rows(checkins: list[QuestCheckin]) -> list[dict]:
             "Category": _category_name(checkin.quest),
             "Status": _normalize_status(checkin.status),
             "XP": f"{_checkin_xp(checkin)} XP",
+        }
+        for checkin in sorted_checkins
+    ]
+
+
+def build_operational_checkin_rows(checkins: list[QuestCheckin]) -> list[dict]:
+    """Return action-ready rows for the Command Center work lists."""
+    sorted_checkins = sorted(
+        checkins,
+        key=lambda checkin: (
+            checkin.checkin_date,
+            checkin.quest.planned_start_at is None,
+            checkin.quest.planned_start_at or datetime.max,
+            checkin.quest.title.lower(),
+        ),
+    )
+
+    return [
+        {
+            "quest_id": checkin.quest_id,
+            "checkin_date": checkin.checkin_date,
+            "time": _quest_time_range(checkin.quest),
+            "title": checkin.quest.title,
+            "category": _category_name(checkin.quest),
+            "status": _normalize_status(checkin.status),
+            "xp": _checkin_xp(checkin),
         }
         for checkin in sorted_checkins
     ]

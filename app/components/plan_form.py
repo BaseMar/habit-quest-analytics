@@ -37,7 +37,6 @@ class PlanDraft:
     goal_id: int | None
     weekdays: list[int] | None = None
     end_date: date | None = None
-    generate_initial_month: bool = False
 
     @property
     def is_recurring(self) -> bool:
@@ -198,7 +197,6 @@ def render_plan_form(
 
     weekdays = None
     end_date = None
-    generate_initial_month = False
     if is_recurring:
         recurrence_preset = st.radio(
             "Repeat",
@@ -225,12 +223,6 @@ def render_plan_form(
                 min_value=planned_date,
                 key=f"{key_prefix}_end_date",
             )
-        generate_initial_month = st.checkbox(
-            f"Add planned days for {planned_date:%B %Y}",
-            value=True,
-            key=f"{key_prefix}_generate_initial_month",
-        )
-
     with st.expander("Notes", expanded=False):
         notes = st.text_area(
             "Notes",
@@ -265,6 +257,5 @@ def render_plan_form(
             goal_id=goal_id,
             weekdays=weekdays,
             end_date=end_date,
-            generate_initial_month=generate_initial_month,
         )
     )

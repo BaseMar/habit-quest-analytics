@@ -137,35 +137,14 @@ def apply_character_profile_styles() -> None:
             padding: 0.82rem 0.95rem;
         }
 
-        .hq-achievements-note {
-            color: var(--hq-text-secondary);
-            font-size: 0.88rem;
-            margin-top: 0.15rem;
-        }
-
-        .hq-hero-quick-stats {
-            display: grid;
-            gap: 0.45rem;
-            grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-        }
-
-        .hq-hero-chip,
-        .hq-xp-metric,
-        .snapshot-tile {
+        .hq-xp-metric {
             background: var(--hq-muted-surface);
             border: 1px solid var(--hq-border);
             border-radius: 7px;
             box-sizing: border-box;
         }
 
-        .hq-hero-chip {
-            min-height: 48px;
-            padding: 0.45rem 0.52rem;
-        }
-
-        .hq-hero-chip-label,
-        .hq-xp-label,
-        .snapshot-label {
+        .hq-xp-label {
             color: var(--hq-text-secondary);
             font-size: 0.64rem;
             font-weight: 760;
@@ -177,18 +156,12 @@ def apply_character_profile_styles() -> None:
             white-space: nowrap;
         }
 
-        .hq-hero-chip-value,
-        .hq-xp-value,
-        .snapshot-value {
+        .hq-xp-value {
             color: var(--hq-text-primary);
             font-weight: 800;
             line-height: 1.18;
             margin-top: 0.18rem;
             overflow-wrap: anywhere;
-        }
-
-        .hq-hero-chip-value {
-            font-size: 0.88rem;
         }
 
         .hq-xp-panel {
@@ -239,22 +212,6 @@ def apply_character_profile_styles() -> None:
             margin-top: 0.38rem;
         }
 
-        .snapshot-grid {
-            display: grid;
-            gap: 0.5rem;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            width: 100%;
-        }
-
-        .snapshot-tile {
-            min-height: 58px;
-            padding: 0.52rem 0.58rem;
-        }
-
-        .snapshot-value {
-            font-size: 0.94rem;
-        }
-
         div[data-testid="stFileUploader"] button {
             display: none;
         }
@@ -265,16 +222,8 @@ def apply_character_profile_styles() -> None:
         }
 
         @media (max-width: 820px) {
-            .hq-hero-quick-stats {
-                grid-template-columns: 1fr;
-            }
-
             .hq-xp-row {
                 grid-template-columns: 1fr;
-            }
-
-            .snapshot-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
         </style>
@@ -321,9 +270,6 @@ def render_avatar_controls(profile: dict) -> None:
 
 def render_character_hero(profile: dict) -> None:
     progress_percent = int(profile["level_progress"] * 100)
-    quest_days = _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)
-    completion_rate = _activity_value(profile, ["Completion Rate"], default="0.0%")
-    weekly_xp = _activity_value(profile, ["Weekly XP"], default=0)
 
     with st.container():
         avatar_col, identity_col, xp_col = st.columns([0.16, 0.51, 0.33], gap="medium")
@@ -338,11 +284,6 @@ def render_character_hero(profile: dict) -> None:
                     <div class="hq-character-name">{escape(str(profile["character_name"]))}</div>
                     <div class="hq-character-title">{escape(str(profile["character_title"]))}</div>
                     <div class="hq-level-badge">Level {int(profile["current_level"])}</div>
-                    <div class="hq-hero-quick-stats">
-                        {_hero_chip("Quest Days", quest_days)}
-                        {_hero_chip("Completion", completion_rate)}
-                        {_hero_chip("Weekly XP", weekly_xp)}
-                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -377,7 +318,7 @@ def render_character_hero(profile: dict) -> None:
             """
             <div class="hq-empty-compact">
                 <strong>No completed quest days yet.</strong>
-                Complete quest days in Quest Planner to earn XP and grow RPG stats.
+                Complete planned work in Command Center to earn XP and grow RPG stats.
             </div>
             """,
             unsafe_allow_html=True,
@@ -614,22 +555,6 @@ def _render_stat_row(row: dict) -> str:
     """
 
 
-def render_activity_snapshot(profile: dict) -> None:
-    tiles = [
-        ("Quest Days", _activity_value(profile, ["Completed Quest Days", "Completed Quests"], default=0)),
-        ("Avg XP / Day", _activity_value(profile, ["Average XP / Quest Day", "Average XP / Completed Quest"], default=0)),
-        ("Completion Rate", _activity_value(profile, ["Completion Rate"], default="0.0%")),
-        ("Weekly XP", _activity_value(profile, ["Weekly XP"], default=0)),
-        ("Most Active Category", _activity_value(profile, ["Most Active Category"], default="Not enough data")),
-        ("Strongest Stat", _activity_value(profile, ["Strongest RPG Stat"], default="Not enough data")),
-        ("Best Weekday", _activity_value(profile, ["Most Productive Weekday"], default="Not enough data")),
-    ]
-    tile_markup = "".join(_activity_tile(label, value) for label, value in tiles)
-
-    render_section_title("Activity Snapshot", "Compact activity metrics for the current character sheet.")
-    st.markdown(f'<div class="snapshot-grid">{tile_markup}</div>', unsafe_allow_html=True)
-
-
 def render_how_stats_are_calculated() -> None:
     with st.expander("How Stats Are Calculated"):
         st.markdown(
@@ -644,42 +569,12 @@ def render_how_stats_are_calculated() -> None:
         )
 
 
-def render_achievements_planned() -> None:
-    render_section_title("Achievements - planned")
-    st.markdown(
-        '<div class="hq-achievements-note">Achievement unlocks will be added in a future update.</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def _activity_value(profile: dict, labels: list[str], default):
-    values = {str(item["label"]): item["value"] for item in profile["activity_stats"]}
-    for label in labels:
-        if label in values:
-            return values[label]
-    return default
-
-
-def _hero_chip(label: str, value) -> str:
-    return (
-        f'<div class="hq-hero-chip"><div class="hq-hero-chip-label">{escape(label)}</div>'
-        f'<div class="hq-hero-chip-value">{escape(str(value))}</div></div>'
-    )
-
-
-def _activity_tile(label: str, value) -> str:
-    return (
-        f'<div class="snapshot-tile"><div class="snapshot-label">{escape(label)}</div>'
-        f'<div class="snapshot-value">{escape(str(value))}</div></div>'
-    )
-
-
 apply_theme()
 apply_character_profile_styles()
 render_page_header(
     "Character Profile",
     "Character Profile",
-    "A compact RPG character sheet for quest XP, stat growth, and daily progress.",
+    "A compact RPG character sheet for XP, level progression, and stat growth.",
 )
 
 init_db()
@@ -687,6 +582,4 @@ profile = get_character_profile_data()
 
 render_character_hero(profile)
 render_rpg_stats_section(profile)
-render_activity_snapshot(profile)
 render_how_stats_are_calculated()
-render_achievements_planned()

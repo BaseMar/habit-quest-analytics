@@ -27,24 +27,26 @@ The MVP is functional and deployed as a public Streamlit Cloud portfolio demo.
 
 Implemented:
 
-- Home Base onboarding hub and app map.
-- Custom Streamlit navigation with explicit page labels.
-- Command Center operational overview powered by `QuestCheckin` records.
-- Quest Planner with calendar scheduling, selected day schedule, new quest form, and Monthly Checklist.
-- Recurring Habits v1 with selected-weekday templates, explicit selected-month
+- Custom Streamlit navigation with Command Center as the default page.
+- Command Center for today's and overdue `QuestCheckin` status actions.
+- Planner with calendar scheduling, selected-day editing, unified task/routine/
+  project-session form, and read-only Monthly Review.
+- Projects & Routines workspace for project lifecycle, bulk session planning,
+  routine templates, future-month generation, and safe cleanup.
+- Recurring Habits v1 with selected-weekday templates, creation-month
   generation, archive/delete controls, safe single generated-day deletion, and
   safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
 - Checklist service for planned, completed, skipped, failed, and reset
-  transitions, with Monthly Checklist updates blocked for unscheduled dates.
+  transitions, with scheduled-date validation.
 - XP idempotency through `QuestCheckin.xp_awarded`.
 - Scheduled quest creation that creates a planned check-in for the scheduled date.
 - Safe deletion for unused recurring templates and unresolved one-time planned
   quests while preserving historical and XP-awarded records.
 - Time-based XP for new scheduled quests and recurring habit templates.
 - Habit Analytics using check-ins for weekly pulse, XP trends, status/category breakdowns, consistency, planned minutes, and insights.
-- Character Profile using check-in XP for total XP, nonlinear level, completed
-  quest days, RPG stat levels, and stat-level radar chart.
+- Character Profile using check-in XP for total XP, nonlinear level, RPG stat
+  levels, and stat-level radar chart.
 - SQLite/SQLAlchemy persistence and startup schema helpers.
 - Default category seeding.
 - Pytest coverage for model, service, metric, profile, and analytics behavior.
@@ -68,13 +70,12 @@ Compatibility:
 
 These ideas are not currently implemented.
 
-1. Long-term Goals / Projects.
-2. Recurring habit editing and true N-times-per-week scheduling.
-3. PostgreSQL / production persistence.
-4. Authentication and user-specific data isolation.
-5. Google Calendar sync for scheduled quests.
-6. AI planning assistant for natural-language scheduling.
-7. Voice quest capture / microphone input.
-8. Streak system / bonus XP.
-9. Optional automatic stale planned failure workflow.
-10. Legacy `Quest.status` cleanup after the check-in migration is stable.
+1. True N-times-per-week routine scheduling.
+2. PostgreSQL / production persistence.
+3. Authentication and user-specific data isolation.
+4. Google Calendar sync for scheduled quests.
+5. AI planning assistant for natural-language scheduling.
+6. Voice quest capture / microphone input.
+7. Streak system / bonus XP.
+8. Optional automatic stale planned failure workflow.
+9. Legacy `Quest.status` cleanup after the check-in migration is stable.

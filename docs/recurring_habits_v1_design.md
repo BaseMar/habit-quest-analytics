@@ -9,7 +9,8 @@ main source of truth for daily status, XP, and progression.
 ## Status
 
 Recurring Habits v1 is implemented for selected-weekday templates and explicit
-selected-month generation from Quest Planner.
+creation-month generation from Planner and future-month generation from
+Projects & Routines.
 
 Template management is also implemented:
 
@@ -190,7 +191,7 @@ Recurring Habits v1 uses explicit month-based generation.
 
 User flow:
 
-1. User selects a month in Quest Planner's Monthly Review.
+1. User selects a month in Projects & Routines.
 2. User clicks `Generate routines for <month>`.
 3. The system generates planned quest days only inside that month.
 4. Inactive habits are skipped.
@@ -209,21 +210,23 @@ Do not auto-generate recurring records from:
 
 Those surfaces should only display already-generated `QuestCheckin` records.
 
-## Quest Planner Impact
+## Planner And Management Impact
 
-Quest Planner remains the planning surface.
+Planner remains the calendar and creation surface. Projects & Routines owns
+template management and future-month generation.
 
 Current UI:
 
 - Use the unified `Add to plan` form for one-time work and recurring routines.
-- Keep recurring routine management under `Manage`.
+- Create a routine through the unified Add to plan form and automatically
+  generate its eligible days for the creation month.
+- Keep recurring routine management under `Projects & Routines`.
 - Provide a recurring routines table and selected routine management controls.
-- Allow template fields to be edited under `Manage`; changes affect later
+- Allow template fields to be edited under `Projects & Routines`; changes affect later
   generation only and leave existing generated days unchanged.
 - Keep deletion, stopping, optional future-day cleanup, and resuming together
   under one routine lifecycle control.
-- Provide the selected-month generation button in `Monthly Review`, next to the
-  selected period.
+- Provide the selected-month generation button in `Projects & Routines`.
 - Allows unused templates to be deleted after confirmation.
 - Archives/deactivates templates with generated history instead of hard-deleting
   them.
@@ -263,12 +266,8 @@ Monthly Checklist should not calculate recurrence itself.
 
 It displays persisted generated `QuestCheckin` records exactly like other planned quest
 days, grouped into one logical row per recurring habit template. Empty days should remain blank.
-Generated recurring habit days use the same status actions:
-
-- Complete
-- Skip
-- Fail
-- Reset
+Generated recurring habit days use the same Command Center status actions as
+other planned work.
 
 Monthly Checklist should preserve existing completed, skipped, failed, and planned check-ins.
 It should not create a new check-in when the selected recurring habit is not scheduled for the

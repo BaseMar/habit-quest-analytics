@@ -81,11 +81,12 @@ the product name and progression system, not a requirement for using the planner
 
 Implemented:
 
-- Home Base onboarding hub.
+- Command Center as the default operational workspace.
 - Custom Streamlit navigation/sidebar with explicit page labels.
 - Calendar-based Quest Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
-- Recurring Habit templates with explicit selected-month planned-day generation.
+- Recurring Habit templates with automatic generation for the creation month and
+  explicit future-month generation from Projects & Routines.
 - Recurring habit template editing, a unified stop/resume lifecycle, unused-template
   deletion, single generated-day deletion, and safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
@@ -95,9 +96,8 @@ Implemented:
 - Scheduled quest creation that creates a planned check-in for the scheduled
   date.
 - Safe deletion for unresolved one-time planned quests.
-- Long-term Goals / Projects backend foundation with a `Goal` model, service
-  layer, Quest Planner goal creation UI, one-time quest linking, and a single
-  project workspace derived from linked check-ins.
+- Long-term Goals / Projects with a `Goal` model, service layer, inline project
+  creation from Planner, one-time session linking, and a dedicated workspace.
 - Goal/project creation and linked goal sessions require a category.
 - Goal/project planned total time can be left unset when the total effort is not
   known yet.
@@ -107,15 +107,14 @@ Implemented:
 - The project workspace combines progress, lifecycle actions, and a Goal
   Session Planner that previews and bulk creates multiple scheduled one-time
   sessions from remaining unscheduled goal effort.
-- Goal lifecycle controls in Quest Planner: archive, complete, reopen, and safe
-  delete for unused goals.
+- Goal lifecycle controls in Projects & Routines: archive, complete, reopen,
+  and safe delete for unused goals.
 - Monthly Checklist groups goal-linked sessions into one visual row per goal
   while preserving separate underlying `Quest` and `QuestCheckin` records.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
 - Nonlinear character leveling and RPG stat leveling.
-- Command Center operational metrics powered by check-ins.
-- Character Profile XP, level, completed quest days, and RPG stats powered by
-  check-in XP.
+- Command Center operational actions and metrics powered by check-ins.
+- Character Profile XP, level, and RPG stats powered by check-in XP.
 - Habit Analytics weekly pulse, trend, breakdown, consistency, planned workload,
   goal analytics, and insight data powered by check-ins.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
@@ -124,7 +123,6 @@ Implemented:
 Still evolving:
 
 - True N-times-per-week routine scheduling.
-- Long-term Goals / Projects full standalone dashboard.
 - Production persistence.
 - Authentication and user-specific data.
 - External calendar sync.
@@ -189,14 +187,13 @@ The app is designed to answer questions such as:
 - XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
 - Calendar and selected day schedule views that display check-in status.
-- Direct Complete, Skip, and Fail actions for planned work in the selected day
-  schedule; resolved work can be reset to Planned there.
+- Command Center is the only screen for completing, skipping, failing, or
+  resetting today's and overdue planned work.
 - Recurring Habit templates for Every day, Weekdays, and custom selected
   weekdays.
-- Explicit selected-month generation for recurring planned quest days from
-  Monthly Review.
-- Monthly Review keeps the selected period and missing-routine generation in
-  one control row, and status editing offers only scheduled dates.
+- Creating a routine generates its days for the selected creation month.
+- Projects & Routines generates missing routine days for future months.
+- Monthly Review is a read-only matrix of planned and completed work.
 - Recurring habits can be all-day or use a planned start/end time window.
 - Routine templates can be edited without changing already generated days or
   their history; new settings apply to later month generation.
@@ -238,10 +235,10 @@ The app is designed to answer questions such as:
 
 ### Command Center
 
-- Read-only operational overview for today's quest check-ins.
+- Default operational workspace for today's and overdue quest check-ins.
 - Planned Today, Completed Today, Failed, and Overdue metrics from
   `QuestCheckin`.
-- Today's Focus list using parent quest details and daily check-in status.
+- Status actions for today's and overdue planned work.
 
 ### Habit Analytics
 
@@ -252,7 +249,7 @@ The app is designed to answer questions such as:
 - Check-ins by status and category.
 - Completion rate by weekday.
 - Planned minutes by category.
-- Goals / Projects analytics tab with weighted overall progress, goal effort,
+- Projects analytics tab with weighted overall progress, project effort,
   linked session outcomes, XP by goal, and weekly completed effort.
 - Insight summaries based on completed and failed check-ins.
 
@@ -261,7 +258,6 @@ The app is designed to answer questions such as:
 - Avatar upload stored locally for the demo profile.
 - Total XP from `QuestCheckin.xp_awarded`.
 - Level, XP to next level, and level progress.
-- Completed Quest Days count.
 - RPG stat XP from completed check-ins joined to quest categories.
 - RPG stat levels with progress bars.
 - Radar chart for stat-level balance.
@@ -282,17 +278,14 @@ The app is designed to answer questions such as:
 
 ## App Sections
 
-- `Home Base` - onboarding, app explanation, quick start, app map, and
-  local-first MVP note.
-- `Command Center` - read-only operational overview powered by daily quest
-  check-ins.
-- `Quest Planner` - `Plan` for the calendar, day schedule, and unified form;
-  `Manage` for projects and routines; and `Monthly Review` for the checklist
-  and selected-month routine generation.
+- `Command Center` - default screen for daily and overdue status actions.
+- `Planner` - calendar, unified Add to plan form, selected-day editing and
+  removal of unresolved work, plus read-only Monthly Review.
+- `Projects & Routines` - project progress and lifecycle, bulk project-session
+  scheduling, routine templates, and future-month routine generation.
 - `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
-  charts, planned minutes, goal analytics, and insights.
-- `Character Profile` - avatar, XP, level, completed quest days, RPG stats, and
-  radar chart.
+  charts, planned minutes, project comparison, and insights.
+- `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
 
 ## Key Technical Decisions
 
@@ -326,7 +319,7 @@ The app is designed to answer questions such as:
 ```text
 Scheduled Quest
   -> Planned QuestCheckin
-  -> Monthly Checklist status update
+  -> Command Center status action
   -> Command Center operational metrics
   -> Character Profile XP/progression
   -> Habit Analytics trends and consistency
@@ -349,8 +342,8 @@ should remain stable as the UI evolves.
 ```text
 habit-quest-analytics/
   app/
-    main.py                  # Streamlit entrypoint, Home Base, explicit navigation
-    pages/                   # Command Center, Quest Planner, Habit Analytics, Character Profile
+    main.py                  # Streamlit entrypoint and explicit navigation
+    pages/                   # Command Center, Planner, Projects & Routines, Analytics, Profile
   src/
     analysis/                # Pure metric helpers
     database/                # SQLAlchemy models, SQLite engine, startup schema helpers, seed data
@@ -579,11 +572,9 @@ Current limitations:
 
 - Recurring Habits v1 supports selected weekdays, template editing, and explicit
   month generation; true N-times-per-week auto-scheduling is not implemented yet.
-- Long-term Goals / Projects full standalone dashboard is not implemented yet;
-  Quest Planner includes project creation and a selected-project workspace for
-  progress, sessions, and lifecycle actions, while Habit Analytics includes goal
-  analytics. The design is documented in
-  [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
+- Projects & Routines provides a selected-project workspace. A broader portfolio
+  dashboard with deeper drilldowns remains future work; the design is documented
+  in [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - SQLite/local file storage is suitable for MVP and demo use, not production
   multi-user persistence.
 - Authentication and user-specific data isolation are not implemented.
@@ -597,14 +588,13 @@ Current limitations:
 
 Suggested future order:
 
-1. Long-term Goals / Projects full standalone dashboard
-2. N-times-per-week recurring habit scheduling
-3. PostgreSQL / production persistence
-4. Authentication
-5. Google Calendar sync
-6. AI planning assistant
-7. Voice quest capture / microphone input
-8. Streak system / bonus XP
-9. Achievement system
-10. Optional auto-fail activation workflow
-11. Legacy `Quest.status` cleanup
+1. N-times-per-week recurring habit scheduling
+2. PostgreSQL / production persistence
+3. Authentication
+4. Google Calendar sync
+5. AI planning assistant
+6. Voice quest capture / microphone input
+7. Streak system / bonus XP
+8. Achievement system
+9. Optional auto-fail activation workflow
+10. Legacy `Quest.status` cleanup

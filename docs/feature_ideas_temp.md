@@ -117,17 +117,15 @@ Positive value:
 - Keeps the UI clean while preserving analytics integrity.
 - Supports better long-term tracking.
 
-## Priority 5. Command Center Quick Actions
+## Priority 5. Command Center Quick Actions - implemented
 
 What it adds:
 
-- Optional status action controls in Command Center for today's quest check-ins.
+- Status action controls in Command Center for today's and overdue quest check-ins.
 
 Why it matters:
 
-- Command Center already provides a read-only daily overview.
-- Quick actions could make the daily workflow faster if the app later needs that
-  behavior outside Quest Planner.
+- Command Center is the daily execution surface.
 
 Positive value:
 

@@ -84,7 +84,8 @@ This replaces the older "completed quests" interpretation in profile-style views
 
 ## Command Center Metrics
 
-Command Center is read-only and uses check-ins for operational status.
+Command Center uses check-ins for operational status and is the single UI
+surface for resolving today's and overdue planned work.
 
 ```text
 planned_today = count(check-ins where status = Planned and checkin_date = today)

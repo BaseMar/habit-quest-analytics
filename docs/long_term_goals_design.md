@@ -160,15 +160,15 @@ Rules:
 
 ## UI Design
 
-### Quest Planner
+### Planner And Projects Workspace
 
 Current backend/minimal UI behavior:
 
-- Goals can be created in Quest Planner with title, optional planned total time,
+- Projects can be created inline in Planner with title, optional planned total time,
   optional notes, required category, start date, and target date.
 - A one-time scheduled quest can optionally be linked to an active goal/project
   at creation time.
-- Users select one project workspace in Quest Planner; it shows
+- Users select one project workspace in Projects & Routines; it shows
   completed/planned effort, progress percentage,
   earned/expected XP, session counts, category, status, and target date.
 - The unified Add to plan form can select an active project or create one
@@ -178,8 +178,8 @@ Current backend/minimal UI behavior:
 - Project-linked sessions use generated session titles instead of asking the
   user to name each session manually.
 - Goal/project creation and linked goal sessions reject missing categories.
-- Project lifecycle actions appear alongside the selected project's progress and
-  session planning controls.
+- Project lifecycle actions appear in the selected project workspace alongside
+  progress and session-planning controls.
 - Delete is allowed only for goals with no linked quests; goals with linked
   quest sessions should be archived instead.
 - Recurring habit template creation does not show or set a goal link.
@@ -229,17 +229,11 @@ Example flow:
 5. Complete sessions in Monthly Checklist.
 6. Goal progress updates automatically.
 
-### Goal Dashboard / Project Board
+### Projects & Routines
 
-A future page or section could show:
-
-- active goals list,
-- progress bar per goal,
-- completed/total hours,
-- earned XP,
-- remaining hours,
-- target date,
-- status.
+The implemented Projects & Routines page provides the selected project
+workspace, lifecycle actions, and bulk session planning. Portfolio-level
+comparison and trends remain in Habit Analytics.
 
 ### Character Profile
 
@@ -252,7 +246,7 @@ Potential future addition:
 
 Current implementation:
 
-- Habit Analytics has a `Goals / Projects` tab.
+- Habit Analytics has a `Projects` tab.
 - Goal KPIs include active goals, completed goals, planned effort, completed
   effort, weighted overall progress, and earned goal XP.
 - Goal progress comparison uses completed and remaining effort from linked
