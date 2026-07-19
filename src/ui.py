@@ -1435,36 +1435,6 @@ def apply_global_styles() -> None:
             line-height: 1.35;
         }}
 
-        .planner-day-summary {{
-            display: grid;
-            gap: 0.5rem;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            margin: 0.7rem 0 0.9rem;
-        }}
-
-        .planner-day-stat {{
-            background: var(--hq-surface-elevated);
-            border: 1px solid var(--hq-border);
-            border-radius: 6px;
-            display: grid;
-            gap: 0.12rem;
-            padding: 0.55rem 0.62rem;
-        }}
-
-        .planner-day-stat span {{
-            color: var(--hq-text-secondary);
-            font-size: 0.72rem;
-            font-weight: 720;
-            line-height: 1.2;
-            text-transform: uppercase;
-        }}
-
-        .planner-day-stat strong {{
-            color: var(--hq-text-primary);
-            font-size: 0.92rem;
-            line-height: 1.25;
-        }}
-
         .hq-legend-row {{
             align-items: center;
             display: flex;
