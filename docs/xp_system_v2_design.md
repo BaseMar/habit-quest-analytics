@@ -5,7 +5,8 @@ This document defines XP System v2 for Habit Quest Analytics.
 Current app context:
 
 - Daily tracking uses `QuestCheckin`.
-- Monthly Checklist resolves planned quest days.
+- Command Center resolves planned quest days; Monthly Checklist shows their
+  month-level history.
 - Recurring Habits v1 generates normal `Quest` and planned `QuestCheckin`
   records.
 - Command Center, Character Profile, and Habit Analytics use check-in records as
@@ -55,7 +56,8 @@ Meaning:
 - 20 XP per planned hour.
 - Minimum 5 XP for short tasks.
 - Use `estimated_minutes` or planned schedule duration.
-- Do not add `actual_minutes` in v2.
+- `actual_minutes` may be recorded separately for reflection, but XP continues
+  to use planned minutes.
 - Do not retroactively recalculate historical XP unless a separate migration is
   explicitly designed later.
 

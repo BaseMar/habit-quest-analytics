@@ -96,17 +96,18 @@ Implemented:
 - Scheduled quest creation that creates a planned check-in for the scheduled
   date.
 - Safe deletion for unresolved one-time planned quests.
-- Long-term Goals / Projects with a `Goal` model, service layer, inline project
-  creation from Planner, one-time session linking, and a dedicated workspace.
+- Long-term Goals / Projects with a `Goal` model, service layer, one-time
+  session linking, and a dedicated workspace for project creation and editing.
 - Goal/project creation and linked goal sessions require a category.
 - Goal/project planned total time can be left unset when the total effort is not
   known yet.
-- The unified Add to plan form can create a project inline and then add a
-  one-time work session to it, with automatic per-goal session numbering and
-  generated session titles.
-- The project workspace combines progress, lifecycle actions, and a Goal
-  Session Planner that previews and bulk creates multiple scheduled one-time
-  sessions from remaining unscheduled goal effort.
+- The unified Add to plan form can link a one-time work session to an existing
+  project, with automatic per-goal session numbering and generated session
+  titles.
+- The project workspace combines creation, editing, progress, lifecycle
+  actions, project comparison, and a Goal Session Planner that previews and
+  bulk creates multiple scheduled one-time sessions from remaining unscheduled
+  goal effort.
 - Goal lifecycle controls in Projects & Routines: archive, complete, reopen,
   and safe delete for unused goals.
 - Monthly Checklist groups goal-linked sessions into one visual row per goal
@@ -115,8 +116,9 @@ Implemented:
 - Nonlinear character leveling and RPG stat leveling.
 - Command Center operational actions and metrics powered by check-ins.
 - Character Profile XP, level, and RPG stats powered by check-in XP.
-- Habit Analytics weekly pulse, trend, breakdown, consistency, planned workload,
-  goal analytics, and insight data powered by check-ins.
+- Habit Analytics date filters, plan-versus-completion trends, category and
+  routine performance, recorded actual time, and insight data powered by
+  check-ins.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
@@ -159,8 +161,8 @@ Habit Quest Analytics turns productivity tracking into a compact RPG loop:
 - Complete quest days to earn XP.
 - Grow RPG stats through quest categories.
 - Review today's operational status in Command Center.
-- Analyze consistency, trends, status mix, category activity, and planned
-  workload in Habit Analytics.
+- Analyze consistency, plan versus completion, category and routine activity,
+  planned workload, and recorded actual time in Habit Analytics.
 - View level, XP progress, avatar, stat-level bars, radar chart, and RPG stats
   in Character Profile.
 
@@ -223,13 +225,9 @@ The app is designed to answer questions such as:
 - Matrix preview with quests as rows and days as columns.
 - Recurring habits appear as one logical row with generated dates populated.
 - Status legend for empty, planned, completed, skipped, and failed days.
-- Compact status editor for selected quest/date corrections.
-- Planned cells offer Complete, Skip, and Fail; resolved cells offer Reset to
-  Planned.
-- Status actions are enabled only for scheduled/generated cells; blank
-  not-scheduled cells are locked and do not create new check-ins.
-- Compact delete controls for unresolved one-time planned quests and unresolved
-  generated recurring days.
+- Read-only monthly status history; daily status actions belong to Command
+  Center.
+- Selected-day planning controls handle editing or removing unresolved work.
 - `QuestCheckin.xp_awarded` prevents duplicate XP from repeated completion
   actions.
 
@@ -249,8 +247,8 @@ The app is designed to answer questions such as:
 - Check-ins by status and category.
 - Completion rate by weekday.
 - Planned minutes by category.
-- Projects analytics tab with weighted overall progress, project effort,
-  linked session outcomes, XP by goal, and weekly completed effort.
+- Optional recorded actual minutes for completed work.
+- Project completion forecasts based on completed planned effort and target dates.
 - Insight summaries based on completed and failed check-ins.
 
 ### Character Profile
@@ -281,10 +279,11 @@ The app is designed to answer questions such as:
 - `Command Center` - default screen for daily and overdue status actions.
 - `Planner` - calendar, unified Add to plan form, selected-day editing and
   removal of unresolved work, plus read-only Monthly Review.
-- `Projects & Routines` - project progress and lifecycle, bulk project-session
-  scheduling, routine templates, and future-month routine generation.
-- `Habit Analytics` - weekly pulse, XP trends, check-in breakdowns, consistency
-  charts, planned minutes, project comparison, and insights.
+- `Projects & Routines` - project creation, editing, progress, lifecycle,
+  comparison, bulk project-session scheduling, routine templates, and
+  future-month routine generation.
+- `Habit Analytics` - date-filtered plan versus completion trends, category and
+  routine performance, recorded actual time, and insights.
 - `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
 
 ## Key Technical Decisions
@@ -303,8 +302,9 @@ The app is designed to answer questions such as:
   `max(planned_total_minutes - completed_minutes - currently_planned_minutes, 0)`.
 - Failed and skipped goal sessions do not reduce remaining scheduling effort,
   so replacement work can be planned.
-- Monthly Checklist updates and delete controls use the built checklist cell as
-  the editability source of truth, so unscheduled dates stay locked.
+- Monthly Checklist is a read-only monthly history. Status transitions occur in
+  Command Center; unresolved planning changes occur from Planner's selected-day
+  panel.
 - Deletion workflows are conservative: completed, skipped, failed, and
   XP-awarded records are preserved.
 - Business logic lives in service layers instead of Streamlit page code.
@@ -528,9 +528,6 @@ pip install -r requirements.txt
 ```bash
 streamlit run app/main.py
 ```
-
-In VS Code, you can also open `run_streamlit.py` and click **Run Python File**.
-That launcher runs the same Streamlit command from the project root.
 
 The app initializes SQLite tables and default categories on startup. Default
 categories can also be seeded manually:

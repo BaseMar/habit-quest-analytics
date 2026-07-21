@@ -42,7 +42,7 @@ Target flow:
 - Plan quests in Quest Planner.
 - Scheduled quests create planned check-ins for their scheduled date.
 - Review a selected month.
-- Mark a planned quest day as completed, skipped, failed, or planned.
+- Resolve today's or overdue planned work in Command Center.
 - Award XP once for completed daily check-ins.
 - Feed check-in data into Command Center, Habit Analytics, and Character Profile.
 
@@ -58,23 +58,21 @@ Core behavior:
 - Each non-goal cell represents one quest on one date.
 - Goal cells can represent one or more linked session check-ins for that goal on
   that date.
-- User selects a quest/date and marks it `Completed`, `Skipped`, `Failed`, or resets it to `Planned` only when that cell is scheduled/generated.
+- The monthly matrix is a read-only history and does not expose status actions.
+- Command Center marks an eligible check-in `Completed`, `Skipped`, `Failed`, or
+  resets it to `Planned`.
 - Unresolved planned cells remain `Planned`.
 - Empty days remain neutral/blank and are locked.
 - Completed check-ins award XP once.
 - Skipped and failed check-ins award no XP.
 
-Editability rules:
+Status safeguards:
 
-- One-time quests can be updated only on their scheduled/check-in date.
-- Recurring habits can be updated only on generated dates.
-- Goal rows can be updated only on dates with actual linked sessions.
-- If a goal has multiple sessions on the same date, the UI requires selecting
-  the specific session/check-in before applying a status.
-- Neutral blank/not-scheduled cells are not editable.
-- Status actions must not create check-ins for unscheduled dates.
-- The UI shows a locked/not-scheduled state when a user selects an invalid
-  quest/date pair.
+- Status actions never create check-ins for unscheduled dates.
+- The service rejects updates for a quest/date pair without a scheduled
+  check-in.
+- Command Center exposes status actions only for eligible today's and overdue
+  check-ins.
 
 ## Status Semantics
 
@@ -291,7 +289,7 @@ Covered by current tests:
 - Monthly checklist data builder.
 - Command Center metrics from check-ins.
 - Quest Planner calendar/day status helpers.
-- Monthly Checklist unscheduled-date blocking.
+- Monthly Checklist unscheduled-date blocking in the service layer.
 - Character Profile XP/stat calculations from check-ins.
 - Habit Analytics metrics from check-ins.
 - Monthly Checklist recurring habit grouping from generated instances.
@@ -302,9 +300,8 @@ Manual verification focus:
 
 - Create scheduled quest.
 - Confirm planned check-in appears in Monthly Checklist.
-- Confirm unscheduled cells show locked/not-scheduled state and do not create
-  check-ins.
-- Mark Complete, Skip, Fail, and Reset.
+- Confirm unscheduled dates cannot create check-ins through the service.
+- Mark Complete, Skip, Fail, and Reset in Command Center.
 - Confirm matrix, calendar, selected day schedule, Command Center, Habit Analytics, and Character Profile reflect the expected check-in data.
 
 ## Non-Goals For V1

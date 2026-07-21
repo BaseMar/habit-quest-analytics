@@ -1,9 +1,9 @@
 import json
-from calendar import monthrange
 from datetime import date, datetime, time
 
 from src.database.db import get_session
 from src.database.models import Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance, utc_now
+from src.services.schedule_service import build_month_days
 from src.services.xp_service import calculate_time_based_xp
 
 
@@ -406,7 +406,7 @@ def build_recurring_habit_dates_for_month(
     month: int,
 ) -> list[date]:
     """Return eligible recurring habit dates in a selected month without writing data."""
-    days = _build_month_days(year, month)
+    days = build_month_days(year, month)
     if not habit.is_active:
         return []
 
@@ -431,7 +431,7 @@ def generate_recurring_habit_for_month(
     session=None,
 ) -> dict:
     """Generate planned quest days and check-ins for one recurring habit in a month."""
-    _build_month_days(year, month)
+    build_month_days(year, month)
 
     owns_session = session is None
     session = session or get_session()
@@ -503,7 +503,7 @@ def generate_all_recurring_habits_for_month(
     session=None,
 ) -> dict:
     """Generate planned quest days and check-ins for recurring habits in a month."""
-    _build_month_days(year, month)
+    build_month_days(year, month)
 
     owns_session = session is None
     session = session or get_session()
@@ -607,16 +607,6 @@ def _combine_date_time(scheduled_date: date, scheduled_time: time | None) -> dat
     if scheduled_time is None:
         return None
     return datetime.combine(scheduled_date, scheduled_time)
-
-
-def _build_month_days(year: int, month: int) -> list[date]:
-    if month < 1 or month > 12:
-        raise ValueError("month must be between 1 and 12.")
-    if year < 1:
-        raise ValueError("year must be 1 or greater.")
-
-    day_count = monthrange(year, month)[1]
-    return [date(year, month, day) for day in range(1, day_count + 1)]
 
 
 def _get_recurring_habit_instance(

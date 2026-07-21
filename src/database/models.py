@@ -145,6 +145,7 @@ class QuestCheckin(Base):
     checkin_date = Column(Date, nullable=False)
     status = Column(String(30), nullable=False, default="Planned")
     xp_awarded = Column(Integer, nullable=False, default=0)
+    actual_minutes = Column(Integer, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     skipped_at = Column(DateTime, nullable=True)
     failed_at = Column(DateTime, nullable=True)

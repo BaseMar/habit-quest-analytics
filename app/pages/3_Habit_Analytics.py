@@ -1,8 +1,7 @@
 import sys
+from datetime import date, timedelta
 from pathlib import Path
-from html import escape
 
-import pandas as pd
 import plotly.express as px
 import streamlit as st
 
@@ -12,10 +11,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.database.db import init_db
 from src.services.analytics_service import (
-    get_goal_analytics_summary,
-    get_goal_completed_minutes_by_week,
-    get_goal_progress_dataset,
-    get_goal_session_status_dataset,
     get_habit_analytics_data,
 )
 from src.services.quest_service import get_categories
@@ -29,27 +24,102 @@ from src.ui import (
     style_chart,
 )
 
-
-GOAL_STATUS_FILTERS = {
-    "Active + Completed": ("Active", "Completed"),
-    "Active": ("Active",),
-    "Completed": ("Completed",),
-    "Archived": ("Archived",),
-    "All": "All",
+WORK_TYPE_OPTIONS = {
+    "All work": "all",
+    "One-time tasks": "one_time",
+    "Routines": "routine",
+    "Project sessions": "project_session",
 }
 
 
-def render_weekly_pulse(weekly_pulse: dict) -> None:
+def render_analytics_filters(categories: list, today: date) -> dict:
+    period_col, category_col, type_col = st.columns([0.46, 0.27, 0.27], vertical_alignment="bottom")
+    with period_col:
+        if hasattr(st, "segmented_control"):
+            period = st.segmented_control(
+                "Period",
+                ["7 days", "30 days", "90 days", "Custom"],
+                default="30 days",
+                key="analytics_period",
+            )
+        else:
+            period = st.radio(
+                "Period",
+                ["7 days", "30 days", "90 days", "Custom"],
+                horizontal=True,
+                key="analytics_period",
+            )
+        period = period or "30 days"
+
+    category_options = {"All categories": None} | {category.name: category.id for category in categories}
+    with category_col:
+        category_name = st.selectbox("Category", list(category_options), key="analytics_category")
+    with type_col:
+        work_type_label = st.selectbox("Work type", list(WORK_TYPE_OPTIONS), key="analytics_work_type")
+
+    if period == "Custom":
+        start_col, end_col = st.columns(2)
+        with start_col:
+            start_date = st.date_input(
+                "From",
+                value=today - timedelta(days=29),
+                max_value=today,
+                key="analytics_start_date",
+            )
+        with end_col:
+            end_date = st.date_input(
+                "To",
+                value=today,
+                min_value=start_date,
+                max_value=today,
+                key="analytics_end_date",
+            )
+    else:
+        days = int(period.split()[0])
+        start_date = today - timedelta(days=days - 1)
+        end_date = today
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "category_id": category_options[category_name],
+        "work_type": WORK_TYPE_OPTIONS[work_type_label],
+    }
+
+
+def render_period_summary(period_summary: dict, previous_period_summary: dict) -> None:
     metric_cols = st.columns(4)
     metrics = (
-        ("Weekly XP", weekly_pulse["weekly_xp"]),
-        ("Completed This Week", weekly_pulse["completed_this_week"]),
-        ("Failed This Week", weekly_pulse["failed_this_week"]),
-        ("Weekly Completion", f"{weekly_pulse['weekly_completion_rate']}%"),
+        (
+            "Completion",
+            f"{period_summary['completion_rate']}%",
+            _format_delta(period_summary["completion_rate"], previous_period_summary["completion_rate"], "pp"),
+        ),
+        (
+            "Completed",
+            f"{period_summary['completed_count']} / {period_summary['checkins_count']}",
+            _format_delta(period_summary["completed_count"], previous_period_summary["completed_count"]),
+        ),
+        (
+            "Completed planned time",
+            _format_minutes(period_summary["completed_planned_minutes"]),
+            _format_delta(period_summary["completed_planned_minutes"], previous_period_summary["completed_planned_minutes"], " min"),
+        ),
+        (
+            "XP earned",
+            period_summary["xp_earned"],
+            _format_delta(period_summary["xp_earned"], previous_period_summary["xp_earned"], " XP"),
+        ),
     )
-    for column, (label, value) in zip(metric_cols, metrics):
+    for column, (label, value, delta) in zip(metric_cols, metrics):
         with column:
-            render_metric_card(label, value)
+            render_metric_card(label, value, f"vs previous period: {delta}")
+    if period_summary["actual_time_entries_count"]:
+        st.caption(
+            "Recorded actual time: "
+            f"{_format_minutes(period_summary['actual_minutes'])} across "
+            f"{period_summary['actual_time_entries_count']} completed item(s)."
+        )
 
 
 def render_xp_by_day(xp_by_day) -> None:
@@ -73,6 +143,35 @@ def render_xp_by_day(xp_by_day) -> None:
     st.plotly_chart(style_chart(fig, height=360), width="stretch")
 
 
+def render_planned_vs_completed_by_week(weekly_effort) -> None:
+    if weekly_effort.empty or weekly_effort["Planned Minutes"].sum() == 0:
+        render_empty_state("No planned time in this period", "Schedule work with a duration to compare plan and completion.")
+        return
+
+    tokens = get_theme_tokens()
+    chart_data = weekly_effort.melt(
+        id_vars=["Week", "Planned Completion Rate"],
+        value_vars=["Planned Minutes", "Completed Planned Minutes"],
+        var_name="Effort",
+        value_name="Minutes",
+    )
+    fig = px.bar(
+        chart_data,
+        x="Week",
+        y="Minutes",
+        color="Effort",
+        barmode="group",
+        hover_data={"Planned Completion Rate": ":.1f", "Minutes": True},
+        color_discrete_map={
+            "Planned Minutes": tokens["info"],
+            "Completed Planned Minutes": tokens["accent"],
+        },
+        title="Planned vs Completed Time",
+    )
+    fig.update_layout(xaxis_title="Week starting", yaxis_title="Planned minutes", height=360)
+    st.plotly_chart(style_chart(fig, height=360), width="stretch", config={"displayModeBar": False})
+
+
 def render_status_chart(quests_by_status) -> None:
     if quests_by_status.empty:
         render_empty_state("No status data", "Update quest days to see the status breakdown.")
@@ -88,23 +187,6 @@ def render_status_chart(quests_by_status) -> None:
         color_discrete_sequence=[tokens["info"]],
     )
     fig.update_layout(xaxis_title="Check-in Status", yaxis_title="Check-in Count", showlegend=False, height=320)
-    st.plotly_chart(style_chart(fig), width="stretch")
-
-
-def render_category_chart(quests_by_category) -> None:
-    if quests_by_category.empty:
-        render_empty_state("No category data", "Add categorized quest days to see category balance.")
-        return
-
-    tokens = get_theme_tokens()
-    fig = px.bar(
-        quests_by_category,
-        x="Category",
-        y="Count",
-        title="Check-ins by Category",
-        color_discrete_sequence=[tokens["accent"]],
-    )
-    fig.update_layout(xaxis_title="Category", yaxis_title="Check-in Count", showlegend=False, height=320)
     st.plotly_chart(style_chart(fig), width="stretch")
 
 
@@ -142,30 +224,115 @@ def render_weekday_chart(completion_rate_by_weekday) -> None:
     st.plotly_chart(style_chart(fig), width="stretch")
 
 
-def render_estimated_minutes_chart(estimated_minutes_by_category) -> None:
-    minutes_column = "Planned Minutes" if "Planned Minutes" in estimated_minutes_by_category.columns else "Estimated Minutes"
-    if estimated_minutes_by_category.empty or estimated_minutes_by_category[minutes_column].sum() == 0:
-        render_empty_state("No estimated time recorded", "Schedule quests with duration to compare planned effort.")
+def render_category_performance(category_performance) -> None:
+    if category_performance.empty:
+        render_empty_state("No category data", "Complete or resolve planned work to compare category performance.")
         return
 
     tokens = get_theme_tokens()
-    fig = px.bar(
-        estimated_minutes_by_category,
-        x="Category",
-        y=minutes_column,
-        title="Planned Minutes by Category",
-        color_discrete_sequence=[tokens["accent"]],
+    chart_data = category_performance.melt(
+        id_vars=["Category", "Completion Rate"],
+        value_vars=["Planned Minutes", "Completed Planned Minutes"],
+        var_name="Effort",
+        value_name="Minutes",
     )
-    fig.update_layout(xaxis_title="Category", yaxis_title="Planned Minutes", showlegend=False, height=320)
-    st.plotly_chart(style_chart(fig), width="stretch")
+    fig = px.bar(
+        chart_data,
+        x="Minutes",
+        y="Category",
+        color="Effort",
+        orientation="h",
+        barmode="group",
+        hover_data={"Completion Rate": ":.1f", "Minutes": True},
+        color_discrete_map={
+            "Planned Minutes": tokens["info"],
+            "Completed Planned Minutes": tokens["accent"],
+        },
+        title="Planned vs Completed Time by Category",
+    )
+    fig.update_layout(xaxis_title="Planned minutes", yaxis_title="Category", height=360)
+    fig.update_yaxes(categoryorder="array", categoryarray=category_performance["Category"].tolist()[::-1])
+    st.plotly_chart(style_chart(fig, height=360), width="stretch", config={"displayModeBar": False})
+
+    table_data = category_performance[
+        [
+            "Category",
+            "Planned Minutes",
+            "Completed Planned Minutes",
+            "Completion Rate",
+            "Completed",
+            "Failed",
+            "Skipped",
+            "Planned",
+            "XP Earned",
+            "Actual Minutes",
+        ]
+    ].copy()
+    table_data["Planned Minutes"] = table_data["Planned Minutes"].map(_format_minutes)
+    table_data["Completed Planned Minutes"] = table_data["Completed Planned Minutes"].map(_format_minutes)
+    table_data["Completion Rate"] = table_data["Completion Rate"].map(lambda value: f"{value:.1f}%")
+    table_data["XP Earned"] = table_data["XP Earned"].map(lambda value: f"{value} XP")
+    table_data["Actual Minutes"] = table_data["Actual Minutes"].map(_format_minutes)
+    st.dataframe(table_data, hide_index=True, width="stretch")
+
+
+def render_routine_performance(routine_performance) -> None:
+    if routine_performance.empty:
+        render_empty_state("No routine data", "Generate routine days to review their completion history.")
+        return
+
+    attention_rows = routine_performance[routine_performance["Needs Attention"]]
+    if not attention_rows.empty:
+        attention_labels = [
+            f"{row['Routine']} ({int(row['Failed'])} failed, {int(row['Overdue Planned'])} overdue)"
+            for _, row in attention_rows.iterrows()
+        ]
+        st.warning("Needs attention: " + ", ".join(attention_labels))
+
+    tokens = get_theme_tokens()
+    fig = px.bar(
+        routine_performance,
+        x="Completion Rate",
+        y="Routine",
+        orientation="h",
+        hover_data=["Scheduled", "Completed", "Failed", "Skipped", "Planned", "Overdue Planned"],
+        color_discrete_sequence=[tokens["accent"]],
+        title="Routine Completion Rate",
+    )
+    fig.update_layout(xaxis_title="Completion rate (%)", yaxis_title="Routine", showlegend=False, height=360)
+    fig.update_xaxes(range=[0, 100])
+    fig.update_yaxes(categoryorder="array", categoryarray=routine_performance["Routine"].tolist()[::-1])
+    st.plotly_chart(style_chart(fig, height=360), width="stretch", config={"displayModeBar": False})
+
+    table_data = routine_performance[
+        [
+            "Routine",
+            "Category",
+            "Active",
+            "Completion Rate",
+            "Scheduled",
+            "Completed",
+            "Failed",
+            "Skipped",
+            "Planned",
+            "Overdue Planned",
+            "Last Completed",
+        ]
+    ].copy()
+    table_data["Active"] = table_data["Active"].map(lambda value: "Active" if value else "Stopped")
+    table_data["Completion Rate"] = table_data["Completion Rate"].map(lambda value: f"{value:.1f}%")
+    table_data["Last Completed"] = table_data["Last Completed"].map(
+        lambda value: value.isoformat() if value is not None else "Not completed"
+    )
+    st.dataframe(table_data, hide_index=True, width="stretch")
 
 
 def render_insights(analytics: dict) -> None:
-    insights = _build_insights(analytics)
+    insights = _build_insights(analytics["category_performance"])
     if not insights:
         return
 
-    render_section_title("Insights", "Small readouts derived from current checklist history.")
+    render_section_title("Focus points", "Signals from workload and resolved check-ins in the selected period.")
     insight_cols = st.columns(len(insights))
     for column, (label, value) in zip(insight_cols, insights):
         with column:
@@ -191,45 +358,60 @@ def _format_minutes(minutes: int) -> str:
     return f"{remainder} min"
 
 
-def _format_optional_minutes(minutes: int) -> str:
-    return _format_minutes(minutes) if int(minutes or 0) > 0 else "No time target"
+def _format_delta(current_value: float | int, previous_value: float | int, suffix: str = "") -> str:
+    difference = current_value - previous_value
+    if isinstance(difference, float):
+        return f"{difference:+.1f}{suffix}"
+    return f"{difference:+d}{suffix}"
 
 
-def _format_percent(value: float) -> str:
-    rounded = round(float(value), 1)
-    if rounded.is_integer():
-        return f"{int(rounded)}%"
-    return f"{rounded}%"
-
-
-def _build_insights(analytics: dict) -> list[tuple[str, str]]:
+def _build_insights(category_performance) -> list[tuple[str, str]]:
     insights: list[tuple[str, str]] = []
+    if category_performance.empty:
+        return insights
 
-    completion_rate_by_weekday = analytics["completion_rate_by_weekday"]
-    if not completion_rate_by_weekday.empty:
-        completed_column = (
-            "Completed Quest Days"
-            if "Completed Quest Days" in completion_rate_by_weekday.columns
-            else "Completed Quests"
+    resolved_categories = category_performance[
+        (category_performance["Completed"] + category_performance["Failed"]) > 0
+    ]
+    if not resolved_categories.empty:
+        category_to_improve = resolved_categories.sort_values(
+            ["Completion Rate", "Planned Minutes", "Category"],
+            ascending=[True, False, True],
+        ).iloc[0]
+        insights.append(
+            (
+                "Category to improve",
+                f"{category_to_improve['Category']}: {category_to_improve['Completion Rate']:.0f}% complete",
+            )
         )
-        strongest_weekday = completion_rate_by_weekday.sort_values(
-            [completed_column, "Completion Rate", "Weekday"],
+
+    planned_categories = category_performance[category_performance["Planned"] > 0]
+    if not planned_categories.empty:
+        largest_unresolved = planned_categories.sort_values(
+            ["Planned", "Planned Minutes", "Category"],
             ascending=[False, False, True],
         ).iloc[0]
-        insights.append(("Strongest Weekday", str(strongest_weekday["Weekday"])))
+        insights.append(
+            (
+                "Largest unresolved workload",
+                f"{largest_unresolved['Category']}: {int(largest_unresolved['Planned'])} planned",
+            )
+        )
 
-    quests_by_category = analytics.get("completed_checkins_by_category", analytics["quests_by_category"])
-    if not quests_by_category.empty:
-        top_category = quests_by_category.sort_values(["Count", "Category"], ascending=[False, True]).iloc[0]
-        insights.append(("Most Active Category", str(top_category["Category"])))
+    completed_categories = category_performance[category_performance["Completed Planned Minutes"] > 0]
+    if not completed_categories.empty:
+        largest_completed = completed_categories.sort_values(
+            ["Completed Planned Minutes", "Category"],
+            ascending=[False, True],
+        ).iloc[0]
+        insights.append(
+            (
+                "Most completed focus",
+                f"{largest_completed['Category']}: {_format_minutes(largest_completed['Completed Planned Minutes'])}",
+            )
+        )
 
-    quests_by_status = analytics["quests_by_status"]
-    if not quests_by_status.empty:
-        failed_rows = quests_by_status[quests_by_status["Status"] == "Failed"]
-        failed_count = int(failed_rows["Count"].iloc[0]) if not failed_rows.empty else 0
-        insights.append(("Failed Quest Days", str(failed_count)))
-
-    return insights[:3]
+    return insights
 
 
 def render_activity_overview(analytics: dict) -> None:
@@ -240,335 +422,51 @@ def render_activity_overview(analytics: dict) -> None:
         )
         return
 
-    render_section_title("Weekly Pulse", "Compact performance readout for the current week.")
-    render_weekly_pulse(analytics["weekly_pulse"])
+    overview_tab, patterns_tab, categories_tab, routines_tab = st.tabs(
+        ["Overview", "Patterns", "Categories", "Routines"]
+    )
+    with overview_tab:
+        date_range = analytics["date_range"]
+        render_section_title(
+            "Period overview",
+            f"{date_range['start_date']:%d %b %Y} to {date_range['end_date']:%d %b %Y}.",
+        )
+        render_period_summary(analytics["period_summary"], analytics["previous_period_summary"])
 
-    render_section_title("Trend Overview", "Time-based progress from completed quest-day XP.")
-    with st.container():
+        render_section_title("Plan and completion", "Scheduled workload compared with completed planned time each week.")
+        render_planned_vs_completed_by_week(analytics["planned_vs_completed_by_week"])
+
+        render_section_title("XP trend", "XP awarded for completed check-ins in the selected period.")
         render_xp_by_day(analytics["xp_by_day"])
+        render_insights(analytics)
 
-    render_section_title("Performance Breakdown", "How quest days are distributed by state and category.")
-    status_col, category_col = st.columns(2, gap="large")
-    with status_col:
-        with st.container():
+    with patterns_tab:
+        status_col, consistency_col = st.columns(2)
+        with status_col:
+            render_section_title("Performance breakdown", "How quest days are distributed by state.")
             render_status_chart(analytics["quests_by_status"])
-    with category_col:
-        with st.container():
-            render_category_chart(analytics["quests_by_category"])
-
-    render_section_title("Consistency & Time", "Checklist consistency and planned workload by category.")
-    weekday_col, minutes_col = st.columns(2, gap="large")
-    with weekday_col:
-        with st.container():
+        with consistency_col:
+            render_section_title("Consistency", "Resolved check-in outcomes grouped by weekday.")
             render_weekday_chart(analytics["completion_rate_by_weekday"])
-    with minutes_col:
-        with st.container():
-            render_estimated_minutes_chart(analytics["estimated_minutes_by_category"])
 
-    render_insights(analytics)
+    with categories_tab:
+        render_section_title("Category performance", "Planned and completed planned time, outcomes, and XP by category.")
+        render_category_performance(analytics["category_performance"])
 
-
-def render_goal_analytics_filters() -> tuple[tuple[str, ...] | str, int | None]:
-    filter_cols = st.columns(2, gap="medium")
-    with filter_cols[0]:
-        status_label = st.selectbox(
-            "Goal status",
-            list(GOAL_STATUS_FILTERS.keys()),
-            index=0,
-            key="goal_analytics_status_filter",
-        )
-    categories = get_categories()
-    category_options = {"All categories": None} | {category.name: category.id for category in categories}
-    with filter_cols[1]:
-        category_label = st.selectbox(
-            "Category",
-            list(category_options.keys()),
-            key="goal_analytics_category_filter",
-        )
-    st.caption("Default view includes Active and Completed goals. Archived goals are excluded unless selected.")
-    return GOAL_STATUS_FILTERS[status_label], category_options[category_label]
-
-
-def render_goal_kpis(summary: dict) -> None:
-    metric_cols = st.columns(6)
-    metrics = (
-        ("Active Projects", summary["active_goals"]),
-        ("Completed Projects", summary["completed_goals"]),
-        ("Planned Effort", _format_minutes(summary["planned_effort_minutes"])),
-        ("Completed Effort", _format_minutes(summary["completed_effort_minutes"])),
-        ("Overall Progress", _format_percent(summary["overall_progress_percent"])),
-        ("Goal XP Earned", f"{summary['goal_xp_earned']} XP"),
-    )
-    for column, (label, value) in zip(metric_cols, metrics):
-        with column:
-            render_metric_card(label, value)
-
-
-def render_compact_goal_empty_state(title: str, message: str) -> None:
-    st.markdown(
-        f"""
-        <div class="hq-empty-compact">
-            <strong>{escape(title)}</strong>
-            <span>{escape(message)}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_goal_progress_visual(goal_table: pd.DataFrame, progress_dataset: pd.DataFrame) -> None:
-    if progress_dataset.empty:
-        render_compact_goal_empty_state(
-            "No goals match these filters",
-            "Adjust the status or category filters to include goals.",
-        )
-        return
-
-    chart_data = progress_dataset.melt(
-        id_vars=["Goal", "Progress Percent"],
-        value_vars=["Completed Effort", "Remaining Effort"],
-        var_name="Effort",
-        value_name="Minutes",
-    )
-    tokens = get_theme_tokens()
-    remaining_color = "#CBD5E1" if tokens["mode"] == "Light" else "#475569"
-    chart_data["Label"] = chart_data["Minutes"].map(lambda value: _format_minutes(int(value)) if int(value) else "")
-    fig = px.bar(
-        chart_data,
-        x="Minutes",
-        y="Goal",
-        color="Effort",
-        orientation="h",
-        title="Goal Progress by Effort",
-        color_discrete_map={
-            "Completed Effort": tokens["accent"],
-            "Remaining Effort": remaining_color,
-        },
-        hover_data={"Progress Percent": ":.1f", "Minutes": True},
-        text="Label",
-    )
-    fig.update_layout(xaxis_title="Minutes", yaxis_title="Goal", barmode="stack", height=360)
-    fig.update_yaxes(categoryorder="array", categoryarray=progress_dataset["Goal"].tolist()[::-1])
-    fig.update_traces(texttemplate="%{text}", textposition="inside", insidetextanchor="middle", cliponaxis=False)
-    st.plotly_chart(style_chart(fig, height=360), width="stretch", config={"displayModeBar": False})
-
-
-def render_goal_xp_chart(goal_table: pd.DataFrame) -> None:
-    if len(goal_table) < 2:
-        return
-    if goal_table.empty or int(goal_table["Earned XP"].sum()) == 0:
-        render_compact_goal_empty_state(
-            "No goal XP earned yet",
-            "Complete linked goal sessions to see XP by goal.",
-        )
-        return
-
-    tokens = get_theme_tokens()
-    chart_data = goal_table.sort_values(["Earned XP", "Goal"], ascending=[False, True])
-    fig = px.bar(
-        chart_data,
-        x="Earned XP",
-        y="Goal",
-        orientation="h",
-        title="XP Earned by Goal",
-        color_discrete_sequence=[tokens["accent"]],
-        text="Earned XP",
-    )
-    fig.update_layout(xaxis_title="XP Earned", yaxis_title="Goal", showlegend=False, height=320)
-    fig.update_yaxes(categoryorder="array", categoryarray=chart_data["Goal"].tolist()[::-1])
-    fig.update_traces(texttemplate="%{text} XP", textposition="outside", cliponaxis=False)
-    st.plotly_chart(style_chart(fig, height=320), width="stretch", config={"displayModeBar": False})
-
-
-def render_goal_session_outcomes(status_dataset: pd.DataFrame) -> None:
-    if status_dataset.empty or int(status_dataset["Count"].sum()) == 0:
-        render_compact_goal_empty_state(
-            "No linked sessions yet",
-            "Add sessions from Quest Planner to see goal outcomes.",
-        )
-        return
-
-    tokens = get_theme_tokens()
-    chart_data = (
-        status_dataset.groupby("Status", as_index=False)["Count"]
-        .sum()
-        .query("Count > 0")
-        .reset_index(drop=True)
-    )
-    if chart_data.empty:
-        render_compact_goal_empty_state(
-            "No linked sessions yet",
-            "Add sessions from Quest Planner to see goal outcomes.",
-        )
-        return
-
-    fig = px.pie(
-        chart_data,
-        names="Status",
-        values="Count",
-        hole=0.56,
-        color="Status",
-        title="Session Outcomes",
-        category_orders={"Status": ["Completed", "Planned", "Skipped", "Failed"]},
-        color_discrete_map={
-            "Completed": tokens["success"],
-            "Planned": tokens["info"],
-            "Skipped": tokens["warning"],
-            "Failed": tokens["danger"],
-        },
-    )
-    fig.update_traces(textinfo="percent+label", hovertemplate="%{label}: %{value} sessions (%{percent})<extra></extra>")
-    fig.update_layout(height=320, legend_title_text="Status")
-    st.plotly_chart(style_chart(fig, height=320), width="stretch", config={"displayModeBar": False})
-
-
-def render_goal_effort_trend(trend_dataset: pd.DataFrame) -> None:
-    if trend_dataset.empty or trend_dataset["Week"].nunique() < 2:
-        render_compact_goal_empty_state(
-            "Not enough weekly data yet",
-            "Complete linked sessions in at least two different weeks to display a trend.",
-        )
-        return
-
-    tokens = get_theme_tokens()
-    chart_data = trend_dataset.copy()
-    chart_data["Week Label"] = chart_data["Week"].map(
-        lambda value: f"{value:%b} {value.day}" if hasattr(value, "strftime") else str(value)
-    )
-    chart_data["Completed Hours"] = chart_data["Completed Minutes"] / 60
-    fig = px.line(
-        chart_data,
-        x="Week Label",
-        y="Completed Hours",
-        title="Completed Goal Effort by Week",
-        markers=True,
-        color_discrete_sequence=[tokens["accent"]],
-    )
-    max_hours = max(float(chart_data["Completed Hours"].max()), 1)
-    fig.update_layout(
-        xaxis_title="Week",
-        yaxis_title="Completed Hours",
-        showlegend=False,
-        height=320,
-        yaxis_range=[0, max_hours * 1.18],
-    )
-    fig.update_traces(line={"width": 3}, marker={"size": 8})
-    st.plotly_chart(style_chart(fig, height=320), width="stretch", config={"displayModeBar": False})
-
-
-def render_goal_comparison_table(goal_table: pd.DataFrame) -> None:
-    if len(goal_table) < 2:
-        return
-
-    display_table = goal_table.copy()
-    display_table["Progress"] = display_table["Progress Percent"].map(_format_percent)
-    display_table["Completed / Planned"] = (
-        display_table["Completed Minutes"].map(_format_minutes)
-        + " / "
-        + display_table["Planned Minutes"].map(_format_optional_minutes)
-    )
-    display_table["Sessions"] = display_table.apply(
-        lambda row: (
-            f"{int(row['Completed Sessions'])} completed"
-            + (f"  {int(row['Planned Sessions'])} planned" if int(row["Planned Sessions"]) else "")
-            + (f"  {int(row['Skipped Sessions'])} skipped" if int(row["Skipped Sessions"]) else "")
-            + (f"  {int(row['Failed Sessions'])} failed" if int(row["Failed Sessions"]) else "")
-        ),
-        axis=1,
-    )
-    display_table["Target Date"] = display_table["Target Date"].map(
-        lambda value: value.isoformat() if hasattr(value, "isoformat") else "No target"
-    )
-    columns = [
-        "Goal",
-        "Status",
-        "Progress",
-        "Completed / Planned",
-        "Earned XP",
-        "Sessions",
-        "Target Date",
-    ]
-    header_cells = "".join(f"<th>{escape(column)}</th>" for column in columns)
-    body_rows = "\n".join(
-        "<tr>"
-        + "".join(f"<td>{escape(str(row[column]))}</td>" for column in columns)
-        + "</tr>"
-        for row in display_table[columns].to_dict("records")
-    )
-    with st.expander("View goal comparison table", expanded=False):
-        st.markdown(
-            f"""
-            <div class="hq-table-scroll">
-                <table class="hq-data-table">
-                    <thead><tr>{header_cells}</tr></thead>
-                    <tbody>{body_rows}</tbody>
-                </table>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-def render_goal_analytics() -> None:
-    render_section_title(
-        "Project Analysis",
-        "Compare long-term project effort and outcomes derived from linked sessions and check-in XP.",
-    )
-    statuses, category_id = render_goal_analytics_filters()
-    summary = get_goal_analytics_summary(statuses=statuses, category_id=category_id)
-
-    if not summary["has_goals"]:
-        render_empty_state(
-            "No projects yet",
-            "Create projects in Projects & Routines, then add linked sessions in Quest Planner.",
-        )
-        return
-
-    render_goal_kpis(summary)
-
-    progress_dataset = get_goal_progress_dataset(statuses=statuses, category_id=category_id)
-    status_dataset = get_goal_session_status_dataset(statuses=statuses, category_id=category_id)
-    trend_dataset = get_goal_completed_minutes_by_week(statuses=statuses, category_id=category_id)
-    goal_table = summary["goal_table"]
-
-    render_section_title("Project Comparison", "Compare completed and remaining effort across the selected projects.")
-    render_goal_progress_visual(goal_table, progress_dataset)
-
-    if summary["linked_sessions_count"] == 0:
-        render_compact_goal_empty_state(
-            "No linked sessions yet",
-            "Add sessions in Quest Planner to populate project outcomes and weekly effort trends.",
-        )
-    else:
-        if len(goal_table) > 1:
-            chart_col, status_col = st.columns(2, gap="large")
-            with chart_col:
-                render_goal_xp_chart(goal_table)
-            with status_col:
-                render_goal_session_outcomes(status_dataset)
-        else:
-            render_goal_session_outcomes(status_dataset)
-
-        render_section_title("Effort Trend", "Completed linked goal effort grouped by check-in week.")
-        render_goal_effort_trend(trend_dataset)
-
-    render_goal_comparison_table(goal_table)
+    with routines_tab:
+        render_section_title("Routine performance", "Completion, misses, and recent routine history in the selected period.")
+        render_routine_performance(analytics["routine_performance"])
 
 
 apply_theme()
 render_page_header(
     "Review progress",
     "Habit Analytics",
-    "See current habit consistency and project progress without leaving your planning workflow.",
+    "See current consistency, time allocation, and recent habit performance.",
 )
 
 init_db()
-analytics = get_habit_analytics_data()
-
-activity_tab, goals_tab = st.tabs(["Habits", "Projects"])
-
-with activity_tab:
-    render_activity_overview(analytics)
-
-with goals_tab:
-    render_goal_analytics()
+today = date.today()
+filters = render_analytics_filters(get_categories(), today)
+analytics = get_habit_analytics_data(today=today, **filters)
+render_activity_overview(analytics)

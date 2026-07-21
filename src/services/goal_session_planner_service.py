@@ -5,6 +5,7 @@ from math import ceil
 
 from src.database.db import get_session
 from src.database.models import Goal, Quest, QuestCheckin
+from src.services.goal_session_data import get_linked_goal_quests, get_quest_checkins, get_quest_planned_minutes
 from src.services.quest_service import (
     build_goal_session_title,
     create_scheduled_quest,
@@ -23,9 +24,9 @@ def get_goal_session_planning_summary(
     session = session or get_session()
     try:
         goal = _get_goal_or_raise(session, goal_id)
-        linked_quests = _get_linked_quests(session, goal.id)
+        linked_quests = get_linked_goal_quests(session, goal.id)
         quests_by_id = {quest.id: quest for quest in linked_quests}
-        checkins = _get_linked_checkins(session, list(quests_by_id))
+        checkins = get_quest_checkins(session, list(quests_by_id))
 
         completed_minutes = 0
         currently_planned_minutes = 0
@@ -37,7 +38,7 @@ def get_goal_session_planning_summary(
             if quest is None:
                 continue
 
-            minutes = _get_quest_planned_minutes(quest)
+            minutes = get_quest_planned_minutes(quest)
             if checkin.status == "Completed":
                 completed_minutes += minutes
             elif checkin.status == "Planned":
@@ -240,29 +241,6 @@ def _validate_goal_is_active(goal: Goal) -> None:
 def _validate_goal_category(goal: Goal) -> None:
     if goal.category_id is None:
         raise ValueError("Goal sessions require a category.")
-
-
-def _get_linked_quests(session, goal_id: int) -> list[Quest]:
-    return session.query(Quest).filter(Quest.goal_id == goal_id).order_by(Quest.id).all()
-
-
-def _get_linked_checkins(session, quest_ids: list[int]) -> list[QuestCheckin]:
-    if not quest_ids:
-        return []
-    return (
-        session.query(QuestCheckin)
-        .filter(QuestCheckin.quest_id.in_(quest_ids))
-        .order_by(QuestCheckin.checkin_date, QuestCheckin.id)
-        .all()
-    )
-
-
-def _get_quest_planned_minutes(quest: Quest) -> int:
-    if quest.estimated_minutes and quest.estimated_minutes > 0:
-        return int(quest.estimated_minutes)
-    if quest.planned_start_at is not None and quest.planned_end_at is not None:
-        return max(int((quest.planned_end_at - quest.planned_start_at).total_seconds() // 60), 0)
-    return 0
 
 
 def _validate_session_duration_minutes(session_duration_minutes: int) -> int:

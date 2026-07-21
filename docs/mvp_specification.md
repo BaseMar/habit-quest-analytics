@@ -33,10 +33,11 @@ The current usable version includes:
 - `Command Center` - default daily workspace for today's and overdue check-in status actions.
 - `Planner` - calendar, unified planning form, selected-day editing/removal of
   unresolved work, and read-only Monthly Review.
-- `Projects & Routines` - project workspace and lifecycle, bulk project-session
-  planning, routine templates, and future-month routine generation.
+- `Projects & Routines` - project creation, editing, lifecycle, comparison,
+  bulk project-session planning, routine templates, and future-month routine
+  generation.
 - `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency,
-  planned minutes, project comparison, and insights.
+  planned minutes, and insights.
 - `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
 
 ## User-Facing Language

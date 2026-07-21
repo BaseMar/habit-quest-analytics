@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.database.models import Base, Category, Goal, Quest, QuestCheckin
+from src.database.models import Base, Category, Goal, Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance
 from src.services.analytics_service import (
     build_character_activity_stats,
     build_operational_checkin_rows,
@@ -21,9 +21,7 @@ from src.services.analytics_service import (
     get_character_profile_data,
     get_dashboard_kpis,
     get_goal_analytics_summary,
-    get_goal_completed_minutes_by_week,
     get_goal_progress_dataset,
-    get_goal_session_status_dataset,
     get_habit_analytics_data,
 )
 
@@ -81,12 +79,14 @@ def _add_checkin(
     checkin_date: date,
     status: str = "Planned",
     xp_awarded: int = 0,
+    actual_minutes: int | None = None,
 ) -> QuestCheckin:
     checkin = QuestCheckin(
         quest_id=quest.id,
         checkin_date=checkin_date,
         status=status,
         xp_awarded=xp_awarded,
+        actual_minutes=actual_minutes,
     )
     session.add(checkin)
     session.commit()
@@ -332,6 +332,212 @@ def test_get_habit_analytics_data_does_not_double_count_legacy_quests_when_check
 
     assert result["weekly_pulse"]["weekly_xp"] == 30
     assert result["xp_by_day"].to_dict("records") == [{"Date": date(2026, 6, 26), "XP": 30}]
+
+
+def test_habit_analytics_filters_checkins_and_compares_previous_period(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    current = _add_quest(session, "Current health", category=health, estimated_minutes=60)
+    other_category = _add_quest(session, "Current work", category=work, estimated_minutes=45)
+    previous = _add_quest(session, "Previous health", category=health, estimated_minutes=30)
+    _add_checkin(session, current, date(2026, 6, 24), "Completed", xp_awarded=20)
+    _add_checkin(session, other_category, date(2026, 6, 24), "Completed", xp_awarded=15)
+    _add_checkin(session, previous, date(2026, 6, 17), "Failed")
+
+    result = get_habit_analytics_data(
+        today=date(2026, 6, 26),
+        start_date=date(2026, 6, 20),
+        end_date=date(2026, 6, 26),
+        category_id=health.id,
+        session=session,
+    )
+
+    assert result["date_range"] == {"start_date": date(2026, 6, 20), "end_date": date(2026, 6, 26)}
+    assert result["period_summary"] == {
+        "checkins_count": 1,
+        "completed_count": 1,
+        "failed_count": 0,
+        "skipped_count": 0,
+        "planned_minutes": 60,
+        "completed_planned_minutes": 60,
+        "actual_minutes": 0,
+        "actual_time_entries_count": 0,
+        "xp_earned": 20,
+        "completion_rate": 100.0,
+    }
+    assert result["previous_period_summary"]["checkins_count"] == 1
+    assert result["previous_period_summary"]["completion_rate"] == 0.0
+
+
+def test_habit_analytics_filters_project_sessions_and_routines(session):
+    category = _add_category(session)
+    goal = _add_goal(session, category=category)
+    project_session = _add_quest(session, "Project session", category=category, goal=goal)
+    one_time_task = _add_quest(session, "One-time task", category=category)
+    routine_quest = _add_quest(session, "Routine day", category=category)
+    habit = RecurringHabit(
+        title="Routine",
+        category_id=category.id,
+        xp_reward=20,
+        estimated_minutes=60,
+        recurrence_type="selected_weekdays",
+        weekdays="0",
+        start_date=date(2026, 6, 1),
+    )
+    session.add(habit)
+    session.commit()
+    session.add(
+        RecurringHabitInstance(
+            recurring_habit_id=habit.id,
+            quest_id=routine_quest.id,
+            scheduled_date=date(2026, 6, 24),
+        )
+    )
+    session.commit()
+    for quest in (project_session, one_time_task, routine_quest):
+        _add_checkin(session, quest, date(2026, 6, 24), "Completed", xp_awarded=20)
+
+    base_filters = {"today": date(2026, 6, 26), "start_date": date(2026, 6, 20), "end_date": date(2026, 6, 26), "session": session}
+
+    assert get_habit_analytics_data(work_type="project_session", **base_filters)["period_summary"]["checkins_count"] == 1
+    assert get_habit_analytics_data(work_type="one_time", **base_filters)["period_summary"]["checkins_count"] == 1
+    assert get_habit_analytics_data(work_type="routine", **base_filters)["period_summary"]["checkins_count"] == 1
+
+
+def test_habit_analytics_groups_planned_and_completed_time_by_week(session):
+    completed = _add_quest(session, "Completed", estimated_minutes=30)
+    failed = _add_quest(session, "Failed", estimated_minutes=60)
+    _add_checkin(session, completed, date(2026, 6, 1), "Completed", xp_awarded=10)
+    _add_checkin(session, failed, date(2026, 6, 8), "Failed")
+
+    result = get_habit_analytics_data(
+        today=date(2026, 6, 14),
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 14),
+        session=session,
+    )
+
+    assert result["planned_vs_completed_by_week"].to_dict("records") == [
+        {
+            "Week": date(2026, 6, 1),
+            "Planned Minutes": 30,
+            "Completed Planned Minutes": 30,
+            "Planned Completion Rate": 100.0,
+        },
+        {
+            "Week": date(2026, 6, 8),
+            "Planned Minutes": 60,
+            "Completed Planned Minutes": 0,
+            "Planned Completion Rate": 0.0,
+        },
+    ]
+
+
+def test_habit_analytics_builds_category_performance_table(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    completed = _add_quest(session, "Workout", category=health, estimated_minutes=60)
+    failed = _add_quest(session, "Stretch", category=health, estimated_minutes=30)
+    planned = _add_quest(session, "Report", category=work, estimated_minutes=45)
+    skipped = _add_quest(session, "Meeting", category=work, estimated_minutes=15)
+    _add_checkin(session, completed, date(2026, 6, 24), "Completed", xp_awarded=20, actual_minutes=75)
+    _add_checkin(session, failed, date(2026, 6, 24), "Failed")
+    _add_checkin(session, planned, date(2026, 6, 25), "Planned")
+    _add_checkin(session, skipped, date(2026, 6, 25), "Skipped")
+
+    result = get_habit_analytics_data(
+        today=date(2026, 6, 26),
+        start_date=date(2026, 6, 20),
+        end_date=date(2026, 6, 26),
+        session=session,
+    )
+
+    assert result["category_performance"].to_dict("records") == [
+        {
+            "Category": "Health",
+            "Planned Minutes": 90,
+            "Completed Planned Minutes": 60,
+            "Completed": 1,
+            "Failed": 1,
+            "Skipped": 0,
+            "Planned": 0,
+            "XP Earned": 20,
+            "Actual Minutes": 75,
+            "Completion Rate": 50.0,
+        },
+        {
+            "Category": "Work",
+            "Planned Minutes": 60,
+            "Completed Planned Minutes": 0,
+            "Completed": 0,
+            "Failed": 0,
+            "Skipped": 1,
+            "Planned": 1,
+            "XP Earned": 0,
+            "Actual Minutes": 0,
+            "Completion Rate": 0.0,
+        },
+    ]
+
+
+def test_habit_analytics_builds_routine_performance_and_attention_signal(session):
+    category = _add_category(session)
+    habit = RecurringHabit(
+        title="Morning routine",
+        category_id=category.id,
+        xp_reward=20,
+        estimated_minutes=30,
+        recurrence_type="selected_weekdays",
+        weekdays="0,1,2",
+        start_date=date(2026, 6, 1),
+        is_active=True,
+    )
+    session.add(habit)
+    session.commit()
+    completed = _add_quest(session, "Routine completed", category=category)
+    failed = _add_quest(session, "Routine failed", category=category)
+    overdue = _add_quest(session, "Routine overdue", category=category)
+    for quest, scheduled_date in (
+        (completed, date(2026, 6, 22)),
+        (failed, date(2026, 6, 23)),
+        (overdue, date(2026, 6, 24)),
+    ):
+        session.add(
+            RecurringHabitInstance(
+                recurring_habit_id=habit.id,
+                quest_id=quest.id,
+                scheduled_date=scheduled_date,
+            )
+        )
+    session.commit()
+    _add_checkin(session, completed, date(2026, 6, 22), "Completed", xp_awarded=20)
+    _add_checkin(session, failed, date(2026, 6, 23), "Failed")
+    _add_checkin(session, overdue, date(2026, 6, 24), "Planned")
+
+    result = get_habit_analytics_data(
+        today=date(2026, 6, 26),
+        start_date=date(2026, 6, 20),
+        end_date=date(2026, 6, 26),
+        session=session,
+    )
+
+    assert result["routine_performance"].to_dict("records") == [
+        {
+            "Routine": "Morning routine",
+            "Category": "Health",
+            "Active": True,
+            "Scheduled": 3,
+            "Completed": 1,
+            "Failed": 1,
+            "Skipped": 0,
+            "Planned": 1,
+            "Last Scheduled": date(2026, 6, 24),
+            "Last Completed": date(2026, 6, 22),
+            "Overdue Planned": 1,
+            "Completion Rate": 50.0,
+            "Needs Attention": True,
+        }
+    ]
 
 
 def test_build_xp_by_day_uses_completed_or_planned_date(session):
@@ -1146,37 +1352,6 @@ def test_goal_analytics_progress_capped_and_remaining_not_negative(session):
     assert summary["remaining_effort_minutes"] == 0
     assert progress_row["Progress Percent"] == 100.0
     assert progress_row["Remaining Effort"] == 0
-
-
-def test_goal_completed_minutes_by_week_groups_by_checkin_date(session):
-    goal = _add_goal(session)
-    first = _add_quest(session, "First", estimated_minutes=60, goal=goal)
-    second = _add_quest(session, "Second", estimated_minutes=90, goal=goal)
-    planned = _add_quest(session, "Planned", estimated_minutes=120, goal=goal)
-    _add_checkin(session, first, date(2026, 7, 6), "Completed", xp_awarded=20)
-    _add_checkin(session, second, date(2026, 7, 12), "Completed", xp_awarded=30)
-    _add_checkin(session, planned, date(2026, 7, 13), "Planned", xp_awarded=0)
-
-    result = get_goal_completed_minutes_by_week(session=session)
-
-    assert result.to_dict("records") == [{"Week": date(2026, 7, 6), "Completed Minutes": 150}]
-
-
-def test_goal_session_status_dataset_counts_by_goal(session):
-    goal = _add_goal(session)
-    completed = _add_quest(session, "Completed", estimated_minutes=60, goal=goal)
-    skipped = _add_quest(session, "Skipped", estimated_minutes=60, goal=goal)
-    _add_checkin(session, completed, date(2026, 7, 1), "Completed", xp_awarded=20)
-    _add_checkin(session, skipped, date(2026, 7, 2), "Skipped", xp_awarded=0)
-
-    result = get_goal_session_status_dataset(session=session)
-
-    assert result.to_dict("records") == [
-        {"Goal": "Portfolio Project", "Status": "Completed", "Count": 1},
-        {"Goal": "Portfolio Project", "Status": "Planned", "Count": 0},
-        {"Goal": "Portfolio Project", "Status": "Skipped", "Count": 1},
-        {"Goal": "Portfolio Project", "Status": "Failed", "Count": 0},
-    ]
 
 
 def test_goal_analytics_excludes_quests_without_goal_id(session):

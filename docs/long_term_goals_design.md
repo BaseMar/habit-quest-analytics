@@ -9,13 +9,10 @@ Current implementation status:
 - One-time scheduled quests can link to active goals through `Quest.goal_id`.
 - Goal-linked quest sessions receive stable per-goal session numbers through
   `Quest.goal_session_number`.
-- Goal progress is derived from linked quest sessions and
-  `QuestCheckin.xp_awarded`.
-- Quest Planner creates a compact project inline from the unified Add to plan
-  form.
-- Quest Planner includes one selected-project workspace with derived progress.
-- The unified Add to plan form can create a project inline and add planned
-  one-time quest sessions linked to it.
+- Goal progress is derived from linked quest sessions and their check-ins.
+- Projects & Routines owns project creation, editing, progress, lifecycle, and
+  comparison.
+- Quest Planner can link one-time sessions to an existing project.
 - The selected-project workspace includes a Goal Session Planner for previewing
   and bulk creating multiple planned one-time sessions.
 - Goal session titles are generated automatically as
@@ -23,7 +20,7 @@ Current implementation status:
 - The same project workspace includes lifecycle actions to archive, complete,
   reopen, and safely delete unused goals.
 - Recurring habits are not linked to goals.
-- Full Goal Dashboard / Project Board UI is not implemented yet.
+- A deeper standalone project dashboard is not implemented yet.
 
 ## Problem
 
@@ -226,14 +223,14 @@ Example flow:
 2. Open the project, then select Plan Multiple Sessions.
 3. Preview 2h sessions on Monday, Wednesday, and Friday.
 4. Confirm generation of 10 separate planned quest sessions.
-5. Complete sessions in Monthly Checklist.
+5. Complete sessions in Command Center.
 6. Goal progress updates automatically.
 
 ### Projects & Routines
 
-The implemented Projects & Routines page provides the selected project
-workspace, lifecycle actions, and bulk session planning. Portfolio-level
-comparison and trends remain in Habit Analytics.
+The implemented Projects & Routines page provides project creation, editing,
+the selected-project workspace, lifecycle actions, compact comparison, and bulk
+session planning.
 
 ### Character Profile
 
@@ -242,18 +239,18 @@ Potential future addition:
 - Show major active goals or completed goals.
 - Avoid overcomplicating the current Character Profile.
 
-### Habit Analytics
+### Project Analytics
 
 Current implementation:
 
-- Habit Analytics has a `Projects` tab.
+- Projects & Routines provides a compact comparison of active and completed
+  projects.
 - Goal KPIs include active goals, completed goals, planned effort, completed
   effort, weighted overall progress, and earned goal XP.
-- Goal progress comparison uses completed and remaining effort from linked
-  one-time quest sessions.
-- XP by goal is derived from `QuestCheckin.xp_awarded` for linked sessions.
-- Session outcomes show completed, planned, skipped, and failed linked sessions.
-- Completed goal effort by week uses `QuestCheckin.checkin_date`.
+- The comparison uses completed and remaining effort from linked one-time quest
+  sessions.
+- A project with target effort, target date, and completed session history shows
+  a completion forecast based on its completed planned effort per day.
 
 Future analytics ideas:
 
@@ -308,13 +305,13 @@ Rules:
 1. `docs: add long-term goals design` - implemented.
 2. `feat: add goal/project model and service layer` - implemented.
 3. `feat: link one-time quests to goals` - implemented.
-4. `feat: add goal progress UI in Quest Planner` - implemented.
-5. `feat: add goal creation UI in Quest Planner` - implemented.
-6. `feat: add goal lifecycle actions in Quest Planner` - implemented.
+4. `feat: add goal progress UI in Projects & Routines` - implemented.
+5. `feat: add goal creation UI in Projects & Routines` - implemented.
+6. `feat: add goal lifecycle actions in Projects & Routines` - implemented.
 7. `feat: add unified one-time goal session flow` - implemented.
 8. `feat: add goal session planner` - implemented.
-9. `feat: add goal analytics` - implemented in Habit Analytics.
-10. `docs: update long-term goals documentation`
+9. `feat: add project comparison` - implemented in Projects & Routines.
+10. `docs: update long-term goals documentation` - implemented.
 
 ## Test Plan
 

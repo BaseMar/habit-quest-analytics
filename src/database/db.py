@@ -45,6 +45,10 @@ def _ensure_sqlite_schema() -> None:
 
     if "quest_checkins" not in table_names:
         QuestCheckin.__table__.create(bind=engine, checkfirst=True)
+    checkin_columns = {column["name"] for column in inspect(engine).get_columns("quest_checkins")}
+    if "actual_minutes" not in checkin_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE quest_checkins ADD COLUMN actual_minutes INTEGER"))
     if "goals" not in table_names:
         Goal.__table__.create(bind=engine, checkfirst=True)
         table_names.append("goals")

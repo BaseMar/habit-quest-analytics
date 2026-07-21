@@ -56,27 +56,46 @@ def render_work_items(items: list[dict], empty_title: str, empty_message: str, k
 
     for item in items:
         with st.container(border=True):
-            details_col, xp_col, action_col = st.columns([0.58, 0.12, 0.3], vertical_alignment="center")
+            is_planned = item["status"] == "Planned"
+            column_widths = [0.72, 0.28] if is_planned else [0.78, 0.22]
+            details_col, effort_col = st.columns(column_widths, vertical_alignment="center")
+            actual_minutes = None
             with details_col:
                 time_label = item["time"] if item["time"] != "Not scheduled" else "Any time"
                 st.write(f"**{item['title']}**")
                 st.caption(f"{item['checkin_date']:%a, %b %d} / {time_label} / {item['category']} / {item['status']}")
-            with xp_col:
+            with effort_col:
                 st.caption(f"{item['xp']} XP")
-            with action_col:
-                action = render_checkin_status_actions(
-                    item["status"],
-                    key_prefix=f"{key_prefix}_{item['quest_id']}_{item['checkin_date'].isoformat()}",
-                )
-                if action is not None:
-                    label, next_status = action
-                    try:
-                        update_checkin_status(item["quest_id"], item["checkin_date"], next_status)
-                    except ValueError as error:
-                        st.error(str(error))
-                    else:
-                        st.session_state["command_status_message"] = f"{label} saved for {item['title']}."
-                        st.rerun()
+                if is_planned:
+                    actual_minutes = int(
+                        st.number_input(
+                            "Actual minutes",
+                            min_value=0,
+                            value=0,
+                            step=5,
+                            key=f"actual_minutes_{key_prefix}_{item['quest_id']}_{item['checkin_date'].isoformat()}",
+                            help="Optional. Saved only when you complete this item.",
+                        )
+                    )
+
+            action = render_checkin_status_actions(
+                item["status"],
+                key_prefix=f"{key_prefix}_{item['quest_id']}_{item['checkin_date'].isoformat()}",
+            )
+            if action is not None:
+                label, next_status = action
+                try:
+                    update_checkin_status(
+                        item["quest_id"],
+                        item["checkin_date"],
+                        next_status,
+                        actual_minutes=actual_minutes or None,
+                    )
+                except ValueError as error:
+                    st.error(str(error))
+                else:
+                    st.session_state["command_status_message"] = f"{label} saved for {item['title']}."
+                    st.rerun()
 
 
 def render_status_kpis(command_center: dict) -> None:

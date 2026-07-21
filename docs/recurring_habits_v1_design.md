@@ -44,7 +44,7 @@ The implemented flow is:
 RecurringHabit template
   -> generated Quest
   -> planned QuestCheckin
-  -> completion through Monthly Checklist
+  -> completion through Command Center
 ```
 
 Generated habit days should appear naturally in the existing check-in workflow:

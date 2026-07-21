@@ -134,7 +134,8 @@ Positive value:
 
 Implementation note:
 
-- Keep status changes in Quest Planner / Monthly Checklist unless a later design explicitly adds quick actions.
+- Keep status changes in Command Center; Planner's Monthly Review remains a
+  read-only history.
 
 ## Priority 6. Date Filters for Dashboard and Analytics
 

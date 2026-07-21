@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
 from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
-from src.database.models import Goal, PlayerProfile, Quest, QuestCheckin
+from src.database.models import Goal, PlayerProfile, Quest, QuestCheckin, RecurringHabitInstance
 from src.services.checklist_service import ensure_checkin
 from src.services.goal_service import get_goal_progress
 from src.services.xp_service import calculate_level, get_character_level_progress, get_stat_level_progress
@@ -185,9 +185,18 @@ def get_command_center_items_for_date(review_date: date, session=None) -> list[d
             session.close()
 
 
-def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
+def get_habit_analytics_data(
+    today: date | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    category_id: int | None = None,
+    work_type: str = "all",
+    session=None,
+) -> dict:
     """Return prepared dataframes for the Habit Analytics page."""
     today = today or date.today()
+    start_date, end_date = _normalize_analytics_date_range(start_date, end_date, today)
+    normalized_work_type = _normalize_analytics_work_type(work_type)
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=7)
     week_start_at = datetime.combine(week_start, time.min)
@@ -196,13 +205,37 @@ def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
     owns_session = session is None
     session = session or get_session()
     try:
-        quests = session.query(Quest).options(joinedload(Quest.category)).all()
+        quests = (
+            session.query(Quest)
+            .options(joinedload(Quest.category), joinedload(Quest.recurring_habit_instance))
+            .all()
+        )
         checkins = (
             session.query(QuestCheckin)
-            .options(joinedload(QuestCheckin.quest).joinedload(Quest.category))
+            .options(
+                joinedload(QuestCheckin.quest).joinedload(Quest.category),
+                joinedload(QuestCheckin.quest)
+                .joinedload(Quest.recurring_habit_instance)
+                .joinedload(RecurringHabitInstance.recurring_habit),
+            )
             .all()
         )
         if checkins:
+            filtered_checkins = _filter_analytics_checkins(
+                checkins,
+                start_date=start_date,
+                end_date=end_date,
+                category_id=category_id,
+                work_type=normalized_work_type,
+            )
+            previous_start_date, previous_end_date = _previous_period(start_date, end_date)
+            previous_checkins = _filter_analytics_checkins(
+                checkins,
+                start_date=previous_start_date,
+                end_date=previous_end_date,
+                category_id=category_id,
+                work_type=normalized_work_type,
+            )
             weekly_checkins = [
                 checkin
                 for checkin in checkins
@@ -216,41 +249,188 @@ def get_habit_analytics_data(today: date | None = None, session=None) -> dict:
             )
             resolved_this_week = completed_this_week + failed_this_week
             return {
-                "has_quests": True,
+                "has_quests": bool(filtered_checkins),
+                "date_range": {"start_date": start_date, "end_date": end_date},
+                "period_summary": _build_analytics_period_summary(filtered_checkins),
+                "previous_period_summary": _build_analytics_period_summary(previous_checkins),
                 "weekly_pulse": {
                     "weekly_xp": sum(checkin.xp_awarded or 0 for checkin in weekly_checkins),
                     "completed_this_week": completed_this_week,
                     "failed_this_week": failed_this_week,
                     "weekly_completion_rate": calculate_completion_rate(completed_this_week, resolved_this_week),
                 },
-                "xp_by_day": build_xp_by_day_from_checkins(checkins),
-                "quests_by_status": build_checkins_by_status(checkins),
-                "quests_by_category": build_checkins_by_category(checkins),
-                "completed_checkins_by_category": build_checkins_by_category(completed_checkins_from(checkins)),
-                "completion_rate_by_weekday": build_completion_rate_by_weekday_from_checkins(checkins),
-                "estimated_minutes_by_category": build_planned_minutes_by_category_from_checkins(checkins),
+                "xp_by_day": build_xp_by_day_from_checkins(filtered_checkins),
+                "quests_by_status": build_checkins_by_status(filtered_checkins),
+                "quests_by_category": build_checkins_by_category(filtered_checkins),
+                "completed_checkins_by_category": build_checkins_by_category(completed_checkins_from(filtered_checkins)),
+                "category_performance": build_category_performance_from_checkins(filtered_checkins),
+                "routine_performance": build_routine_performance_from_checkins(filtered_checkins, end_date),
+                "completion_rate_by_weekday": build_completion_rate_by_weekday_from_checkins(filtered_checkins),
+                "estimated_minutes_by_category": build_planned_minutes_by_category_from_checkins(filtered_checkins),
+                "planned_vs_completed_by_week": build_planned_vs_completed_by_week_from_checkins(
+                    filtered_checkins,
+                    start_date,
+                    end_date,
+                ),
             }
 
+        filtered_quests = _filter_analytics_quests(
+            quests,
+            start_date=start_date,
+            end_date=end_date,
+            category_id=category_id,
+            work_type=normalized_work_type,
+        )
+        previous_start_date, previous_end_date = _previous_period(start_date, end_date)
+        previous_quests = _filter_analytics_quests(
+            quests,
+            start_date=previous_start_date,
+            end_date=previous_end_date,
+            category_id=category_id,
+            work_type=normalized_work_type,
+        )
         weekly_quests = build_quests_in_week(quests, week_start_at, week_end_at)
         completed_this_week = sum(1 for quest in weekly_quests if _is_completed(quest))
         failed_this_week = sum(1 for quest in weekly_quests if _normalize_status(quest.status) == "Failed")
         return {
-            "has_quests": bool(quests),
+            "has_quests": bool(filtered_quests),
+            "date_range": {"start_date": start_date, "end_date": end_date},
+            "period_summary": _build_analytics_quest_period_summary(filtered_quests),
+            "previous_period_summary": _build_analytics_quest_period_summary(previous_quests),
             "weekly_pulse": {
                 "weekly_xp": sum(quest.xp_reward or 0 for quest in weekly_quests if _is_completed(quest)),
                 "completed_this_week": completed_this_week,
                 "failed_this_week": failed_this_week,
                 "weekly_completion_rate": calculate_completion_rate(completed_this_week, len(weekly_quests)),
             },
-            "xp_by_day": build_xp_by_day(quests),
-            "quests_by_status": build_quests_by_status(quests),
-            "quests_by_category": build_quests_by_category(quests),
-            "completion_rate_by_weekday": build_completion_rate_by_weekday(quests),
-            "estimated_minutes_by_category": build_estimated_minutes_by_category(quests),
+            "xp_by_day": build_xp_by_day(filtered_quests),
+            "quests_by_status": build_quests_by_status(filtered_quests),
+            "quests_by_category": build_quests_by_category(filtered_quests),
+            "category_performance": build_category_performance_from_quests(filtered_quests),
+            "routine_performance": _empty_routine_performance_dataset(),
+            "completion_rate_by_weekday": build_completion_rate_by_weekday(filtered_quests),
+            "estimated_minutes_by_category": build_estimated_minutes_by_category(filtered_quests),
+            "planned_vs_completed_by_week": build_planned_vs_completed_by_week_from_quests(
+                filtered_quests,
+                start_date,
+                end_date,
+            ),
         }
     finally:
         if owns_session:
             session.close()
+
+
+def _normalize_analytics_date_range(
+    start_date: date | None,
+    end_date: date | None,
+    today: date,
+) -> tuple[date, date]:
+    normalized_end_date = end_date or today
+    normalized_start_date = start_date or normalized_end_date - timedelta(days=29)
+    if normalized_start_date > normalized_end_date:
+        raise ValueError("Analytics start date must be on or before the end date.")
+    return normalized_start_date, normalized_end_date
+
+
+def _normalize_analytics_work_type(work_type: str) -> str:
+    allowed_work_types = {"all", "one_time", "routine", "project_session"}
+    if work_type not in allowed_work_types:
+        raise ValueError("Unknown analytics work type.")
+    return work_type
+
+
+def _previous_period(start_date: date, end_date: date) -> tuple[date, date]:
+    period_days = (end_date - start_date).days + 1
+    previous_end_date = start_date - timedelta(days=1)
+    return previous_end_date - timedelta(days=period_days - 1), previous_end_date
+
+
+def _filter_analytics_checkins(
+    checkins: list[QuestCheckin],
+    start_date: date,
+    end_date: date,
+    category_id: int | None,
+    work_type: str,
+) -> list[QuestCheckin]:
+    return [
+        checkin
+        for checkin in checkins
+        if start_date <= checkin.checkin_date <= end_date
+        and _matches_analytics_filters(checkin.quest, category_id, work_type)
+    ]
+
+
+def _filter_analytics_quests(
+    quests: list[Quest],
+    start_date: date,
+    end_date: date,
+    category_id: int | None,
+    work_type: str,
+) -> list[Quest]:
+    return [
+        quest
+        for quest in quests
+        if (scheduled_date := _quest_scheduled_date(quest)) is not None
+        and start_date <= scheduled_date <= end_date
+        and _matches_analytics_filters(quest, category_id, work_type)
+    ]
+
+
+def _matches_analytics_filters(quest: Quest | None, category_id: int | None, work_type: str) -> bool:
+    if quest is None:
+        return False
+    if category_id is not None and quest.category_id != category_id:
+        return False
+    is_routine = quest.recurring_habit_instance is not None
+    if work_type == "routine":
+        return is_routine
+    if work_type == "project_session":
+        return not is_routine and quest.goal_id is not None
+    if work_type == "one_time":
+        return not is_routine and quest.goal_id is None
+    return True
+
+
+def _build_analytics_period_summary(checkins: list[QuestCheckin]) -> dict:
+    completed_checkins = [checkin for checkin in checkins if _normalize_status(checkin.status) == "Completed"]
+    failed_checkins = [checkin for checkin in checkins if _normalize_status(checkin.status) == "Failed"]
+    skipped_checkins = [checkin for checkin in checkins if _normalize_status(checkin.status) == "Skipped"]
+    planned_minutes = sum(_checkin_planned_minutes(checkin) for checkin in checkins)
+    completed_planned_minutes = sum(_checkin_planned_minutes(checkin) for checkin in completed_checkins)
+    actual_time_entries = [checkin for checkin in completed_checkins if checkin.actual_minutes is not None]
+    return {
+        "checkins_count": len(checkins),
+        "completed_count": len(completed_checkins),
+        "failed_count": len(failed_checkins),
+        "skipped_count": len(skipped_checkins),
+        "planned_minutes": planned_minutes,
+        "completed_planned_minutes": completed_planned_minutes,
+        "actual_minutes": sum(checkin.actual_minutes or 0 for checkin in actual_time_entries),
+        "actual_time_entries_count": len(actual_time_entries),
+        "xp_earned": sum(checkin.xp_awarded or 0 for checkin in completed_checkins),
+        "completion_rate": calculate_completion_rate(len(completed_checkins), len(completed_checkins) + len(failed_checkins)),
+    }
+
+
+def _build_analytics_quest_period_summary(quests: list[Quest]) -> dict:
+    completed_quests = [quest for quest in quests if _is_completed(quest)]
+    failed_quests = [quest for quest in quests if _normalize_status(quest.status) == "Failed"]
+    skipped_quests = [quest for quest in quests if _normalize_status(quest.status) == "Skipped"]
+    planned_minutes = sum(quest.estimated_minutes or 0 for quest in quests)
+    completed_planned_minutes = sum(quest.estimated_minutes or 0 for quest in completed_quests)
+    return {
+        "checkins_count": len(quests),
+        "completed_count": len(completed_quests),
+        "failed_count": len(failed_quests),
+        "skipped_count": len(skipped_quests),
+        "planned_minutes": planned_minutes,
+        "completed_planned_minutes": completed_planned_minutes,
+        "actual_minutes": 0,
+        "actual_time_entries_count": 0,
+        "xp_earned": sum(quest.xp_reward or 0 for quest in completed_quests),
+        "completion_rate": calculate_completion_rate(len(completed_quests), len(completed_quests) + len(failed_quests)),
+    }
 
 
 def get_goal_analytics_summary(
@@ -331,72 +511,6 @@ def get_goal_progress_dataset(
         .sort_values(["Progress Percent", "Completed Effort", "Goal"], ascending=[False, False, True])
         .reset_index(drop=True)
     )
-
-
-def get_goal_session_status_dataset(
-    statuses: list[str] | tuple[str, ...] | str | None = None,
-    category_id: int | None = None,
-    session=None,
-) -> pd.DataFrame:
-    """Return linked goal session status counts for charting."""
-    summary = get_goal_analytics_summary(statuses=statuses, category_id=category_id, session=session)
-    rows = []
-    for row in summary["goal_rows"]:
-        rows.extend(
-            [
-                {"Goal": row["Goal"], "Status": "Completed", "Count": row["Completed Sessions"]},
-                {"Goal": row["Goal"], "Status": "Planned", "Count": row["Planned Sessions"]},
-                {"Goal": row["Goal"], "Status": "Skipped", "Count": row["Skipped Sessions"]},
-                {"Goal": row["Goal"], "Status": "Failed", "Count": row["Failed Sessions"]},
-            ]
-        )
-    return pd.DataFrame(rows, columns=["Goal", "Status", "Count"])
-
-
-def get_goal_completed_minutes_by_week(
-    statuses: list[str] | tuple[str, ...] | str | None = None,
-    category_id: int | None = None,
-    session=None,
-) -> pd.DataFrame:
-    """Return completed linked goal effort grouped by check-in week."""
-    owns_session = session is None
-    session = session or get_session()
-    try:
-        goals = _get_filtered_goals(session, statuses=statuses, category_id=category_id)
-        goal_ids = [goal.id for goal in goals]
-        if not goal_ids:
-            return pd.DataFrame(columns=["Week", "Completed Minutes"])
-
-        checkins = (
-            session.query(QuestCheckin)
-            .options(joinedload(QuestCheckin.quest))
-            .join(Quest)
-            .filter(Quest.goal_id.in_(goal_ids), QuestCheckin.status == "Completed")
-            .all()
-        )
-        rows = []
-        for checkin in checkins:
-            if checkin.quest is None:
-                continue
-            week_start = checkin.checkin_date - timedelta(days=checkin.checkin_date.weekday())
-            rows.append(
-                {
-                    "Week": week_start,
-                    "Completed Minutes": _checkin_planned_minutes(checkin),
-                }
-            )
-        if not rows:
-            return pd.DataFrame(columns=["Week", "Completed Minutes"])
-        return (
-            pd.DataFrame(rows)
-            .groupby("Week", as_index=False)["Completed Minutes"]
-            .sum()
-            .sort_values("Week")
-            .reset_index(drop=True)
-        )
-    finally:
-        if owns_session:
-            session.close()
 
 
 def get_character_profile_data(today: date | None = None, session=None) -> dict:
@@ -844,6 +958,161 @@ def build_checkins_by_category(checkins: list[QuestCheckin]) -> pd.DataFrame:
     )
 
 
+def build_category_performance_from_checkins(checkins: list[QuestCheckin]) -> pd.DataFrame:
+    """Return category-level workload, outcomes, and XP for a filtered check-in set."""
+    rows_by_category: dict[str, dict] = {}
+    for checkin in checkins:
+        category = _category_name(checkin.quest) if checkin.quest is not None else "Uncategorized"
+        row = rows_by_category.setdefault(
+            category,
+            {
+                "Category": category,
+                "Planned Minutes": 0,
+                "Completed Planned Minutes": 0,
+                "Completed": 0,
+                "Failed": 0,
+                "Skipped": 0,
+                "Planned": 0,
+                "XP Earned": 0,
+                "Actual Minutes": 0,
+            },
+        )
+        planned_minutes = _checkin_planned_minutes(checkin)
+        status = _normalize_status(checkin.status)
+        row["Planned Minutes"] += planned_minutes
+        row[status] += 1
+        if status == "Completed":
+            row["Completed Planned Minutes"] += planned_minutes
+            row["XP Earned"] += checkin.xp_awarded or 0
+            row["Actual Minutes"] += checkin.actual_minutes or 0
+
+    return _finalize_category_performance(rows_by_category)
+
+
+def build_category_performance_from_quests(quests: list[Quest]) -> pd.DataFrame:
+    """Return legacy category performance for databases without check-ins."""
+    rows_by_category: dict[str, dict] = {}
+    for quest in quests:
+        category = _category_name(quest)
+        row = rows_by_category.setdefault(
+            category,
+            {
+                "Category": category,
+                "Planned Minutes": 0,
+                "Completed Planned Minutes": 0,
+                "Completed": 0,
+                "Failed": 0,
+                "Skipped": 0,
+                "Planned": 0,
+                "XP Earned": 0,
+                "Actual Minutes": 0,
+            },
+        )
+        planned_minutes = quest.estimated_minutes or 0
+        status = _normalize_status(quest.status)
+        row["Planned Minutes"] += planned_minutes
+        row[status] += 1
+        if status == "Completed":
+            row["Completed Planned Minutes"] += planned_minutes
+            row["XP Earned"] += quest.xp_reward or 0
+
+    return _finalize_category_performance(rows_by_category)
+
+
+def _finalize_category_performance(rows_by_category: dict[str, dict]) -> pd.DataFrame:
+    if not rows_by_category:
+        return pd.DataFrame(
+            columns=[
+                "Category",
+                "Planned Minutes",
+                "Completed Planned Minutes",
+                "Completion Rate",
+                "Completed",
+                "Failed",
+                "Skipped",
+                "Planned",
+                "XP Earned",
+                "Actual Minutes",
+            ]
+        )
+    rows = list(rows_by_category.values())
+    for row in rows:
+        row["Completion Rate"] = calculate_completion_rate(row["Completed"], row["Completed"] + row["Failed"])
+    return (
+        pd.DataFrame(rows)
+        .sort_values(["Planned Minutes", "Category"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+
+
+def build_routine_performance_from_checkins(checkins: list[QuestCheckin], as_of_date: date) -> pd.DataFrame:
+    """Return routine-level outcomes from generated recurring habit instances."""
+    rows_by_routine: dict[int, dict] = {}
+    for checkin in checkins:
+        quest = checkin.quest
+        instance = quest.recurring_habit_instance if quest is not None else None
+        habit = instance.recurring_habit if instance is not None else None
+        if habit is None:
+            continue
+        row = rows_by_routine.setdefault(
+            habit.id,
+            {
+                "Routine": habit.title,
+                "Category": _category_name(quest),
+                "Active": habit.is_active,
+                "Scheduled": 0,
+                "Completed": 0,
+                "Failed": 0,
+                "Skipped": 0,
+                "Planned": 0,
+                "Last Scheduled": checkin.checkin_date,
+                "Last Completed": None,
+                "Overdue Planned": 0,
+            },
+        )
+        status = _normalize_status(checkin.status)
+        row["Scheduled"] += 1
+        row[status] += 1
+        row["Last Scheduled"] = max(row["Last Scheduled"], checkin.checkin_date)
+        if status == "Completed":
+            row["Last Completed"] = max(row["Last Completed"] or checkin.checkin_date, checkin.checkin_date)
+        if status == "Planned" and checkin.checkin_date < as_of_date:
+            row["Overdue Planned"] += 1
+
+    if not rows_by_routine:
+        return _empty_routine_performance_dataset()
+
+    rows = list(rows_by_routine.values())
+    for row in rows:
+        row["Completion Rate"] = calculate_completion_rate(row["Completed"], row["Completed"] + row["Failed"])
+        row["Needs Attention"] = row["Active"] and (row["Failed"] > 0 or row["Overdue Planned"] > 0)
+    return (
+        pd.DataFrame(rows)
+        .sort_values(["Needs Attention", "Completion Rate", "Routine"], ascending=[False, True, True])
+        .reset_index(drop=True)
+    )
+
+
+def _empty_routine_performance_dataset() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "Routine",
+            "Category",
+            "Active",
+            "Scheduled",
+            "Completed",
+            "Failed",
+            "Skipped",
+            "Planned",
+            "Overdue Planned",
+            "Completion Rate",
+            "Last Scheduled",
+            "Last Completed",
+            "Needs Attention",
+        ]
+    )
+
+
 def build_completion_rate_by_weekday(quests: list[Quest]) -> pd.DataFrame:
     """Return planned weekday completion rates."""
     rows = []
@@ -951,6 +1220,74 @@ def build_planned_minutes_by_category_from_checkins(checkins: list[QuestCheckin]
         .sum()
         .sort_values(["Planned Minutes", "Category"], ascending=[False, True])
         .reset_index(drop=True)
+    )
+
+
+def build_planned_vs_completed_by_week_from_checkins(
+    checkins: list[QuestCheckin],
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    """Return scheduled and completed planned minutes grouped by calendar week."""
+    entries = [
+        (
+            checkin.checkin_date,
+            _checkin_planned_minutes(checkin),
+            _normalize_status(checkin.status) == "Completed",
+        )
+        for checkin in checkins
+    ]
+    return _build_weekly_planned_vs_completed_dataset(entries, start_date, end_date)
+
+
+def build_planned_vs_completed_by_week_from_quests(
+    quests: list[Quest],
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    """Return legacy scheduled and completed planned minutes grouped by calendar week."""
+    entries = [
+        (scheduled_date, quest.estimated_minutes or 0, _is_completed(quest))
+        for quest in quests
+        if (scheduled_date := _quest_scheduled_date(quest)) is not None
+    ]
+    return _build_weekly_planned_vs_completed_dataset(entries, start_date, end_date)
+
+
+def _build_weekly_planned_vs_completed_dataset(
+    entries: list[tuple[date, int, bool]],
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
+    week_start = start_date - timedelta(days=start_date.weekday())
+    last_week_start = end_date - timedelta(days=end_date.weekday())
+    rows_by_week = {}
+    while week_start <= last_week_start:
+        rows_by_week[week_start] = {
+            "Week": week_start,
+            "Planned Minutes": 0,
+            "Completed Planned Minutes": 0,
+        }
+        week_start += timedelta(days=7)
+
+    for entry_date, planned_minutes, is_completed in entries:
+        entry_week_start = entry_date - timedelta(days=entry_date.weekday())
+        row = rows_by_week.get(entry_week_start)
+        if row is None:
+            continue
+        row["Planned Minutes"] += planned_minutes
+        if is_completed:
+            row["Completed Planned Minutes"] += planned_minutes
+
+    rows = list(rows_by_week.values())
+    for row in rows:
+        row["Planned Completion Rate"] = _bounded_percent(
+            row["Completed Planned Minutes"],
+            row["Planned Minutes"],
+        )
+    return pd.DataFrame(
+        rows,
+        columns=["Week", "Planned Minutes", "Completed Planned Minutes", "Planned Completion Rate"],
     )
 
 

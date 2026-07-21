@@ -128,6 +128,26 @@ def test_complete_checkin_twice_does_not_duplicate_xp(session):
     assert session.query(QuestCheckin).count() == 1
 
 
+def test_complete_checkin_records_optional_actual_minutes_and_reset_clears_them(session):
+    quest = _create_quest(session, estimated_minutes=60)
+
+    completed = complete_checkin(quest.id, date(2026, 7, 1), actual_minutes=75, session=session)
+    completed_actual_minutes = completed.actual_minutes
+    reset = reset_checkin(quest.id, date(2026, 7, 1), session=session)
+
+    assert completed_actual_minutes == 75
+    assert reset.actual_minutes is None
+
+
+def test_checkin_actual_minutes_require_completion_and_positive_value(session):
+    quest = _create_quest(session)
+
+    with pytest.raises(ValueError, match="Actual minutes can only"):
+        update_checkin_status(quest.id, date(2026, 7, 1), "Skipped", actual_minutes=20, session=session)
+    with pytest.raises(ValueError, match="Actual minutes must be greater"):
+        complete_checkin(quest.id, date(2026, 7, 1), actual_minutes=0, session=session)
+
+
 def test_skip_checkin_sets_skipped_status_timestamp_and_no_xp(session):
     quest = _create_quest(session)
 

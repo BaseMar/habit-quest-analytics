@@ -1,9 +1,11 @@
-from datetime import date
+from datetime import date, timedelta
+from math import ceil
 
 from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
 from src.database.models import Category, Goal, Quest, QuestCheckin, utc_now
+from src.services.goal_session_data import get_linked_goal_quests, get_quest_checkins, get_quest_planned_minutes
 from src.services.xp_service import calculate_time_based_xp
 
 
@@ -206,6 +208,76 @@ def get_goal_progress(goal_id: int, session=None) -> dict:
             session.close()
 
 
+def get_goal_completion_forecast(goal_id: int, today: date | None = None, session=None) -> dict:
+    """Estimate a project completion date from completed planned effort to date."""
+    today = today or date.today()
+    owns_session = session is None
+    session = session or get_session()
+    try:
+        goal = session.get(Goal, goal_id)
+        if goal is None:
+            raise ValueError(f"Goal with id {goal_id} was not found.")
+
+        progress = _build_goal_progress(session, goal)
+        base_forecast = {
+            "available": False,
+            "reason": None,
+            "target_end_date": goal.target_end_date,
+            "projected_completion_date": None,
+            "on_track": None,
+            "daily_completed_minutes": 0.0,
+            "required_daily_minutes": None,
+            "observed_completed_days": 0,
+            "remaining_minutes": progress["remaining_minutes"],
+        }
+        if (goal.planned_total_minutes or 0) <= 0:
+            base_forecast["reason"] = "Set a target effort to forecast this project."
+            return base_forecast
+        if goal.target_end_date is None:
+            base_forecast["reason"] = "Set a target date to forecast this project."
+            return base_forecast
+        if progress["remaining_minutes"] == 0:
+            base_forecast.update(
+                {
+                    "available": True,
+                    "projected_completion_date": today,
+                    "on_track": True,
+                    "required_daily_minutes": 0,
+                }
+            )
+            return base_forecast
+
+        linked_quests = get_linked_goal_quests(session, goal.id)
+        checkins = get_quest_checkins(session, [quest.id for quest in linked_quests])
+        completed_dates = sorted(
+            checkin.checkin_date for checkin in checkins if checkin.status == "Completed" and checkin.checkin_date <= today
+        )
+        if not completed_dates:
+            base_forecast["reason"] = "Complete at least one project session to calculate a forecast."
+            return base_forecast
+
+        first_completed_date = completed_dates[0]
+        observed_days = max((today - first_completed_date).days + 1, 1)
+        daily_completed_minutes = progress["completed_minutes"] / observed_days
+        projected_days = ceil(progress["remaining_minutes"] / daily_completed_minutes)
+        projected_completion_date = today + timedelta(days=max(projected_days - 1, 0))
+        days_to_target = max((goal.target_end_date - today).days + 1, 1)
+        base_forecast.update(
+            {
+                "available": True,
+                "projected_completion_date": projected_completion_date,
+                "on_track": projected_completion_date <= goal.target_end_date,
+                "daily_completed_minutes": round(daily_completed_minutes, 1),
+                "required_daily_minutes": ceil(progress["remaining_minutes"] / days_to_target),
+                "observed_completed_days": observed_days,
+            }
+        )
+        return base_forecast
+    finally:
+        if owns_session:
+            session.close()
+
+
 def get_goal_history_summary(goal_id: int, session=None) -> dict:
     """Return linked session status counts and earned XP for a goal."""
     owns_session = session is None
@@ -252,9 +324,9 @@ def _set_goal_status(goal_id: int, status: str, session=None) -> Goal:
 
 
 def _build_goal_progress(session, goal: Goal) -> dict:
-    linked_quests = _get_linked_quests(session, goal.id)
+    linked_quests = get_linked_goal_quests(session, goal.id)
     linked_quest_ids = [quest.id for quest in linked_quests]
-    checkins = _get_linked_checkins(session, linked_quest_ids)
+    checkins = get_quest_checkins(session, linked_quest_ids)
     quests_by_id = {quest.id: quest for quest in linked_quests}
 
     completed_minutes = 0
@@ -272,7 +344,7 @@ def _build_goal_progress(session, goal: Goal) -> dict:
         earned_xp += checkin.xp_awarded or 0
         if checkin.status == "Completed":
             completed_sessions_count += 1
-            completed_minutes += _get_quest_planned_minutes(quest)
+            completed_minutes += get_quest_planned_minutes(quest)
         elif checkin.status == "Planned":
             planned_sessions_count += 1
         elif checkin.status == "Skipped":
@@ -302,31 +374,8 @@ def _build_goal_progress(session, goal: Goal) -> dict:
     }
 
 
-def _get_linked_quests(session, goal_id: int) -> list[Quest]:
-    return session.query(Quest).filter(Quest.goal_id == goal_id).order_by(Quest.id).all()
-
-
 def _get_linked_quests_count(session, goal_id: int) -> int:
     return session.query(Quest).filter(Quest.goal_id == goal_id).count()
-
-
-def _get_linked_checkins(session, quest_ids: list[int]) -> list[QuestCheckin]:
-    if not quest_ids:
-        return []
-    return (
-        session.query(QuestCheckin)
-        .filter(QuestCheckin.quest_id.in_(quest_ids))
-        .order_by(QuestCheckin.checkin_date, QuestCheckin.id)
-        .all()
-    )
-
-
-def _get_quest_planned_minutes(quest: Quest) -> int:
-    if quest.estimated_minutes and quest.estimated_minutes > 0:
-        return quest.estimated_minutes
-    if quest.planned_start_at is not None and quest.planned_end_at is not None:
-        return max(int((quest.planned_end_at - quest.planned_start_at).total_seconds() // 60), 0)
-    return 0
 
 
 def _normalize_title(title: str) -> str:

@@ -168,6 +168,17 @@ planned_minutes_by_category = sum(parent quest estimated_minutes grouped by cate
 
 This represents planned workload attached to check-ins. It is not actual time spent.
 
+## Recorded Actual Time
+
+```text
+recorded_actual_minutes = sum(QuestCheckin.actual_minutes for completed check-ins with a value)
+```
+
+Actual time is optional and is entered when completing work in Command Center.
+Entries without an actual-time value are excluded rather than treated as zero.
+It is a reflection metric only and does not change XP, completion rate, or goal
+progress.
+
 ## Goal Analytics
 
 Goal analytics use long-term `Goal` records, one-time `Quest` sessions linked
@@ -201,6 +212,20 @@ Rules:
 - Remaining effort is never below zero.
 - Per-goal progress is capped at 100%.
 
+### Goal Completion Forecast
+
+For projects with a target effort, target date, and at least one completed
+session, the forecast uses the average completed planned effort per calendar day
+since the first completed session.
+
+```text
+projected_completion_date = today + ceil(remaining_minutes / daily_completed_minutes) - 1 day
+```
+
+The forecast compares the projected completion date with the target date. It is
+not available when any required planning or completion-history input is missing.
+Recorded actual minutes are intentionally not used in this v1 forecast.
+
 ### Goal Scheduling Effort
 
 The Goal Session Planner uses scheduling effort to decide how many future
@@ -233,15 +258,6 @@ overall_goal_progress =
 
 Overall goal progress is weighted by planned effort. It is not a simple average
 of individual goal percentages. The displayed value is capped between 0 and 100.
-
-### Completed Goal Effort By Week
-
-```text
-completed_goal_effort_by_week =
-    sum(Quest.estimated_minutes for completed linked check-ins grouped by checkin_date week)
-```
-
-The weekly trend uses `QuestCheckin.checkin_date` as the activity date.
 
 ## RPG Stat XP
 
@@ -299,10 +315,11 @@ current_streak = consecutive days with at least one completed habit quest day
 
 Status: planned.
 
-### Planned Vs Actual Time
+### Planned Vs Actual Time Accuracy
 
 ```text
 time_accuracy = actual_minutes / estimated_minutes * 100
 ```
 
-Status: planned. The current data model includes `estimated_minutes`; an actual-time field is still needed before this metric can be implemented.
+Status: planned. Actual-time capture is implemented, but the normalized
+planned-versus-actual accuracy metric is not yet displayed.

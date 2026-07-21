@@ -115,6 +115,7 @@ Stores daily completion records for quests.
 | `checkin_date` | Date this quest check-in belongs to. |
 | `status` | Daily state: `Planned`, `Completed`, `Skipped`, or `Failed`. |
 | `xp_awarded` | XP awarded for this check-in. Defaults to `0`. |
+| `actual_minutes` | Optional positive time recorded when this check-in is completed. |
 | `completed_at` | Timestamp set when the check-in is completed. |
 | `skipped_at` | Timestamp set when the check-in is skipped. |
 | `failed_at` | Timestamp set when the check-in is failed. |
@@ -127,6 +128,8 @@ Constraints and relationships:
 - The pair `quest_id` and `checkin_date` is unique.
 - Completed check-ins award XP once by storing the awarded value in `xp_awarded`.
 - Skipped, failed, and planned check-ins should have `xp_awarded = 0`.
+- `actual_minutes` is cleared when a check-in is skipped, failed, or reset to
+  planned; it does not affect XP rewards.
 - Completed, skipped, failed, and XP-awarded check-ins are historical records and
   are intentionally preserved by cleanup workflows.
 
@@ -396,7 +399,8 @@ The radar chart displays calculated stat levels, not raw XP.
 
 ## Notes For Future Development
 
-- Planned vs actual time analysis will require an actual-time field; `estimated_minutes` already stores planned workload.
+- `estimated_minutes` stores planned workload; `QuestCheckin.actual_minutes`
+  stores optional recorded time for completed work.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - A production deployment with users should use a production database and a real migration strategy.
 - Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.

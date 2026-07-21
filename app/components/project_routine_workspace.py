@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 from calendar import month_name
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 from html import escape
 
+import plotly.express as px
 import streamlit as st
 
 from app.components.plan_form import WEEKDAY_OPTIONS
-from app.components.scheduling import duration_crosses_midnight, end_at_for_duration
 from src.services.goal_service import (
     archive_goal,
     complete_goal,
+    create_goal,
     delete_goal_if_unused,
+    get_goal_completion_forecast,
     get_goal_history_summary,
     get_goal_progress,
     list_goals,
     reopen_goal,
+    update_goal,
 )
+from src.services.analytics_service import get_goal_analytics_summary, get_goal_progress_dataset
 from src.services.goal_session_planner_service import (
     build_goal_session_plan_preview,
     get_goal_session_planning_summary,
@@ -32,7 +36,7 @@ from src.services.recurring_habit_service import (
     stop_recurring_habit,
     update_recurring_habit_template,
 )
-from src.ui import render_empty_state, render_section_title
+from src.ui import get_theme_tokens, render_empty_state, render_metric_card, render_section_title, style_chart
 
 
 def render_project_routine_workspace(category_options: dict[str, int], selected_date: date) -> None:
@@ -40,13 +44,26 @@ def render_project_routine_workspace(category_options: dict[str, int], selected_
     projects_tab, routines_tab = st.tabs(["Projects", "Routines"])
 
     with projects_tab:
-        render_section_title("Projects", "Choose one project to review its progress, sessions, and lifecycle.")
+        render_section_title("Projects", "Create, review, and maintain the projects behind your planned sessions.")
         _render_project_workspace(category_options, selected_date)
+        with st.expander("Portfolio overview", expanded=False):
+            _render_project_comparison()
 
     with routines_tab:
-        render_section_title("Routine schedule", "Generate missing days only for the month you select.")
-        _render_routine_generation_controls()
-        render_section_title("Routines", "Edit a template or change its lifecycle without changing history.")
+        heading_col, action_col = st.columns([0.72, 0.28], vertical_alignment="bottom")
+        with heading_col:
+            render_section_title("Routines", "Edit a template or change its lifecycle without changing history.")
+        with action_col:
+            generator_open = st.session_state.get("routine_generation_open", False)
+            if st.button(
+                "Hide generator" if generator_open else "Generate days",
+                use_container_width=True,
+                key="toggle_routine_generation",
+            ):
+                st.session_state["routine_generation_open"] = not generator_open
+                st.rerun()
+        if st.session_state.get("routine_generation_open", False):
+            _render_routine_generation_controls()
         _render_recurring_habits(category_options)
 
 
@@ -55,11 +72,20 @@ def _render_project_workspace(category_options: dict[str, int], selected_date: d
     if status_message:
         st.success(status_message)
 
+    if st.button("New project", type="primary", key="create_project"):
+        st.session_state.pop("editing_project_id", None)
+        st.session_state["creating_project"] = True
+        st.rerun()
+
+    if st.session_state.get("creating_project"):
+        _render_project_editor(None, category_options, selected_date)
+        return
+
     goals = list_goals()
     if not goals:
         render_empty_state(
             "No projects yet",
-            "Create a project from Add to plan, then link one-time sessions to track progress.",
+            "Create a project here, then link its sessions in Planner.",
         )
         return
 
@@ -70,22 +96,156 @@ def _render_project_workspace(category_options: dict[str, int], selected_date: d
         active_goal = next((goal for goal in goals if goal.status == "Active"), goals[0])
         st.session_state["project_workspace_id"] = active_goal.id
 
-    selected_goal_id = st.selectbox(
-        "Project",
-        list(goals_by_id),
-        format_func=lambda goal_id: f"{goals_by_id[goal_id].title} / {goals_by_id[goal_id].status}",
-        key="project_workspace_id",
-    )
+    project_col, edit_col, options_col = st.columns([0.58, 0.21, 0.21], vertical_alignment="bottom")
+    with project_col:
+        selected_goal_id = st.selectbox(
+            "Project",
+            list(goals_by_id),
+            format_func=lambda goal_id: f"{goals_by_id[goal_id].title} / {goals_by_id[goal_id].status}",
+            key="project_workspace_id",
+        )
+    with edit_col:
+        if st.button("Edit project", use_container_width=True, key=f"edit_project_{selected_goal_id}"):
+            st.session_state["editing_project_id"] = selected_goal_id
+            st.rerun()
+
     goal = goals_by_id[selected_goal_id]
-    progress = get_goal_progress(goal.id)
     history = get_goal_history_summary(goal.id)
+    with options_col:
+        with st.popover("Project actions", use_container_width=True):
+            _render_goal_lifecycle(goal, history)
+
+    if st.session_state.get("editing_project_id") == goal.id:
+        _render_project_editor(goal, category_options, selected_date)
+        return
+
+    progress = get_goal_progress(goal.id)
     _render_project_progress_card(goal, progress, category_names_by_id)
+    _render_goal_completion_forecast(goal)
 
     if goal.status == "Active":
         _render_goal_session_planner(goal, selected_date)
     else:
         st.caption("Only active projects can receive new sessions.")
-    _render_goal_lifecycle(goal, history)
+
+
+def _render_project_editor(goal, category_options: dict[str, int], selected_date: date) -> None:
+    is_new_project = goal is None
+    key_prefix = "create_project_form" if is_new_project else f"edit_project_form_{goal.id}"
+    category_names = list(category_options)
+    default_category_name = (
+        next((name for name, category_id in category_options.items() if category_id == goal.category_id), category_names[0])
+        if goal is not None
+        else category_names[0]
+    )
+    default_start_date = goal.start_date if goal is not None and goal.start_date is not None else selected_date
+    default_target_date = goal.target_end_date if goal is not None else None
+
+    st.divider()
+    st.subheader("Create project" if is_new_project else "Edit project")
+    with st.container(border=True):
+        title = st.text_input(
+            "Project name",
+            value="" if is_new_project else goal.title,
+            placeholder="Portfolio project",
+            key=f"{key_prefix}_title",
+        )
+        category_name = st.selectbox(
+            "Category",
+            category_names,
+            index=category_names.index(default_category_name),
+            key=f"{key_prefix}_category",
+        )
+        description = st.text_area(
+            "Description (optional)",
+            value="" if is_new_project else goal.description or "",
+            height=72,
+            key=f"{key_prefix}_description",
+        )
+        planned_total_minutes = int(
+            st.number_input(
+                "Target effort (min)",
+                min_value=0,
+                value=0 if is_new_project else int(goal.planned_total_minutes or 0),
+                step=30,
+                key=f"{key_prefix}_effort",
+            )
+        )
+        set_start_date = st.checkbox(
+            "Set a start date",
+            value=True if is_new_project else goal.start_date is not None,
+            key=f"{key_prefix}_set_start_date",
+        )
+        start_date = (
+            st.date_input("Start date", value=default_start_date, key=f"{key_prefix}_start_date")
+            if set_start_date
+            else None
+        )
+        set_target_date = st.checkbox(
+            "Set a target date",
+            value=default_target_date is not None,
+            key=f"{key_prefix}_set_target_date",
+        )
+        target_date_kwargs = {"min_value": start_date} if start_date is not None else {}
+        target_end_date = (
+            st.date_input(
+                "Target date",
+                value=max(default_target_date or start_date or selected_date, start_date or selected_date),
+                key=f"{key_prefix}_target_date",
+                **target_date_kwargs,
+            )
+            if set_target_date
+            else None
+        )
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            save_clicked = st.button(
+                "Create project" if is_new_project else "Save project",
+                type="primary",
+                use_container_width=True,
+                key=f"{key_prefix}_save",
+            )
+        with cancel_col:
+            cancel_clicked = st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel")
+
+    if cancel_clicked:
+        st.session_state.pop("creating_project", None)
+        st.session_state.pop("editing_project_id", None)
+        st.rerun()
+    if not save_clicked:
+        return
+
+    try:
+        if is_new_project:
+            saved_goal = create_goal(
+                title=title,
+                description=description,
+                category_id=category_options[category_name],
+                planned_total_minutes=planned_total_minutes,
+                start_date=start_date,
+                target_end_date=target_end_date,
+            )
+            message = "Project created. Add its sessions in Planner."
+        else:
+            saved_goal = update_goal(
+                goal.id,
+                title=title,
+                description=description,
+                category_id=category_options[category_name],
+                planned_total_minutes=planned_total_minutes,
+                start_date=start_date,
+                target_end_date=target_end_date,
+            )
+            message = "Project updated."
+    except ValueError as error:
+        st.error(str(error))
+        return
+
+    st.session_state.pop("creating_project", None)
+    st.session_state.pop("editing_project_id", None)
+    st.session_state["project_workspace_id"] = saved_goal.id
+    st.session_state["goal_status_message"] = message
+    st.rerun()
 
 
 def _render_project_progress_card(goal, progress: dict, category_names_by_id: dict[int, str]) -> None:
@@ -128,6 +288,91 @@ def _render_project_progress_card(goal, progress: dict, category_names_by_id: di
         """,
         unsafe_allow_html=True,
     )
+
+
+def _render_goal_completion_forecast(goal) -> None:
+    if (goal.planned_total_minutes or 0) <= 0 or goal.target_end_date is None:
+        return
+
+    forecast = get_goal_completion_forecast(goal.id)
+    st.subheader("Completion forecast")
+    if not forecast["available"]:
+        st.info(forecast["reason"])
+        return
+
+    projected_date = forecast["projected_completion_date"]
+    target_date = forecast["target_end_date"]
+    metric_cols = st.columns(3)
+    with metric_cols[0]:
+        render_metric_card("Projected completion", projected_date.strftime("%b %d, %Y"))
+    with metric_cols[1]:
+        render_metric_card("Target date", target_date.strftime("%b %d, %Y"))
+    with metric_cols[2]:
+        render_metric_card("Required daily effort", _format_minutes(forecast["required_daily_minutes"]))
+
+    pace = _format_minutes(round(forecast["daily_completed_minutes"]))
+    target_status = "On track" if forecast["on_track"] else "At risk"
+    st.caption(
+        f"{target_status}. Current pace: {pace} per observed day across "
+        f"{forecast['observed_completed_days']} day(s)."
+    )
+
+
+def _render_project_comparison() -> None:
+    goals = list_goals()
+    if len(goals) < 2:
+        render_empty_state(
+            "Not enough projects to compare",
+            "Create at least two active or completed projects to view a portfolio comparison.",
+        )
+        return
+
+    summary = get_goal_analytics_summary(statuses=("Active", "Completed"))
+    if summary["included_goals_count"] < 2:
+        render_empty_state(
+            "No comparable projects",
+            "Keep at least two projects active or completed to compare their progress.",
+        )
+        return
+
+    metric_cols = st.columns(4)
+    metrics = (
+        ("Active", summary["active_goals"]),
+        ("Completed effort", _format_minutes(summary["completed_effort_minutes"])),
+        ("Remaining effort", _format_minutes(summary["remaining_effort_minutes"])),
+        ("Overall progress", _format_percent(summary["overall_progress_percent"])),
+    )
+    for column, (label, value) in zip(metric_cols, metrics):
+        with column:
+            render_metric_card(label, value)
+
+    progress_dataset = get_goal_progress_dataset(statuses=("Active", "Completed"))
+    if progress_dataset.empty:
+        return
+
+    chart_data = progress_dataset.melt(
+        id_vars=["Goal", "Progress Percent"],
+        value_vars=["Completed Effort", "Remaining Effort"],
+        var_name="Effort",
+        value_name="Minutes",
+    )
+    tokens = get_theme_tokens()
+    remaining_color = "#CBD5E1" if tokens["mode"] == "Light" else "#475569"
+    fig = px.bar(
+        chart_data,
+        x="Minutes",
+        y="Goal",
+        color="Effort",
+        orientation="h",
+        color_discrete_map={
+            "Completed Effort": tokens["accent"],
+            "Remaining Effort": remaining_color,
+        },
+        hover_data={"Progress Percent": ":.1f", "Minutes": True},
+    )
+    fig.update_layout(xaxis_title="Minutes", yaxis_title="Project", barmode="stack", height=340)
+    fig.update_yaxes(categoryorder="array", categoryarray=progress_dataset["Goal"].tolist()[::-1])
+    st.plotly_chart(style_chart(fig, height=340), width="stretch", config={"displayModeBar": False})
 
 
 def _render_goal_session_planner(goal, selected_date: date) -> None:
@@ -179,8 +424,13 @@ def _render_goal_session_planner(goal, selected_date: date) -> None:
         preview_disabled = goal.category_id is None or not selected_weekdays or planning_summary["effort_to_schedule_minutes"] <= 0
         if goal.category_id is None:
             st.error("This goal needs a category before sessions can be planned.")
-        if planning_summary["effort_to_schedule_minutes"] <= 0:
-            st.info("This goal has no unscheduled effort right now.")
+        if planning_summary["planned_total_minutes"] <= 0:
+            st.info(
+                "Set a target effort to use automatic session planning. "
+                "You can still add individual project sessions manually in Planner."
+            )
+        elif planning_summary["effort_to_schedule_minutes"] <= 0:
+            st.info("This project has no unscheduled effort right now.")
         if st.button("Preview", use_container_width=True, key=f"{planner_key}_preview_button", disabled=preview_disabled):
             try:
                 preview = build_goal_session_plan_preview(**current_config)
@@ -227,7 +477,8 @@ def _render_goal_session_plan_preview(preview: dict) -> None:
 
 
 def _render_goal_lifecycle(goal, history: dict) -> None:
-    with st.expander("Project lifecycle", expanded=False):
+    with st.container():
+        st.caption("Project lifecycle")
         can_delete = history["linked_quests_count"] == 0
         if goal.status == "Active":
             complete_col, archive_col = st.columns(2)
@@ -337,15 +588,52 @@ def _render_recurring_habit_editor(habit, category_options: dict[str, int]) -> N
         title = st.text_input("Title", value=habit.title, key=f"{key_prefix}_title")
         category_name = st.selectbox("Category", category_names, index=category_names.index(current_category_name), key=f"{key_prefix}_category")
         start_date = st.date_input("Starts on", value=habit.start_date, key=f"{key_prefix}_start_date")
-        estimated_minutes = int(st.number_input("Duration (min)", min_value=5, max_value=720, value=int(habit.estimated_minutes), step=5, key=f"{key_prefix}_duration"))
-        set_time = st.checkbox("Set a time", value=habit.planned_start_time is not None, key=f"{key_prefix}_set_time")
+        set_time = st.checkbox(
+            "Set a time",
+            value=habit.planned_start_time is not None and habit.planned_end_time is not None,
+            key=f"{key_prefix}_set_time",
+        )
         planned_start_time = None
         planned_end_time = None
         if set_time:
-            planned_start_time = st.time_input("Start time", value=habit.planned_start_time or time(9, 0), step=300, key=f"{key_prefix}_start_time")
-            planned_end_time = end_at_for_duration(start_date, planned_start_time, estimated_minutes).time()
-            if duration_crosses_midnight(start_date, planned_start_time, estimated_minutes):
-                st.error("The selected duration cannot cross midnight.")
+            default_start_time = habit.planned_start_time or time(9, 0)
+            default_end_time = habit.planned_end_time or (
+                datetime.combine(start_date, default_start_time) + timedelta(minutes=int(habit.estimated_minutes))
+            ).time()
+            start_col, end_col = st.columns(2)
+            with start_col:
+                planned_start_time = st.time_input(
+                    "Start time",
+                    value=default_start_time,
+                    step=300,
+                    key=f"{key_prefix}_start_time",
+                )
+            with end_col:
+                planned_end_time = st.time_input(
+                    "End time",
+                    value=default_end_time,
+                    step=300,
+                    key=f"{key_prefix}_end_time",
+                )
+            estimated_minutes = int(
+                (datetime.combine(start_date, planned_end_time) - datetime.combine(start_date, planned_start_time)).total_seconds()
+                // 60
+            )
+            has_valid_time_range = estimated_minutes > 0
+            if not has_valid_time_range:
+                st.error("End time must be after start time.")
+        else:
+            estimated_minutes = int(
+                st.number_input(
+                    "Duration (min)",
+                    min_value=5,
+                    max_value=720,
+                    value=int(habit.estimated_minutes),
+                    step=5,
+                    key=f"{key_prefix}_duration",
+                )
+            )
+            has_valid_time_range = True
         recurrence = st.radio("Repeat", ["Every day", "Weekdays", "Custom days"], index=["Every day", "Weekdays", "Custom days"].index(current_recurrence), horizontal=True, key=f"{key_prefix}_recurrence")
         if recurrence == "Custom days":
             selected_weekday_names = st.multiselect("Days", list(WEEKDAY_OPTIONS), default=[name for name, value in WEEKDAY_OPTIONS.items() if value in current_weekdays], key=f"{key_prefix}_weekdays")
@@ -367,8 +655,8 @@ def _render_recurring_habit_editor(habit, category_options: dict[str, int]) -> N
             st.rerun()
         if not save_clicked:
             return
-        if set_time and duration_crosses_midnight(start_date, planned_start_time, estimated_minutes):
-            st.error("The selected duration cannot cross midnight.")
+        if not has_valid_time_range:
+            st.error("End time must be after start time.")
         elif not weekdays:
             st.error("Choose at least one day for the routine.")
         else:

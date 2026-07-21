@@ -12,6 +12,7 @@ from src.services.goal_service import (
     create_goal as service_create_goal,
     delete_goal_if_unused,
     get_goal,
+    get_goal_completion_forecast,
     get_goal_history_summary,
     get_goal_progress,
     list_active_goals,
@@ -375,6 +376,50 @@ def test_completed_linked_quest_increases_completed_minutes_and_earned_xp(sessio
     assert progress["remaining_minutes"] == 1080
     assert progress["progress_percent"] == 10
     assert progress["earned_xp"] == 40
+
+
+def test_goal_completion_forecast_uses_completed_planned_effort_and_target_date(session):
+    goal = create_goal(
+        "Portfolio Project",
+        planned_total_minutes=300,
+        target_end_date=date(2026, 7, 10),
+        session=session,
+    )
+    first = _create_goal_session(session, goal, minutes=100, planned_date=date(2026, 7, 1))
+    second = _create_goal_session(session, goal, minutes=100, planned_date=date(2026, 7, 3))
+    complete_checkin(first.id, date(2026, 7, 1), actual_minutes=120, session=session)
+    complete_checkin(second.id, date(2026, 7, 3), actual_minutes=80, session=session)
+
+    forecast = get_goal_completion_forecast(goal.id, today=date(2026, 7, 5), session=session)
+
+    assert forecast == {
+        "available": True,
+        "reason": None,
+        "target_end_date": date(2026, 7, 10),
+        "projected_completion_date": date(2026, 7, 7),
+        "on_track": True,
+        "daily_completed_minutes": 40.0,
+        "required_daily_minutes": 17,
+        "observed_completed_days": 5,
+        "remaining_minutes": 100,
+    }
+
+
+def test_goal_completion_forecast_requires_target_effort_date_and_history(session):
+    open_ended = create_goal("Open-ended", planned_total_minutes=0, session=session)
+    no_target = create_goal("No target", planned_total_minutes=120, session=session)
+    target_without_history = create_goal(
+        "No history",
+        planned_total_minutes=120,
+        target_end_date=date(2026, 7, 10),
+        session=session,
+    )
+
+    assert get_goal_completion_forecast(open_ended.id, session=session)["reason"] == "Set a target effort to forecast this project."
+    assert get_goal_completion_forecast(no_target.id, session=session)["reason"] == "Set a target date to forecast this project."
+    assert get_goal_completion_forecast(target_without_history.id, session=session)["reason"] == (
+        "Complete at least one project session to calculate a forecast."
+    )
 
 
 @pytest.mark.parametrize(

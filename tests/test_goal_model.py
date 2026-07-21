@@ -162,6 +162,48 @@ def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path, mo
     assert "goal_session_number" in quest_columns
 
 
+def test_sqlite_schema_helper_adds_actual_minutes_to_existing_checkins_table(tmp_path, monkeypatch):
+    database_path = tmp_path / "existing.db"
+    engine = create_engine(f"sqlite:///{database_path}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE quests (
+                    id INTEGER PRIMARY KEY,
+                    title VARCHAR(200) NOT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'active',
+                    is_habit BOOLEAN NOT NULL DEFAULT 0,
+                    xp_reward INTEGER NOT NULL DEFAULT 10
+                )
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                CREATE TABLE quest_checkins (
+                    id INTEGER PRIMARY KEY,
+                    quest_id INTEGER NOT NULL,
+                    checkin_date DATE NOT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'Planned',
+                    xp_awarded INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+        )
+
+    monkeypatch.setattr(database_db, "DATABASE_URL", f"sqlite:///{database_path}")
+    monkeypatch.setattr(database_db, "engine", engine)
+
+    database_db._ensure_sqlite_schema()
+    database_db._ensure_sqlite_schema()
+
+    checkin_columns = {column["name"] for column in inspect(engine).get_columns("quest_checkins")}
+
+    assert "actual_minutes" in checkin_columns
+
+
 def test_sqlite_schema_helper_updates_goal_planned_time_constraint(tmp_path, monkeypatch):
     database_path = tmp_path / "existing.db"
     engine = create_engine(f"sqlite:///{database_path}")

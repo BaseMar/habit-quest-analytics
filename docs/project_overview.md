@@ -31,8 +31,9 @@ Implemented:
 - Command Center for today's and overdue `QuestCheckin` status actions.
 - Planner with calendar scheduling, selected-day editing, unified task/routine/
   project-session form, and read-only Monthly Review.
-- Projects & Routines workspace for project lifecycle, bulk session planning,
-  routine templates, future-month generation, and safe cleanup.
+- Projects & Routines workspace for project creation, editing, lifecycle,
+  comparison, bulk session planning, routine templates, future-month generation,
+  and safe cleanup.
 - Recurring Habits v1 with selected-weekday templates, creation-month
   generation, archive/delete controls, safe single generated-day deletion, and
   safe future planned-day cleanup.
@@ -44,7 +45,8 @@ Implemented:
 - Safe deletion for unused recurring templates and unresolved one-time planned
   quests while preserving historical and XP-awarded records.
 - Time-based XP for new scheduled quests and recurring habit templates.
-- Habit Analytics using check-ins for weekly pulse, XP trends, status/category breakdowns, consistency, planned minutes, and insights.
+- Habit Analytics using check-ins for date-filtered plan-versus-completion
+  trends, category and routine performance, recorded actual time, and insights.
 - Character Profile using check-in XP for total XP, nonlinear level, RPG stat
   levels, and stat-level radar chart.
 - SQLite/SQLAlchemy persistence and startup schema helpers.
