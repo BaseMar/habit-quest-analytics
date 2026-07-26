@@ -305,23 +305,7 @@ Positive value:
 - Builds trust.
 - Allows further personal analysis outside the app.
 
-## Priority 15. Planned vs Actual Time
-
-What it adds:
-
-- Ability to compare estimated minutes with actual time spent.
-
-Why it matters:
-
-- The app already stores estimated minutes, but not actual minutes.
-- This would help users improve planning accuracy.
-
-Positive value:
-
-- Adds productivity insight beyond completion.
-- Helps users understand whether they underestimate tasks.
-
-## Priority 16. Quest Priority
+## Priority 15. Quest Priority
 
 What it adds:
 
@@ -348,7 +332,7 @@ Implementation note:
 - This requires a model change and UI updates.
 - Do not implement too early; first stabilize editing, status flow, and daily usage.
 
-## Priority 17. Character Profile Customization
+## Priority 16. Character Profile Customization
 
 What it adds:
 
@@ -364,7 +348,7 @@ Positive value:
 - Improves emotional connection to the dashboard.
 - Adds polish without changing the analytics engine.
 
-## Priority 18. Optional Design Patterns
+## Priority 17. Optional Design Patterns
 
 What it adds:
 

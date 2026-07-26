@@ -117,8 +117,7 @@ Implemented:
 - Command Center operational actions and metrics powered by check-ins.
 - Character Profile XP, level, and RPG stats powered by check-in XP.
 - Habit Analytics date filters, plan-versus-completion trends, category and
-  routine performance, recorded actual time, and insight data powered by
-  check-ins.
+  routine performance, and insight data powered by check-ins.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
@@ -162,7 +161,7 @@ Habit Quest Analytics turns productivity tracking into a compact RPG loop:
 - Grow RPG stats through quest categories.
 - Review today's operational status in Command Center.
 - Analyze consistency, plan versus completion, category and routine activity,
-  planned workload, and recorded actual time in Habit Analytics.
+  and planned workload in Habit Analytics.
 - View level, XP progress, avatar, stat-level bars, radar chart, and RPG stats
   in Character Profile.
 
@@ -247,7 +246,8 @@ The app is designed to answer questions such as:
 - Check-ins by status and category.
 - Completion rate by weekday.
 - Planned minutes by category.
-- Optional recorded actual minutes for completed work.
+- Date-range period review with prior-period comparison, active-day consistency,
+  workload execution, weekday patterns, category performance, and one clear focus item.
 - Project completion forecasts based on completed planned effort and target dates.
 - Insight summaries based on completed and failed check-ins.
 
@@ -283,7 +283,7 @@ The app is designed to answer questions such as:
   comparison, bulk project-session scheduling, routine templates, and
   future-month routine generation.
 - `Habit Analytics` - date-filtered plan versus completion trends, category and
-  routine performance, recorded actual time, and insights.
+  routine performance, and insights.
 - `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
 
 ## Key Technical Decisions

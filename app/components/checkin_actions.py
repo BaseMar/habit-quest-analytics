@@ -22,6 +22,7 @@ def get_checkin_status_actions(current_status: str | None) -> tuple[CheckinActio
 def render_checkin_status_actions(
     current_status: str | None,
     key_prefix: str,
+    compact: bool = False,
 ) -> tuple[str, str] | None:
     """Render consistent status buttons and return the selected label/status pair."""
     actions = get_checkin_status_actions(current_status)
@@ -30,7 +31,17 @@ def render_checkin_status_actions(
 
     if len(actions) == 1:
         label, next_status, button_type = actions[0]
-        if st.button(
+        if compact:
+            action_column, _ = st.columns([1, 2])
+            with action_column:
+                if st.button(
+                    label,
+                    type=button_type,
+                    use_container_width=True,
+                    key=f"{key_prefix}_{next_status}",
+                ):
+                    return label, next_status
+        elif st.button(
             label,
             type=button_type,
             use_container_width=True,
@@ -39,7 +50,7 @@ def render_checkin_status_actions(
             return label, next_status
         return None
 
-    action_columns = st.columns(3)
+    action_columns = st.columns([1, 1, 1, 1.4] if compact else 3)
     for action_column, (label, next_status, button_type) in zip(action_columns, actions):
         with action_column:
             if st.button(

@@ -46,7 +46,7 @@ Implemented:
   quests while preserving historical and XP-awarded records.
 - Time-based XP for new scheduled quests and recurring habit templates.
 - Habit Analytics using check-ins for date-filtered plan-versus-completion
-  trends, category and routine performance, recorded actual time, and insights.
+  trends, category and routine performance, and insights.
 - Character Profile using check-in XP for total XP, nonlinear level, RPG stat
   levels, and stat-level radar chart.
 - SQLite/SQLAlchemy persistence and startup schema helpers.

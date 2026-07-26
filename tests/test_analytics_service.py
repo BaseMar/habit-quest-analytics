@@ -79,14 +79,12 @@ def _add_checkin(
     checkin_date: date,
     status: str = "Planned",
     xp_awarded: int = 0,
-    actual_minutes: int | None = None,
 ) -> QuestCheckin:
     checkin = QuestCheckin(
         quest_id=quest.id,
         checkin_date=checkin_date,
         status=status,
         xp_awarded=xp_awarded,
-        actual_minutes=actual_minutes,
     )
     session.add(checkin)
     session.commit()
@@ -360,13 +358,38 @@ def test_habit_analytics_filters_checkins_and_compares_previous_period(session):
         "skipped_count": 0,
         "planned_minutes": 60,
         "completed_planned_minutes": 60,
-        "actual_minutes": 0,
-        "actual_time_entries_count": 0,
         "xp_earned": 20,
         "completion_rate": 100.0,
     }
     assert result["previous_period_summary"]["checkins_count"] == 1
     assert result["previous_period_summary"]["completion_rate"] == 0.0
+
+
+def test_habit_analytics_builds_explainable_period_highlights(session):
+    health = _add_category(session, "Health")
+    work = _add_category(session, "Work")
+    workout = _add_quest(session, "Workout", category=health)
+    report = _add_quest(session, "Report", category=work)
+    _add_checkin(session, workout, date(2026, 6, 23), "Completed", xp_awarded=20)
+    _add_checkin(session, workout, date(2026, 6, 24), "Completed", xp_awarded=20)
+    _add_checkin(session, report, date(2026, 6, 24), "Failed")
+
+    result = get_habit_analytics_data(
+        today=date(2026, 6, 26),
+        start_date=date(2026, 6, 20),
+        end_date=date(2026, 6, 26),
+        session=session,
+    )
+
+    assert result["period_highlights"] == {
+        "scheduled_days": 2,
+        "completed_days": 2,
+        "active_day_rate": 100.0,
+    }
+    assert result["review_focus"] == {
+        "title": "Category to review",
+        "message": "Work completed 0% of resolved check-ins.",
+    }
 
 
 def test_habit_analytics_filters_project_sessions_and_routines(session):
@@ -440,7 +463,7 @@ def test_habit_analytics_builds_category_performance_table(session):
     failed = _add_quest(session, "Stretch", category=health, estimated_minutes=30)
     planned = _add_quest(session, "Report", category=work, estimated_minutes=45)
     skipped = _add_quest(session, "Meeting", category=work, estimated_minutes=15)
-    _add_checkin(session, completed, date(2026, 6, 24), "Completed", xp_awarded=20, actual_minutes=75)
+    _add_checkin(session, completed, date(2026, 6, 24), "Completed", xp_awarded=20)
     _add_checkin(session, failed, date(2026, 6, 24), "Failed")
     _add_checkin(session, planned, date(2026, 6, 25), "Planned")
     _add_checkin(session, skipped, date(2026, 6, 25), "Skipped")
@@ -462,7 +485,6 @@ def test_habit_analytics_builds_category_performance_table(session):
             "Skipped": 0,
             "Planned": 0,
             "XP Earned": 20,
-            "Actual Minutes": 75,
             "Completion Rate": 50.0,
         },
         {
@@ -474,7 +496,6 @@ def test_habit_analytics_builds_category_performance_table(session):
             "Skipped": 1,
             "Planned": 1,
             "XP Earned": 0,
-            "Actual Minutes": 0,
             "Completion Rate": 0.0,
         },
     ]

@@ -248,11 +248,16 @@ def get_habit_analytics_data(
                 1 for checkin in weekly_checkins if _normalize_status(checkin.status) == "Failed"
             )
             resolved_this_week = completed_this_week + failed_this_week
+            category_performance = build_category_performance_from_checkins(filtered_checkins)
+            routine_performance = build_routine_performance_from_checkins(filtered_checkins, end_date)
+            weekday_performance = build_completion_rate_by_weekday_from_checkins(filtered_checkins)
             return {
                 "has_quests": bool(filtered_checkins),
                 "date_range": {"start_date": start_date, "end_date": end_date},
                 "period_summary": _build_analytics_period_summary(filtered_checkins),
                 "previous_period_summary": _build_analytics_period_summary(previous_checkins),
+                "period_highlights": build_period_highlights_from_checkins(filtered_checkins),
+                "review_focus": build_review_focus(category_performance, routine_performance),
                 "weekly_pulse": {
                     "weekly_xp": sum(checkin.xp_awarded or 0 for checkin in weekly_checkins),
                     "completed_this_week": completed_this_week,
@@ -263,9 +268,9 @@ def get_habit_analytics_data(
                 "quests_by_status": build_checkins_by_status(filtered_checkins),
                 "quests_by_category": build_checkins_by_category(filtered_checkins),
                 "completed_checkins_by_category": build_checkins_by_category(completed_checkins_from(filtered_checkins)),
-                "category_performance": build_category_performance_from_checkins(filtered_checkins),
-                "routine_performance": build_routine_performance_from_checkins(filtered_checkins, end_date),
-                "completion_rate_by_weekday": build_completion_rate_by_weekday_from_checkins(filtered_checkins),
+                "category_performance": category_performance,
+                "routine_performance": routine_performance,
+                "completion_rate_by_weekday": weekday_performance,
                 "estimated_minutes_by_category": build_planned_minutes_by_category_from_checkins(filtered_checkins),
                 "planned_vs_completed_by_week": build_planned_vs_completed_by_week_from_checkins(
                     filtered_checkins,
@@ -292,11 +297,15 @@ def get_habit_analytics_data(
         weekly_quests = build_quests_in_week(quests, week_start_at, week_end_at)
         completed_this_week = sum(1 for quest in weekly_quests if _is_completed(quest))
         failed_this_week = sum(1 for quest in weekly_quests if _normalize_status(quest.status) == "Failed")
+        category_performance = build_category_performance_from_quests(filtered_quests)
+        weekday_performance = build_completion_rate_by_weekday(filtered_quests)
         return {
             "has_quests": bool(filtered_quests),
             "date_range": {"start_date": start_date, "end_date": end_date},
             "period_summary": _build_analytics_quest_period_summary(filtered_quests),
             "previous_period_summary": _build_analytics_quest_period_summary(previous_quests),
+            "period_highlights": build_period_highlights_from_quests(filtered_quests),
+            "review_focus": build_review_focus(category_performance, _empty_routine_performance_dataset()),
             "weekly_pulse": {
                 "weekly_xp": sum(quest.xp_reward or 0 for quest in weekly_quests if _is_completed(quest)),
                 "completed_this_week": completed_this_week,
@@ -306,9 +315,9 @@ def get_habit_analytics_data(
             "xp_by_day": build_xp_by_day(filtered_quests),
             "quests_by_status": build_quests_by_status(filtered_quests),
             "quests_by_category": build_quests_by_category(filtered_quests),
-            "category_performance": build_category_performance_from_quests(filtered_quests),
+            "category_performance": category_performance,
             "routine_performance": _empty_routine_performance_dataset(),
-            "completion_rate_by_weekday": build_completion_rate_by_weekday(filtered_quests),
+            "completion_rate_by_weekday": weekday_performance,
             "estimated_minutes_by_category": build_estimated_minutes_by_category(filtered_quests),
             "planned_vs_completed_by_week": build_planned_vs_completed_by_week_from_quests(
                 filtered_quests,
@@ -398,7 +407,6 @@ def _build_analytics_period_summary(checkins: list[QuestCheckin]) -> dict:
     skipped_checkins = [checkin for checkin in checkins if _normalize_status(checkin.status) == "Skipped"]
     planned_minutes = sum(_checkin_planned_minutes(checkin) for checkin in checkins)
     completed_planned_minutes = sum(_checkin_planned_minutes(checkin) for checkin in completed_checkins)
-    actual_time_entries = [checkin for checkin in completed_checkins if checkin.actual_minutes is not None]
     return {
         "checkins_count": len(checkins),
         "completed_count": len(completed_checkins),
@@ -406,8 +414,6 @@ def _build_analytics_period_summary(checkins: list[QuestCheckin]) -> dict:
         "skipped_count": len(skipped_checkins),
         "planned_minutes": planned_minutes,
         "completed_planned_minutes": completed_planned_minutes,
-        "actual_minutes": sum(checkin.actual_minutes or 0 for checkin in actual_time_entries),
-        "actual_time_entries_count": len(actual_time_entries),
         "xp_earned": sum(checkin.xp_awarded or 0 for checkin in completed_checkins),
         "completion_rate": calculate_completion_rate(len(completed_checkins), len(completed_checkins) + len(failed_checkins)),
     }
@@ -426,11 +432,90 @@ def _build_analytics_quest_period_summary(quests: list[Quest]) -> dict:
         "skipped_count": len(skipped_quests),
         "planned_minutes": planned_minutes,
         "completed_planned_minutes": completed_planned_minutes,
-        "actual_minutes": 0,
-        "actual_time_entries_count": 0,
         "xp_earned": sum(quest.xp_reward or 0 for quest in completed_quests),
         "completion_rate": calculate_completion_rate(len(completed_quests), len(completed_quests) + len(failed_quests)),
     }
+
+
+def build_period_highlights_from_checkins(checkins: list[QuestCheckin]) -> dict:
+    """Return compact, explainable consistency signals for a reporting period."""
+    scheduled_days = {checkin.checkin_date for checkin in checkins}
+    completed_days = {
+        checkin.checkin_date
+        for checkin in checkins
+        if _normalize_status(checkin.status) == "Completed"
+    }
+    return _build_period_highlights(
+        scheduled_days=scheduled_days,
+        completed_days=completed_days,
+    )
+
+
+def build_period_highlights_from_quests(quests: list[Quest]) -> dict:
+    """Return reporting-period highlights for legacy quest data without check-ins."""
+    scheduled_days = {quest.due_date for quest in quests if quest.due_date is not None}
+    completed_days = {
+        quest.due_date
+        for quest in quests
+        if quest.due_date is not None and _is_completed(quest)
+    }
+    return _build_period_highlights(
+        scheduled_days=scheduled_days,
+        completed_days=completed_days,
+    )
+
+
+def _build_period_highlights(
+    scheduled_days: set[date],
+    completed_days: set[date],
+) -> dict:
+    scheduled_day_count = len(scheduled_days)
+    completed_day_count = len(completed_days)
+    return {
+        "scheduled_days": scheduled_day_count,
+        "completed_days": completed_day_count,
+        "active_day_rate": calculate_completion_rate(completed_day_count, scheduled_day_count),
+    }
+
+
+def build_review_focus(category_performance: pd.DataFrame, routine_performance: pd.DataFrame) -> dict | None:
+    """Return one deterministic focus item instead of a dashboard full of alerts."""
+    attention_routines = routine_performance[routine_performance["Needs Attention"]]
+    if not attention_routines.empty:
+        routine = attention_routines.sort_values(
+            ["Overdue Planned", "Failed", "Routine"], ascending=[False, False, True]
+        ).iloc[0]
+        return {
+            "title": "Routine needs attention",
+            "message": (
+                f"{routine['Routine']}: {int(routine['Overdue Planned'])} overdue planned and "
+                f"{int(routine['Failed'])} failed check-ins."
+            ),
+        }
+
+    unresolved_categories = category_performance[category_performance["Planned"] > 0]
+    if not unresolved_categories.empty:
+        category = unresolved_categories.sort_values(
+            ["Planned", "Planned Minutes", "Category"], ascending=[False, False, True]
+        ).iloc[0]
+        return {
+            "title": "Unresolved workload",
+            "message": f"{category['Category']} has {int(category['Planned'])} planned check-ins in this period.",
+        }
+
+    resolved_categories = category_performance[
+        (category_performance["Completed"] + category_performance["Failed"]) > 0
+    ]
+    if not resolved_categories.empty:
+        category = resolved_categories.sort_values(
+            ["Completion Rate", "Planned Minutes", "Category"], ascending=[True, False, True]
+        ).iloc[0]
+        return {
+            "title": "Category to review",
+            "message": f"{category['Category']} completed {category['Completion Rate']:.0f}% of resolved check-ins.",
+        }
+
+    return None
 
 
 def get_goal_analytics_summary(
@@ -974,7 +1059,6 @@ def build_category_performance_from_checkins(checkins: list[QuestCheckin]) -> pd
                 "Skipped": 0,
                 "Planned": 0,
                 "XP Earned": 0,
-                "Actual Minutes": 0,
             },
         )
         planned_minutes = _checkin_planned_minutes(checkin)
@@ -984,7 +1068,6 @@ def build_category_performance_from_checkins(checkins: list[QuestCheckin]) -> pd
         if status == "Completed":
             row["Completed Planned Minutes"] += planned_minutes
             row["XP Earned"] += checkin.xp_awarded or 0
-            row["Actual Minutes"] += checkin.actual_minutes or 0
 
     return _finalize_category_performance(rows_by_category)
 
@@ -1005,7 +1088,6 @@ def build_category_performance_from_quests(quests: list[Quest]) -> pd.DataFrame:
                 "Skipped": 0,
                 "Planned": 0,
                 "XP Earned": 0,
-                "Actual Minutes": 0,
             },
         )
         planned_minutes = quest.estimated_minutes or 0
@@ -1032,7 +1114,6 @@ def _finalize_category_performance(rows_by_category: dict[str, dict]) -> pd.Data
                 "Skipped",
                 "Planned",
                 "XP Earned",
-                "Actual Minutes",
             ]
         )
     rows = list(rows_by_category.values())

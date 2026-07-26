@@ -540,7 +540,7 @@ def _render_planned_item_editor(quests: list, category_options: dict[str, int]) 
         return
 
     st.session_state.pop("editing_planned_quest_id", None)
-    st.session_state["planner_manage_date"] = planned_date
+    st.session_state["pending_planner_manage_date"] = planned_date
     st.session_state["selected_date"] = planned_date
     st.session_state["planner_overview_status_message"] = "Planned item updated."
     st.rerun()
@@ -606,6 +606,9 @@ def _render_planned_item_delete_action(quests: list) -> None:
 
 def _render_day_management_panel() -> list:
     st.subheader("Selected day")
+    pending_date = st.session_state.pop("pending_planner_manage_date", None)
+    if pending_date is not None:
+        st.session_state["planner_manage_date"] = pending_date
     if "planner_manage_date" not in st.session_state:
         st.session_state["planner_manage_date"] = st.session_state["selected_date"]
     selected_day = st.date_input("Selected day", key="planner_manage_date")

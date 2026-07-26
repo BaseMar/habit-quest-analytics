@@ -15,9 +15,11 @@ class ThemeTokens(TypedDict):
     surface: str
     surface_elevated: str
     border: str
+    border_strong: str
     text_primary: str
     text_secondary: str
     accent: str
+    accent_text: str
     accent_soft: str
     accent_border: str
     success: str
@@ -36,48 +38,52 @@ ACCENT_PRESET_KEY = "hq_accent_preset"
 THEME_MODES = ("Light", "Dark")
 ACCENT_PRESETS = {
     "Blue": {
-        "accent": "#2563EB",
-        "accent_soft_dark": "rgba(96, 165, 250, 0.16)",
-        "accent_soft_light": "#EFF6FF",
-        "accent_border_dark": "rgba(96, 165, 250, 0.36)",
-        "accent_border_light": "#BFDBFE",
+        "accent": "#1D4ED8",
+        "accent_soft_dark": "rgba(29, 78, 216, 0.28)",
+        "accent_soft_light": "#DBEAFE",
+        "accent_border_dark": "#60A5FA",
+        "accent_border_light": "#2563EB",
     },
 }
 
 BASE_TOKENS = {
     "Dark": {
-        "background": "#111827",
-        "background_alt": "#111827",
-        "surface": "#182234",
-        "surface_elevated": "#223047",
-        "border": "rgba(148, 163, 184, 0.2)",
-        "text_primary": "#F3F6FA",
-        "text_secondary": "#AEB9C9",
-        "success": "#22C55E",
-        "warning": "#F59E0B",
-        "danger": "#EF4444",
+        "background": "#0A1220",
+        "background_alt": "#0E1727",
+        "surface": "#111C2D",
+        "surface_elevated": "#18263A",
+        "border": "#60748E",
+        "border_strong": "#94A3B8",
+        "text_primary": "#F8FAFC",
+        "text_secondary": "#D6E0ED",
+        "accent_text": "#93C5FD",
+        "success": "#4ADE80",
+        "warning": "#FBBF24",
+        "danger": "#F87171",
         "info": "#38BDF8",
-        "shadow": "0 1px 2px rgba(2, 6, 23, 0.24)",
-        "input_background": "#182234",
-        "muted_surface": "rgba(148, 163, 184, 0.1)",
-        "chart_grid": "rgba(148, 163, 184, 0.16)",
+        "shadow": "0 1px 2px rgba(2, 6, 23, 0.42)",
+        "input_background": "#18263A",
+        "muted_surface": "rgba(214, 224, 237, 0.14)",
+        "chart_grid": "#40546C",
     },
     "Light": {
-        "background": "#F6F7F9",
-        "background_alt": "#F6F7F9",
+        "background": "#F4F7FB",
+        "background_alt": "#EEF3F8",
         "surface": "#FFFFFF",
-        "surface_elevated": "#F8FAFC",
-        "border": "#E2E8F0",
-        "text_primary": "#18212F",
-        "text_secondary": "#64748B",
+        "surface_elevated": "#E8EEF5",
+        "border": "#64748B",
+        "border_strong": "#475569",
+        "text_primary": "#0F172A",
+        "text_secondary": "#334155",
+        "accent_text": "#1D4ED8",
         "success": "#15803D",
-        "warning": "#B45309",
-        "danger": "#DC2626",
-        "info": "#0369A1",
-        "shadow": "0 1px 2px rgba(15, 23, 42, 0.04)",
+        "warning": "#9A4E00",
+        "danger": "#B91C1C",
+        "info": "#075985",
+        "shadow": "0 1px 2px rgba(15, 23, 42, 0.1)",
         "input_background": "#FFFFFF",
-        "muted_surface": "rgba(15, 23, 42, 0.035)",
-        "chart_grid": "rgba(100, 116, 139, 0.16)",
+        "muted_surface": "rgba(15, 23, 42, 0.07)",
+        "chart_grid": "#CBD5E1",
     },
 }
 
@@ -116,9 +122,11 @@ def get_theme_tokens() -> ThemeTokens:
         surface=base["surface"],
         surface_elevated=base["surface_elevated"],
         border=base["border"],
+        border_strong=base["border_strong"],
         text_primary=base["text_primary"],
         text_secondary=base["text_secondary"],
         accent=accent["accent"],
+        accent_text=base["accent_text"],
         accent_soft=accent[soft_key],
         accent_border=accent[border_key],
         success=base["success"],
@@ -181,9 +189,11 @@ def apply_global_styles() -> None:
             --hq-surface: {tokens["surface"]};
             --hq-surface-elevated: {tokens["surface_elevated"]};
             --hq-border: {tokens["border"]};
+            --hq-border-strong: {tokens["border_strong"]};
             --hq-text-primary: {tokens["text_primary"]};
             --hq-text-secondary: {tokens["text_secondary"]};
             --hq-accent: {tokens["accent"]};
+            --hq-accent-text: {tokens["accent_text"]};
             --hq-accent-soft: {tokens["accent_soft"]};
             --hq-accent-border: {tokens["accent_border"]};
             --hq-success: {tokens["success"]};
@@ -256,6 +266,8 @@ def apply_global_styles() -> None:
         div[data-testid="stCaptionContainer"] p,
         small {{
             color: var(--hq-text-secondary) !important;
+            font-size: 0.84rem !important;
+            font-weight: 560 !important;
         }}
 
         hr {{
@@ -290,7 +302,7 @@ def apply_global_styles() -> None:
         }}
 
         .hq-sidebar-section-title {{
-            color: var(--hq-accent);
+            color: var(--hq-accent-text);
             font-size: 0.74rem;
             font-weight: 760;
             letter-spacing: 0.06em;
@@ -393,7 +405,7 @@ def apply_global_styles() -> None:
         }}
 
         .hq-page-kicker {{
-            color: var(--hq-accent);
+            color: var(--hq-accent-text);
             font-size: 0.76rem;
             font-weight: 760;
             letter-spacing: 0.06em;
@@ -425,6 +437,10 @@ def apply_global_styles() -> None:
             margin-bottom: 0.85rem;
         }}
 
+        .hq-content-gap {{
+            height: 0.75rem;
+        }}
+
         div[data-testid="stMetric"] {{
             background: var(--hq-surface);
             border: 1px solid var(--hq-border);
@@ -446,8 +462,8 @@ def apply_global_styles() -> None:
 
         div[data-testid="stMetricDelta"] svg,
         div[data-testid="stMetricDelta"] p {{
-            color: var(--hq-accent) !important;
-            fill: var(--hq-accent) !important;
+            color: var(--hq-accent-text) !important;
+            fill: var(--hq-accent-text) !important;
         }}
 
         div[data-testid="stAlert"] {{
@@ -468,6 +484,10 @@ def apply_global_styles() -> None:
 
         div[data-testid="stDataFrame"] div[role="grid"] {{
             border-color: var(--hq-border) !important;
+        }}
+
+        div[data-testid="stDataFrame"] div[role="columnheader"] {{
+            border-bottom-color: var(--hq-border-strong) !important;
         }}
 
         .hq-table-scroll {{
@@ -787,6 +807,8 @@ def apply_global_styles() -> None:
             box-shadow: none;
             color: white !important;
             font-weight: 750 !important;
+            justify-content: center !important;
+            text-align: center !important;
         }}
 
         button[kind="secondary"],
@@ -798,6 +820,8 @@ def apply_global_styles() -> None:
             border-radius: 7px !important;
             color: var(--hq-text-primary) !important;
             font-weight: 720 !important;
+            justify-content: center !important;
+            text-align: center !important;
         }}
 
         button[kind="primary"]:hover,

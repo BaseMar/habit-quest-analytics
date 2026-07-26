@@ -160,24 +160,32 @@ Rules:
 - Exclude planned items.
 - Return `0.0` for weekdays without resolved check-ins.
 
+## Period Review Highlights
+
+Habit Analytics derives compact review signals from the selected date range.
+
+```text
+active_day_rate = days_with_at_least_one_completed_checkin / scheduled_checkin_days * 100
+```
+
+- A scheduled day is a distinct `QuestCheckin.checkin_date` in the selected period.
+- An active day has at least one completed check-in.
+
+## Period Review Focus
+
+The review displays at most one focus item, selected in this order:
+
+1. An active routine with overdue planned or failed check-ins.
+2. The category with the largest remaining planned workload in the selected period.
+3. The category with the lowest completion rate among categories with resolved check-ins.
+
 ## Planned Minutes By Category
 
 ```text
 planned_minutes_by_category = sum(parent quest estimated_minutes grouped by category)
 ```
 
-This represents planned workload attached to check-ins. It is not actual time spent.
-
-## Recorded Actual Time
-
-```text
-recorded_actual_minutes = sum(QuestCheckin.actual_minutes for completed check-ins with a value)
-```
-
-Actual time is optional and is entered when completing work in Command Center.
-Entries without an actual-time value are excluded rather than treated as zero.
-It is a reflection metric only and does not change XP, completion rate, or goal
-progress.
+This represents planned workload attached to check-ins.
 
 ## Goal Analytics
 
@@ -224,7 +232,6 @@ projected_completion_date = today + ceil(remaining_minutes / daily_completed_min
 
 The forecast compares the projected completion date with the target date. It is
 not available when any required planning or completion-history input is missing.
-Recorded actual minutes are intentionally not used in this v1 forecast.
 
 ### Goal Scheduling Effort
 
@@ -314,12 +321,3 @@ current_streak = consecutive days with at least one completed habit quest day
 ```
 
 Status: planned.
-
-### Planned Vs Actual Time Accuracy
-
-```text
-time_accuracy = actual_minutes / estimated_minutes * 100
-```
-
-Status: planned. Actual-time capture is implemented, but the normalized
-planned-versus-actual accuracy metric is not yet displayed.

@@ -87,60 +87,31 @@ def render_analytics_filters(categories: list, today: date) -> dict:
     }
 
 
-def render_period_summary(period_summary: dict, previous_period_summary: dict) -> None:
-    metric_cols = st.columns(4)
+def render_period_summary(period_summary: dict, previous_period_summary: dict, period_highlights: dict) -> None:
+    metric_cols = st.columns(3)
     metrics = (
         (
             "Completion",
             f"{period_summary['completion_rate']}%",
-            _format_delta(period_summary["completion_rate"], previous_period_summary["completion_rate"], "pp"),
+            f"{_format_delta(period_summary['completion_rate'], previous_period_summary['completion_rate'], 'pp')} vs previous period",
         ),
         (
             "Completed",
-            f"{period_summary['completed_count']} / {period_summary['checkins_count']}",
-            _format_delta(period_summary["completed_count"], previous_period_summary["completed_count"]),
+            period_summary["completed_count"],
+            (
+                f"of {period_summary['checkins_count']} check-ins; "
+                f"{_format_delta(period_summary['completed_count'], previous_period_summary['completed_count'])} vs previous period"
+            ),
         ),
         (
-            "Completed planned time",
-            _format_minutes(period_summary["completed_planned_minutes"]),
-            _format_delta(period_summary["completed_planned_minutes"], previous_period_summary["completed_planned_minutes"], " min"),
-        ),
-        (
-            "XP earned",
-            period_summary["xp_earned"],
-            _format_delta(period_summary["xp_earned"], previous_period_summary["xp_earned"], " XP"),
+            "Consistency",
+            f"{period_highlights['active_day_rate']:.0f}%",
+            f"{period_highlights['completed_days']} of {period_highlights['scheduled_days']} scheduled days included completed work",
         ),
     )
-    for column, (label, value, delta) in zip(metric_cols, metrics):
+    for column, (label, value, caption) in zip(metric_cols, metrics):
         with column:
-            render_metric_card(label, value, f"vs previous period: {delta}")
-    if period_summary["actual_time_entries_count"]:
-        st.caption(
-            "Recorded actual time: "
-            f"{_format_minutes(period_summary['actual_minutes'])} across "
-            f"{period_summary['actual_time_entries_count']} completed item(s)."
-        )
-
-
-def render_xp_by_day(xp_by_day) -> None:
-    if xp_by_day.empty:
-        render_empty_state("No completed quest days yet", "Complete quest days to see XP trends by day.")
-        return
-
-    tokens = get_theme_tokens()
-    chart_data = _format_date_labels(xp_by_day)
-    fig = px.line(
-        chart_data,
-        x="Date",
-        y="XP",
-        title="XP Trend by Day",
-        markers=True,
-        color_discrete_sequence=[tokens["accent"]],
-    )
-    fig.update_layout(xaxis_title="Check-in Date", yaxis_title="XP Earned", showlegend=False, height=360)
-    fig.update_xaxes(type="category")
-    fig.update_traces(line={"width": 3}, marker={"size": 8})
-    st.plotly_chart(style_chart(fig, height=360), width="stretch")
+            render_metric_card(label, value, caption)
 
 
 def render_planned_vs_completed_by_week(weekly_effort) -> None:
@@ -166,28 +137,10 @@ def render_planned_vs_completed_by_week(weekly_effort) -> None:
             "Planned Minutes": tokens["info"],
             "Completed Planned Minutes": tokens["accent"],
         },
-        title="Planned vs Completed Time",
+        title="Scheduled Effort Completed",
     )
     fig.update_layout(xaxis_title="Week starting", yaxis_title="Planned minutes", height=360)
     st.plotly_chart(style_chart(fig, height=360), width="stretch", config={"displayModeBar": False})
-
-
-def render_status_chart(quests_by_status) -> None:
-    if quests_by_status.empty:
-        render_empty_state("No status data", "Update quest days to see the status breakdown.")
-        return
-
-    tokens = get_theme_tokens()
-    fig = px.bar(
-        quests_by_status,
-        x="Status",
-        y="Count",
-        title="Check-ins by Status",
-        category_orders={"Status": quests_by_status["Status"].tolist()},
-        color_discrete_sequence=[tokens["info"]],
-    )
-    fig.update_layout(xaxis_title="Check-in Status", yaxis_title="Check-in Count", showlegend=False, height=320)
-    st.plotly_chart(style_chart(fig), width="stretch")
 
 
 def render_weekday_chart(completion_rate_by_weekday) -> None:
@@ -265,29 +218,20 @@ def render_category_performance(category_performance) -> None:
             "Skipped",
             "Planned",
             "XP Earned",
-            "Actual Minutes",
         ]
     ].copy()
     table_data["Planned Minutes"] = table_data["Planned Minutes"].map(_format_minutes)
     table_data["Completed Planned Minutes"] = table_data["Completed Planned Minutes"].map(_format_minutes)
     table_data["Completion Rate"] = table_data["Completion Rate"].map(lambda value: f"{value:.1f}%")
     table_data["XP Earned"] = table_data["XP Earned"].map(lambda value: f"{value} XP")
-    table_data["Actual Minutes"] = table_data["Actual Minutes"].map(_format_minutes)
-    st.dataframe(table_data, hide_index=True, width="stretch")
+    with st.expander("View category data"):
+        st.dataframe(table_data, hide_index=True, width="stretch")
 
 
 def render_routine_performance(routine_performance) -> None:
     if routine_performance.empty:
         render_empty_state("No routine data", "Generate routine days to review their completion history.")
         return
-
-    attention_rows = routine_performance[routine_performance["Needs Attention"]]
-    if not attention_rows.empty:
-        attention_labels = [
-            f"{row['Routine']} ({int(row['Failed'])} failed, {int(row['Overdue Planned'])} overdue)"
-            for _, row in attention_rows.iterrows()
-        ]
-        st.warning("Needs attention: " + ", ".join(attention_labels))
 
     tokens = get_theme_tokens()
     fig = px.bar(
@@ -324,27 +268,15 @@ def render_routine_performance(routine_performance) -> None:
     table_data["Last Completed"] = table_data["Last Completed"].map(
         lambda value: value.isoformat() if value is not None else "Not completed"
     )
-    st.dataframe(table_data, hide_index=True, width="stretch")
+    with st.expander("View routine data"):
+        st.dataframe(table_data, hide_index=True, width="stretch")
 
 
-def render_insights(analytics: dict) -> None:
-    insights = _build_insights(analytics["category_performance"])
-    if not insights:
+def render_review_focus(review_focus: dict | None) -> None:
+    if review_focus is None:
         return
 
-    render_section_title("Focus points", "Signals from workload and resolved check-ins in the selected period.")
-    insight_cols = st.columns(len(insights))
-    for column, (label, value) in zip(insight_cols, insights):
-        with column:
-            render_metric_card(label, value)
-
-
-def _format_date_labels(dataframe):
-    chart_data = dataframe.copy()
-    chart_data["Date"] = chart_data["Date"].map(
-        lambda value: value.strftime("%Y-%m-%d") if hasattr(value, "strftime") else str(value)
-    )
-    return chart_data
+    st.info(f"{review_focus['title']}: {review_focus['message']}")
 
 
 def _format_minutes(minutes: int) -> str:
@@ -365,55 +297,6 @@ def _format_delta(current_value: float | int, previous_value: float | int, suffi
     return f"{difference:+d}{suffix}"
 
 
-def _build_insights(category_performance) -> list[tuple[str, str]]:
-    insights: list[tuple[str, str]] = []
-    if category_performance.empty:
-        return insights
-
-    resolved_categories = category_performance[
-        (category_performance["Completed"] + category_performance["Failed"]) > 0
-    ]
-    if not resolved_categories.empty:
-        category_to_improve = resolved_categories.sort_values(
-            ["Completion Rate", "Planned Minutes", "Category"],
-            ascending=[True, False, True],
-        ).iloc[0]
-        insights.append(
-            (
-                "Category to improve",
-                f"{category_to_improve['Category']}: {category_to_improve['Completion Rate']:.0f}% complete",
-            )
-        )
-
-    planned_categories = category_performance[category_performance["Planned"] > 0]
-    if not planned_categories.empty:
-        largest_unresolved = planned_categories.sort_values(
-            ["Planned", "Planned Minutes", "Category"],
-            ascending=[False, False, True],
-        ).iloc[0]
-        insights.append(
-            (
-                "Largest unresolved workload",
-                f"{largest_unresolved['Category']}: {int(largest_unresolved['Planned'])} planned",
-            )
-        )
-
-    completed_categories = category_performance[category_performance["Completed Planned Minutes"] > 0]
-    if not completed_categories.empty:
-        largest_completed = completed_categories.sort_values(
-            ["Completed Planned Minutes", "Category"],
-            ascending=[False, True],
-        ).iloc[0]
-        insights.append(
-            (
-                "Most completed focus",
-                f"{largest_completed['Category']}: {_format_minutes(largest_completed['Completed Planned Minutes'])}",
-            )
-        )
-
-    return insights
-
-
 def render_activity_overview(analytics: dict) -> None:
     if not analytics["has_quests"]:
         render_empty_state(
@@ -422,38 +305,34 @@ def render_activity_overview(analytics: dict) -> None:
         )
         return
 
-    overview_tab, patterns_tab, categories_tab, routines_tab = st.tabs(
-        ["Overview", "Patterns", "Categories", "Routines"]
+    date_range = analytics["date_range"]
+    render_section_title(
+        "Period review",
+        (
+            f"{date_range['start_date']:%d %b %Y} to {date_range['end_date']:%d %b %Y}. "
+            "Every KPI is compared with the preceding period of the same length."
+        ),
     )
-    with overview_tab:
-        date_range = analytics["date_range"]
-        render_section_title(
-            "Period overview",
-            f"{date_range['start_date']:%d %b %Y} to {date_range['end_date']:%d %b %Y}.",
-        )
-        render_period_summary(analytics["period_summary"], analytics["previous_period_summary"])
+    render_period_summary(
+        analytics["period_summary"],
+        analytics["previous_period_summary"],
+        analytics["period_highlights"],
+    )
+    st.markdown('<div class="hq-content-gap"></div>', unsafe_allow_html=True)
+    render_review_focus(analytics["review_focus"])
 
-        render_section_title("Plan and completion", "Scheduled workload compared with completed planned time each week.")
+    workload_col, consistency_col = st.columns(2)
+    with workload_col:
+        render_section_title("Workload execution", "Scheduled workload compared with completed planned time each week.")
         render_planned_vs_completed_by_week(analytics["planned_vs_completed_by_week"])
+    with consistency_col:
+        render_section_title("Weekly consistency", "Completion rate for resolved check-ins, grouped by weekday.")
+        render_weekday_chart(analytics["completion_rate_by_weekday"])
 
-        render_section_title("XP trend", "XP awarded for completed check-ins in the selected period.")
-        render_xp_by_day(analytics["xp_by_day"])
-        render_insights(analytics)
+    render_section_title("Category performance", "Planned and completed planned time, outcomes, and XP by category.")
+    render_category_performance(analytics["category_performance"])
 
-    with patterns_tab:
-        status_col, consistency_col = st.columns(2)
-        with status_col:
-            render_section_title("Performance breakdown", "How quest days are distributed by state.")
-            render_status_chart(analytics["quests_by_status"])
-        with consistency_col:
-            render_section_title("Consistency", "Resolved check-in outcomes grouped by weekday.")
-            render_weekday_chart(analytics["completion_rate_by_weekday"])
-
-    with categories_tab:
-        render_section_title("Category performance", "Planned and completed planned time, outcomes, and XP by category.")
-        render_category_performance(analytics["category_performance"])
-
-    with routines_tab:
+    if not analytics["routine_performance"].empty:
         render_section_title("Routine performance", "Completion, misses, and recent routine history in the selected period.")
         render_routine_performance(analytics["routine_performance"])
 

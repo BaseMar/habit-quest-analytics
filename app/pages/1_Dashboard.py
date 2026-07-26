@@ -56,31 +56,18 @@ def render_work_items(items: list[dict], empty_title: str, empty_message: str, k
 
     for item in items:
         with st.container(border=True):
-            is_planned = item["status"] == "Planned"
-            column_widths = [0.72, 0.28] if is_planned else [0.78, 0.22]
-            details_col, effort_col = st.columns(column_widths, vertical_alignment="center")
-            actual_minutes = None
+            details_col, effort_col = st.columns([0.78, 0.22], vertical_alignment="center")
             with details_col:
                 time_label = item["time"] if item["time"] != "Not scheduled" else "Any time"
                 st.write(f"**{item['title']}**")
                 st.caption(f"{item['checkin_date']:%a, %b %d} / {time_label} / {item['category']} / {item['status']}")
             with effort_col:
                 st.caption(f"{item['xp']} XP")
-                if is_planned:
-                    actual_minutes = int(
-                        st.number_input(
-                            "Actual minutes",
-                            min_value=0,
-                            value=0,
-                            step=5,
-                            key=f"actual_minutes_{key_prefix}_{item['quest_id']}_{item['checkin_date'].isoformat()}",
-                            help="Optional. Saved only when you complete this item.",
-                        )
-                    )
 
             action = render_checkin_status_actions(
                 item["status"],
                 key_prefix=f"{key_prefix}_{item['quest_id']}_{item['checkin_date'].isoformat()}",
+                compact=True,
             )
             if action is not None:
                 label, next_status = action
@@ -89,7 +76,6 @@ def render_work_items(items: list[dict], empty_title: str, empty_message: str, k
                         item["quest_id"],
                         item["checkin_date"],
                         next_status,
-                        actual_minutes=actual_minutes or None,
                     )
                 except ValueError as error:
                     st.error(str(error))
@@ -98,7 +84,7 @@ def render_work_items(items: list[dict], empty_title: str, empty_message: str, k
                     st.rerun()
 
 
-def render_status_kpis(command_center: dict) -> None:
+def render_status_kpis(command_center: dict, compact: bool = False) -> None:
     status_items = (
         ("Planned today", command_center["planned_quests"], "info"),
         ("Completed today", command_center["completed_today"], "success"),
@@ -125,6 +111,7 @@ def render_status_kpis(command_center: dict) -> None:
             }}
 
             .command-status-card {{
+                --command-status-tone: var(--hq-accent);
                 position: relative;
                 display: flex;
                 align-items: center;
@@ -133,43 +120,37 @@ def render_status_kpis(command_center: dict) -> None:
                 min-height: 58px;
                 padding: 0.75rem 0.9rem 0.75rem 1rem;
                 border: 1px solid var(--hq-border);
+                border-inline: 4px solid var(--command-status-tone);
                 border-radius: 8px;
                 background: var(--hq-surface);
                 box-shadow: none;
             }}
 
-            .command-status-card::before {{
-                content: "";
-                position: absolute;
-                left: 0.72rem;
-                top: 0.86rem;
-                width: 0.45rem;
-                height: 0.45rem;
-                border-radius: 999px;
-                background: var(--hq-accent);
+            .command-status-row.compact {{
+                grid-template-columns: 1fr;
+                gap: 0.55rem;
             }}
 
-            .command-status-card.warning::before {{
-                background: var(--hq-warning);
+            .command-status-card.warning {{
+                --command-status-tone: var(--hq-warning);
             }}
 
-            .command-status-card.danger::before {{
-                background: var(--hq-danger);
+            .command-status-card.danger {{
+                --command-status-tone: var(--hq-danger);
             }}
 
-            .command-status-card.info::before {{
-                background: var(--hq-info);
+            .command-status-card.info {{
+                --command-status-tone: var(--hq-info);
             }}
 
-            .command-status-card.success::before {{
-                background: var(--hq-success);
+            .command-status-card.success {{
+                --command-status-tone: var(--hq-success);
             }}
 
             .command-status-label {{
                 color: var(--hq-text-secondary);
                 font-size: 0.82rem;
                 line-height: 1.15;
-                padding-left: 0.72rem;
             }}
 
             .command-status-value {{
@@ -223,7 +204,7 @@ def render_status_kpis(command_center: dict) -> None:
 
             }}
         </style>
-        <div class="command-status-row">
+        <div class="command-status-row{' compact' if compact else ''}">
             {cards}
         </div>
         """,
@@ -251,38 +232,43 @@ else:
     if status_message:
         st.success(status_message)
 
-    render_status_kpis(command_center)
-    render_mission_brief(command_center)
-
-    render_section_title("Today's work", "Complete, skip, fail, or reset planned work without leaving this page.")
-    render_work_items(
-        command_center["today_work_items"],
-        "No work planned for today",
-        "Schedule tasks in Quest Planner to build today's focus.",
-        "command_today",
-    )
-
-    render_section_title("Needs review", "Resolve overdue planned work before it disappears from your daily flow.")
-    render_work_items(
-        command_center["attention_items"],
-        "No overdue planned work",
-        "Your previous planned work has been resolved.",
-        "command_attention",
-    )
-
-    render_section_title("Review another day")
-    review_date = st.date_input(
-        "Review date",
-        value=date.today(),
-        max_value=date.today(),
-        key="command_review_date",
-    )
-    if review_date != date.today():
+    work_col, summary_col = st.columns([0.68, 0.32], gap="large")
+    with work_col:
+        render_section_title("Today's work", "Complete, skip, fail, or reset planned work without leaving this page.")
         render_work_items(
-            get_command_center_items_for_date(review_date),
-            "No work recorded for this day",
-            "Choose another date or create future work in Planner.",
-            f"command_review_{review_date.isoformat()}",
+            command_center["today_work_items"],
+            "No work planned for today",
+            "Schedule tasks in Quest Planner to build today's focus.",
+            "command_today",
         )
+
+        render_section_title("Needs review", "Resolve overdue planned work before it disappears from your daily flow.")
+        render_work_items(
+            command_center["attention_items"],
+            "No overdue planned work",
+            "Your previous planned work has been resolved.",
+            "command_attention",
+        )
+
+    with summary_col:
+        render_mission_brief(command_center)
+        render_status_kpis(command_center, compact=True)
+        render_section_title("Review another day")
+        review_date = st.date_input(
+            "Review date",
+            value=date.today(),
+            max_value=date.today(),
+            key="command_review_date",
+        )
+
+    if review_date != date.today():
+        with work_col:
+            render_section_title("Selected day", review_date.strftime("%a, %b %d"))
+            render_work_items(
+                get_command_center_items_for_date(review_date),
+                "No work recorded for this day",
+                "Choose another date or create future work in Planner.",
+                f"command_review_{review_date.isoformat()}",
+            )
 
 st.caption("Data source: local SQLite quest check-in records.")

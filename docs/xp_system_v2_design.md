@@ -56,8 +56,6 @@ Meaning:
 - 20 XP per planned hour.
 - Minimum 5 XP for short tasks.
 - Use `estimated_minutes` or planned schedule duration.
-- `actual_minutes` may be recorded separately for reflection, but XP continues
-  to use planned minutes.
 - Do not retroactively recalculate historical XP unless a separate migration is
   explicitly designed later.
 
@@ -279,7 +277,6 @@ Covered by focused tests for:
 
 ## Non-Goals For XP System v2
 
-- No `actual_minutes` field.
 - No retroactive historical XP recalculation by default.
 - No project/goal aggregate model.
 - No achievements overhaul.

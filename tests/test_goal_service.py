@@ -387,8 +387,8 @@ def test_goal_completion_forecast_uses_completed_planned_effort_and_target_date(
     )
     first = _create_goal_session(session, goal, minutes=100, planned_date=date(2026, 7, 1))
     second = _create_goal_session(session, goal, minutes=100, planned_date=date(2026, 7, 3))
-    complete_checkin(first.id, date(2026, 7, 1), actual_minutes=120, session=session)
-    complete_checkin(second.id, date(2026, 7, 3), actual_minutes=80, session=session)
+    complete_checkin(first.id, date(2026, 7, 1), session=session)
+    complete_checkin(second.id, date(2026, 7, 3), session=session)
 
     forecast = get_goal_completion_forecast(goal.id, today=date(2026, 7, 5), session=session)
 

@@ -117,14 +117,10 @@ def update_checkin_status(
     quest_id: int,
     checkin_date: date,
     status: str,
-    actual_minutes: int | None = None,
     session=None,
 ) -> QuestCheckin:
     """Update a daily check-in status and apply timestamp/XP rules."""
     normalized_status = _normalize_checkin_status(status)
-    normalized_actual_minutes = _normalize_actual_minutes(actual_minutes)
-    if normalized_actual_minutes is not None and normalized_status != "Completed":
-        raise ValueError("Actual minutes can only be recorded for completed check-ins.")
 
     owns_session = session is None
     session = session or get_session()
@@ -140,7 +136,7 @@ def update_checkin_status(
             )
             session.add(checkin)
 
-        _apply_status(checkin, quest, normalized_status, normalized_actual_minutes)
+        _apply_status(checkin, quest, normalized_status)
         session.commit()
         session.refresh(checkin)
         return checkin
@@ -187,7 +183,6 @@ def update_checklist_cell_status(
 def complete_checkin(
     quest_id: int,
     checkin_date: date,
-    actual_minutes: int | None = None,
     session=None,
 ) -> QuestCheckin:
     """Mark a daily quest check-in as completed."""
@@ -195,7 +190,6 @@ def complete_checkin(
         quest_id,
         checkin_date,
         "Completed",
-        actual_minutes=actual_minutes,
         session=session,
     )
 
@@ -572,23 +566,10 @@ def _normalize_checkin_status(status: str) -> str:
     return lookup[value]
 
 
-def _normalize_actual_minutes(actual_minutes: int | None) -> int | None:
-    if actual_minutes is None:
-        return None
-    try:
-        value = int(actual_minutes)
-    except (TypeError, ValueError) as error:
-        raise ValueError("Actual minutes must be a positive integer.") from error
-    if value <= 0:
-        raise ValueError("Actual minutes must be greater than 0.")
-    return value
-
-
 def _apply_status(
     checkin: QuestCheckin,
     quest: Quest,
     status: str,
-    actual_minutes: int | None = None,
 ) -> None:
     now = utc_now()
     checkin.status = status
@@ -598,7 +579,6 @@ def _apply_status(
         checkin.skipped_at = None
         checkin.failed_at = None
         checkin.xp_awarded = 0
-        checkin.actual_minutes = None
         return
 
     if status == "Completed":
@@ -606,8 +586,6 @@ def _apply_status(
             checkin.completed_at = now
         checkin.skipped_at = None
         checkin.failed_at = None
-        if actual_minutes is not None:
-            checkin.actual_minutes = actual_minutes
         if checkin.xp_awarded == 0:
             checkin.xp_awarded = quest.xp_reward or 0
         return
@@ -617,7 +595,6 @@ def _apply_status(
         checkin.skipped_at = now
         checkin.failed_at = None
         checkin.xp_awarded = 0
-        checkin.actual_minutes = None
         return
 
     if status == "Failed":
@@ -625,4 +602,3 @@ def _apply_status(
         checkin.skipped_at = None
         checkin.failed_at = now
         checkin.xp_awarded = 0
-        checkin.actual_minutes = None

@@ -38,7 +38,7 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-hero-avatar-icon {
-            color: var(--hq-accent);
+            color: var(--hq-accent-text);
             font-size: 1.8rem;
             line-height: 1;
             margin-bottom: 0.32rem;
@@ -62,7 +62,7 @@ def apply_character_profile_styles() -> None:
         }
 
         .hq-character-title {
-            color: var(--hq-accent);
+            color: var(--hq-accent-text);
             font-size: 0.92rem;
             font-weight: 750;
             line-height: 1.25;
@@ -75,7 +75,7 @@ def apply_character_profile_styles() -> None:
             border: 1px solid var(--hq-accent-border);
             border-radius: 6px;
             box-shadow: none;
-            color: var(--hq-accent);
+            color: var(--hq-accent-text);
             display: inline-flex;
             font-size: 0.78rem;
             font-weight: 850;
