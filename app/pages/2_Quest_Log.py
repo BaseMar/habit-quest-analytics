@@ -179,6 +179,22 @@ def render_calendar(
             gap: 0.75rem;
             margin-bottom: 0.85rem;
         }
+        @media (max-width: 520px) {
+            .fc .fc-toolbar {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+            .fc .fc-header-toolbar .fc-toolbar-chunk:empty {
+                display: none;
+            }
+            .fc .fc-col-header-cell-cushion {
+                padding-inline: 2px;
+            }
+            .fc .fc-daygrid-more-link,
+            .fc .fc-daygrid-event {
+                font-size: 0.72rem;
+            }
+        }
         .fc .fc-button-primary {
             background: var(--hq-surface);
             border-color: var(--hq-border);
@@ -251,6 +267,17 @@ def render_calendar(
         }
         .fc .fc-daygrid-event {
             padding: 0.14rem 0.3rem;
+        }
+        @media (max-width: 520px) {
+            .fc .fc-daygrid-event .fc-event-main {
+                min-width: 0;
+                padding-inline: 0.05rem;
+            }
+            .fc .fc-daygrid-event .fc-event-title {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
         }
         .fc .fc-daygrid-day-frame {
             min-height: 88px;
@@ -386,18 +413,16 @@ def render_add_item_tab(category_options: dict[str, int]) -> None:
     status_message = st.session_state.pop("plan_status_message", None)
     if status_message:
         st.success(status_message)
-    _, form_col, _ = st.columns([0.2, 0.6, 0.2])
-    with form_col:
-        with st.container(border=True):
-            active_goals = list_active_goals()
-            form_result = render_plan_form(
-                category_options=category_options,
-                active_goals=active_goals,
-                selected_date=st.session_state["selected_date"],
-                goal_title_by_id={goal.id: goal.title for goal in active_goals},
-            )
-            if form_result is not None:
-                _save_plan_result(form_result)
+    with st.container(border=True, key="hq_plan_form"):
+        active_goals = list_active_goals()
+        form_result = render_plan_form(
+            category_options=category_options,
+            active_goals=active_goals,
+            selected_date=st.session_state["selected_date"],
+            goal_title_by_id={goal.id: goal.title for goal in active_goals},
+        )
+        if form_result is not None:
+            _save_plan_result(form_result)
 
 
 def _display_status(quest) -> str:
@@ -624,7 +649,7 @@ def render_month_overview_tab(category_options: dict[str, int]) -> None:
         st.success(status_message)
     selected_year, selected_month = render_month_review_controls(st.session_state["selected_date"])
     selected_month_date = date(selected_year, selected_month, 1)
-    calendar_col, day_col = st.columns([0.68, 0.32], gap="large")
+    calendar_col, day_col = st.container(key="hq_calendar").columns([0.68, 0.32], gap="large")
     with calendar_col:
         render_calendar(get_quests_for_calendar(), selected_month_date, fixed_view_label="Month")
     with day_col:

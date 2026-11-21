@@ -4,7 +4,6 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -33,6 +32,7 @@ def apply_character_profile_styles() -> None:
             justify-content: center;
             line-height: 1.3;
             min-height: 104px;
+            max-width: 116px;
             padding: 0.65rem;
             text-align: center;
         }
@@ -59,6 +59,7 @@ def apply_character_profile_styles() -> None:
             font-weight: 850;
             line-height: 1.12;
             margin: 0 0 0.12rem;
+            overflow-wrap: anywhere;
         }
 
         .hq-character-title {
@@ -130,10 +131,8 @@ def apply_character_profile_styles() -> None:
             font-weight: 760;
             letter-spacing: 0.05em;
             line-height: 1.18;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            overflow-wrap: anywhere;
             text-transform: uppercase;
-            white-space: nowrap;
         }
 
         .hq-xp-value {
@@ -192,18 +191,91 @@ def apply_character_profile_styles() -> None:
             margin-top: 0.38rem;
         }
 
-        div[data-testid="stFileUploader"] button {
-            display: none;
-        }
-
         div[data-testid="stFileUploader"] section {
             min-height: 74px;
             padding: 0.55rem;
         }
 
-        @media (max-width: 820px) {
-            .hq-xp-row {
-                grid-template-columns: 1fr;
+        .hq-stat-panel {
+            display: grid;
+            gap: 0.4rem;
+        }
+
+        .hq-stat-panel .stat-row {
+            align-items: center;
+            background: var(--hq-muted-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: 7px;
+            display: grid;
+            gap: 0.5rem;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto;
+            padding: 0.5rem;
+            overflow-wrap: anywhere;
+        }
+
+        .hq-stat-panel .stat-name,
+        .hq-stat-panel .stat-level {
+            font-size: 0.86rem;
+            font-weight: 800;
+        }
+
+        .hq-stat-panel .stat-level {
+            color: var(--hq-accent-text);
+            text-align: right;
+        }
+
+        .hq-stat-panel .stat-category,
+        .hq-stat-panel .stat-help {
+            color: var(--hq-text-secondary);
+            font-size: 0.72rem;
+            line-height: 1.3;
+        }
+
+        .hq-stat-panel .stat-track {
+            background: var(--hq-surface);
+            border: 1px solid var(--hq-border);
+            border-radius: 999px;
+            height: 0.6rem;
+            margin-bottom: 0.18rem;
+            overflow: hidden;
+        }
+
+        .hq-stat-panel .stat-fill {
+            background: var(--hq-accent);
+            border-radius: inherit;
+            height: 100%;
+        }
+
+        @container hq-main (min-width: 100rem) {
+            .st-key-hq_character_hero,
+            .st-key-hq_character_stats {
+                max-width: 100rem;
+            }
+
+            .st-key-hq_character_hero [data-testid="stHorizontalBlock"] {
+                display: grid;
+                grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 32rem);
+            }
+
+            .st-key-hq_character_hero [data-testid="stColumn"] {
+                min-width: 0;
+                width: 100%;
+            }
+        }
+
+        @container hq-main (max-width: 44rem) {
+            .st-key-hq_character_hero [data-testid="stHorizontalBlock"] {
+                display: grid;
+                grid-template-columns: 7.25rem minmax(0, 1fr);
+            }
+
+            .st-key-hq_character_hero [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .st-key-hq_character_hero [data-testid="stHorizontalBlock"] > :last-child {
+                grid-column: 1 / -1;
             }
         }
         </style>
@@ -231,7 +303,7 @@ def render_avatar(profile: dict) -> None:
 def render_avatar_controls(profile: dict) -> None:
     with st.popover("Change avatar", use_container_width=True):
         uploaded_avatar = st.file_uploader(
-            "Drag and drop an avatar image",
+            "Avatar image",
             type=["png", "jpg", "jpeg"],
             accept_multiple_files=False,
         )
@@ -251,7 +323,7 @@ def render_avatar_controls(profile: dict) -> None:
 def render_character_hero(profile: dict) -> None:
     progress_percent = int(profile["level_progress"] * 100)
 
-    with st.container():
+    with st.container(key="hq_character_hero"):
         avatar_col, identity_col, xp_col = st.columns([0.16, 0.51, 0.33], gap="medium")
         with avatar_col:
             render_avatar(profile)
@@ -306,163 +378,22 @@ def render_character_hero(profile: dict) -> None:
 
 
 def render_rpg_stats_section(profile: dict) -> None:
-    tokens = get_theme_tokens()
     render_section_title("RPG Stats", "Stat levels from completed quest-day XP by category.")
-    rows = "".join(_render_stat_row(row) for row in profile["stat_profile"])
-    radar_html = _build_radar_figure(profile, height=260).to_html(
-        full_html=False,
-        include_plotlyjs=True,
-        config={"displayModeBar": False, "responsive": True},
-    )
-    components.html(
-        f"""
-        <style>
-            body {{
-                background: transparent;
-                margin: 0;
-                overflow: hidden;
-            }}
+    stats_col, radar_col = st.container(key="hq_character_stats").columns([1.45, 1], gap="medium")
 
-            .rpg-stats-grid {{
-                box-sizing: border-box;
-                display: grid;
-                gap: 14px;
-                grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.95fr);
-                height: 334px;
-                width: 100%;
-            }}
+    with stats_col:
+        rows = "".join(_render_stat_row(row) for row in profile["stat_profile"])
+        st.html(f'<div class="hq-stat-panel">{rows}</div>')
 
-            .rpg-card {{
-                background: {tokens["surface"]};
-                border: 1px solid {tokens["border"]};
-                border-radius: 8px;
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                height: 100%;
-                padding: 12px;
-                width: 100%;
-            }}
-
-            .rpg-card-title {{
-                color: {tokens["text_primary"]};
-                font: 800 15px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin: 0 0 8px;
-            }}
-
-            .stat-panel {{
-                box-sizing: border-box;
-                display: flex;
-                flex: 1;
-                flex-direction: column;
-                justify-content: space-between;
-                min-height: 0;
-                width: 100%;
-            }}
-
-            .stat-row {{
-                align-items: center;
-                background: {tokens["muted_surface"]};
-                border: 1px solid {tokens["border"]};
-                border-radius: 7px;
-                box-sizing: border-box;
-                display: grid;
-                gap: 8px;
-                grid-template-columns: minmax(96px, 0.86fr) minmax(150px, 1.55fr) 50px;
-                min-height: 43px;
-                padding: 6px 8px;
-                width: 100%;
-            }}
-
-            .stat-name {{
-                color: {tokens["text_primary"]};
-                font: 800 13px/1.12 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                overflow-wrap: anywhere;
-            }}
-
-            .stat-category {{
-                color: {tokens["text_secondary"]};
-                font: 650 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 1px;
-            }}
-
-            .stat-track {{
-                background: {tokens["muted_surface"]};
-                border: 1px solid {tokens["border"]};
-                border-radius: 999px;
-                box-shadow: none;
-                height: 10px;
-                overflow: hidden;
-                width: 100%;
-            }}
-
-            .stat-fill {{
-                background: {tokens["accent"]};
-                border-radius: inherit;
-                box-shadow: none;
-                height: 100%;
-                min-width: 3px;
-            }}
-
-            .stat-fill.empty {{
-                min-width: 0;
-            }}
-
-            .stat-help {{
-                color: {tokens["text_secondary"]};
-                font: 600 10.5px/1.15 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 3px;
-                white-space: nowrap;
-            }}
-
-            .stat-level {{
-                color: {tokens["accent"]};
-                font: 850 13px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                text-align: right;
-                white-space: nowrap;
-            }}
-
-            .radar-card {{
-                align-items: stretch;
-            }}
-
-            .radar-wrap {{
-                align-items: center;
-                display: flex;
-                flex: 1;
-                justify-content: center;
-                min-height: 0;
-                width: 100%;
-            }}
-
-            .radar-caption {{
-                color: {tokens["text_secondary"]};
-                font: 650 11px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                margin-top: 2px;
-                text-align: center;
-            }}
-
-            @media (max-width: 900px) {{
-                .rpg-stats-grid {{
-                    grid-template-columns: 1fr;
-                    height: 672px;
-                }}
-            }}
-        </style>
-        <div class="rpg-stats-grid">
-            <section class="rpg-card">
-                <div class="rpg-card-title">RPG Stat Progress</div>
-                <div class="stat-panel">{rows}</div>
-            </section>
-            <section class="rpg-card radar-card">
-                <div class="rpg-card-title">Stat Level Radar</div>
-                <div class="radar-wrap">{radar_html}</div>
-                <div class="radar-caption">Current stat levels, not raw XP.</div>
-            </section>
-        </div>
-        """,
-        height=348,
-    )
+    with radar_col:
+        st.subheader("Stat Level Radar")
+        st.plotly_chart(
+            _build_radar_figure(profile, height=260),
+            width="stretch",
+            theme=None,
+            config={"displayModeBar": False},
+        )
+        st.caption("Current stat levels, not raw XP.")
 
 
 def _build_radar_figure(profile: dict, height: int) -> go.Figure:
@@ -515,7 +446,6 @@ def _build_radar_figure(profile: dict, height: int) -> go.Figure:
 
 def _render_stat_row(row: dict) -> str:
     progress_percent = max(0, min(100, float(row["progress_percent"])))
-    fill_class = "stat-fill empty" if progress_percent <= 0 else "stat-fill"
     return f"""
     <div class="stat-row">
         <div>
@@ -524,7 +454,7 @@ def _render_stat_row(row: dict) -> str:
         </div>
         <div>
             <div class="stat-track">
-                <div class="{fill_class}" style="width: {progress_percent:.2f}%"></div>
+                <div class="stat-fill" style="width: {progress_percent:.2f}%"></div>
             </div>
             <div class="stat-help">
                 {int(row["xp_into_current_level"])} / {int(row["xp_needed_for_next_level"])} XP to next level

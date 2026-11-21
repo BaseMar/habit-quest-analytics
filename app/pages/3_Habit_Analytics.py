@@ -33,7 +33,9 @@ WORK_TYPE_OPTIONS = {
 
 
 def render_analytics_filters(categories: list, today: date) -> dict:
-    period_col, category_col, type_col = st.columns([0.46, 0.27, 0.27], vertical_alignment="bottom")
+    period_col, category_col, type_col = st.container(key="hq_analytics_filters").columns(
+        [0.46, 0.27, 0.27], vertical_alignment="bottom"
+    )
     with period_col:
         if hasattr(st, "segmented_control"):
             period = st.segmented_control(
@@ -321,7 +323,7 @@ def render_activity_overview(analytics: dict) -> None:
     st.markdown('<div class="hq-content-gap"></div>', unsafe_allow_html=True)
     render_review_focus(analytics["review_focus"])
 
-    workload_col, consistency_col = st.columns(2)
+    workload_col, consistency_col = st.container(key="hq_analytics_charts").columns(2)
     with workload_col:
         render_section_title("Workload execution", "Scheduled workload compared with completed planned time each week.")
         render_planned_vs_completed_by_week(analytics["planned_vs_completed_by_week"])
@@ -329,12 +331,15 @@ def render_activity_overview(analytics: dict) -> None:
         render_section_title("Weekly consistency", "Completion rate for resolved check-ins, grouped by weekday.")
         render_weekday_chart(analytics["completion_rate_by_weekday"])
 
-    render_section_title("Category performance", "Planned and completed planned time, outcomes, and XP by category.")
-    render_category_performance(analytics["category_performance"])
+    with st.container(key="hq_analytics_breakdown"):
+        with st.container():
+            render_section_title("Category performance", "Planned and completed planned time, outcomes, and XP by category.")
+            render_category_performance(analytics["category_performance"])
 
-    if not analytics["routine_performance"].empty:
-        render_section_title("Routine performance", "Completion, misses, and recent routine history in the selected period.")
-        render_routine_performance(analytics["routine_performance"])
+        if not analytics["routine_performance"].empty:
+            with st.container():
+                render_section_title("Routine performance", "Completion, misses, and recent routine history in the selected period.")
+                render_routine_performance(analytics["routine_performance"])
 
 
 apply_theme()

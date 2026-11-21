@@ -232,7 +232,7 @@ else:
     if status_message:
         st.success(status_message)
 
-    work_col, summary_col = st.columns([0.68, 0.32], gap="large")
+    work_col, summary_col = st.container(key="hq_command").columns([0.68, 0.32], gap="large")
     with work_col:
         render_section_title("Today's work", "Complete, skip, fail, or reset planned work without leaving this page.")
         render_work_items(

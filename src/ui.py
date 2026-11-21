@@ -231,20 +231,64 @@ def apply_global_styles() -> None:
         }}
 
         .stApp > header,
-        .stApp [data-testid="stAppViewContainer"],
-        .stApp section[data-testid="stSidebar"] {{
+        .stApp [data-testid="stAppViewContainer"] {{
             position: relative;
             z-index: 1;
         }}
 
         .block-container {{
-            max-width: 1360px;
+            container: hq-main / inline-size;
+            max-width: clamp(1360px, 75vw - 80px, 2720px);
             padding: 1.5rem 2rem 3rem;
+        }}
+
+        .st-key-hq_plan_form {{
+            margin-inline: auto;
+            max-width: 46rem;
+        }}
+
+        @container hq-main (min-width: 100rem) {{
+            .st-key-hq_analytics_breakdown {{
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }}
+
+            .st-key-hq_analytics_breakdown > :only-child {{
+                grid-column: 1 / -1;
+                max-width: 84rem;
+            }}
+        }}
+
+        @container hq-main (max-width: 54rem) {{
+            :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_analytics_charts,
+                .st-key-hq_character_stats) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {{
+                flex-direction: column;
+            }}
+
+            :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_analytics_charts,
+                .st-key-hq_character_stats) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+                flex: none;
+                width: 100%;
+            }}
+
+            .st-key-hq_analytics_filters [data-testid="stHorizontalBlock"] {{
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }}
+
+            .st-key-hq_analytics_filters [data-testid="stHorizontalBlock"] > :first-child {{
+                grid-column: 1 / -1;
+            }}
+
+            .st-key-hq_analytics_filters [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+                min-width: 0;
+                width: 100%;
+            }}
         }}
 
         @media (max-width: 768px) {{
             .block-container {{
-                padding-top: 1.1rem;
+                padding-top: 1.5rem;
                 padding-left: 1rem;
                 padding-right: 1rem;
             }}
@@ -498,6 +542,7 @@ def apply_global_styles() -> None:
             margin: 0.35rem 0 1rem;
             max-height: 430px;
             overflow: auto;
+            overscroll-behavior-inline: contain;
             width: 100%;
         }}
 
@@ -539,6 +584,8 @@ def apply_global_styles() -> None:
 
         .hq-data-table .hq-table-sticky {{
             left: 0;
+            max-width: 10rem;
+            overflow-wrap: anywhere;
             position: sticky;
             z-index: 3;
         }}
@@ -1216,6 +1263,7 @@ def apply_global_styles() -> None:
         }}
 
         .hq-metric-card {{
+            overflow-wrap: anywhere;
             padding: 1rem;
         }}
 
@@ -1526,6 +1574,7 @@ def apply_global_styles() -> None:
             font-size: 0.94rem;
             font-weight: 720;
             line-height: 1.25;
+            overflow-wrap: anywhere;
         }}
 
         .hq-list-meta {{
@@ -1579,6 +1628,14 @@ def apply_global_styles() -> None:
                 min-height: 40px;
                 padding-left: 0.72rem;
                 padding-right: 0.72rem;
+            }}
+
+            .stTabs [data-baseweb="tab-list"] {{
+                overflow-x: auto;
+            }}
+
+            [data-testid="stSegmentedControl"] [role="group"] {{
+                flex-wrap: wrap;
             }}
         }}
         </style>

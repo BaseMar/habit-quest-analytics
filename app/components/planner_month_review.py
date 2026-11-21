@@ -87,7 +87,7 @@ def _render_checklist_table(checklist: dict) -> None:
     row_html = "\n".join(_render_checklist_table_row(row, checklist["days"]) for row in checklist["rows"])
     st.markdown(
         f"""
-        <div class="hq-table-scroll">
+        <div class="hq-table-scroll" role="region" aria-label="Monthly checklist" tabindex="0">
             <table class="hq-data-table">
                 <thead><tr>{header_html}</tr></thead>
                 <tbody>{row_html}</tbody>
