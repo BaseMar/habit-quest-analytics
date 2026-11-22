@@ -35,61 +35,28 @@ from src.services.recurring_habit_service import (
 from src.ui import get_theme_tokens, render_empty_state, render_page_header, render_section_title
 
 
-CALENDAR_VIEW_OPTIONS = {
-    "Month": {"view": "dayGridMonth", "height": 650, "content_height": 590},
-    "Week": {"view": "timeGridWeek", "height": 760, "content_height": 700},
-    "Day": {"view": "timeGridDay", "height": 720, "content_height": 660},
-    "List": {"view": "listWeek", "height": 420, "content_height": 360},
-}
-
-
-def render_calendar(
-    calendar_events: list[dict],
-    selected_date: date,
-    fixed_view_label: str | None = None,
-) -> None:
+def render_calendar(calendar_events: list[dict], selected_date: date) -> None:
     if calendar is None:
         st.info("Calendar component unavailable.")
         return
 
     tokens = get_theme_tokens()
-    if fixed_view_label is None:
-        if "quest_calendar_view" not in st.session_state:
-            st.session_state["quest_calendar_view"] = "Week"
-
-        if hasattr(st, "segmented_control"):
-            selected_view_label = st.segmented_control(
-                "Calendar view",
-                list(CALENDAR_VIEW_OPTIONS.keys()),
-                key="quest_calendar_view",
-                label_visibility="collapsed",
-            )
-        else:
-            selected_view_label = st.radio(
-                "Calendar view",
-                list(CALENDAR_VIEW_OPTIONS.keys()),
-                horizontal=True,
-                key="quest_calendar_view",
-                label_visibility="collapsed",
-            )
-        selected_view_label = selected_view_label or "Week"
-    else:
-        selected_view_label = fixed_view_label
-    view_config = CALENDAR_VIEW_OPTIONS[selected_view_label]
+    calendar_height = 650
+    calendar_content_height = 590
     calendar_options = {
-        "initialView": view_config["view"],
+        "initialView": "dayGridMonth",
         "initialDate": selected_date.isoformat(),
         "firstDay": 1,
         "selectable": True,
         "editable": False,
         "eventResizableFromStart": False,
-        "height": view_config["height"],
-        "contentHeight": view_config["content_height"],
+        "height": calendar_height,
+        "contentHeight": calendar_content_height,
         "expandRows": False,
         "handleWindowResize": True,
         "stickyHeaderDates": True,
         "headerToolbar": {
-            "left": "" if fixed_view_label is not None else "prev,next today",
+            "left": "",
             "center": "title",
             "right": "",
         },
@@ -295,8 +262,8 @@ def render_calendar(
         }
     """
     custom_css = (
-        custom_css.replace("var(--hq-calendar-height)", f"{view_config['height']}px")
-        .replace("var(--hq-calendar-content-height)", f"{view_config['content_height']}px")
+        custom_css.replace("var(--hq-calendar-height)", f"{calendar_height}px")
+        .replace("var(--hq-calendar-content-height)", f"{calendar_content_height}px")
         .replace("var(--hq-muted-surface)", tokens["muted_surface"])
         .replace("var(--hq-accent-soft)", tokens["accent_soft"])
         .replace("var(--hq-border)", tokens["border"])
@@ -311,13 +278,15 @@ def render_calendar(
     )
 
     try:
+        calendar_revision = st.session_state.get("planner_calendar_revision", 0)
         calendar_state = calendar(
             events=calendar_events,
             options=calendar_options,
             custom_css=custom_css,
+            callbacks=["dateClick", "select", "eventClick"],
             key=(
                 f"quest_calendar_{tokens['mode']}_"
-                f"{selected_view_label}_{selected_date.isoformat()}_"
+                f"{selected_date.isoformat()}_{calendar_revision}_"
                 f"{_calendar_events_signature(calendar_events)}"
             ),
         )
@@ -329,7 +298,6 @@ def render_calendar(
     if clicked_date and clicked_date != st.session_state["selected_date"]:
         st.session_state["selected_date"] = clicked_date
         st.session_state["planner_manage_date"] = clicked_date
-        st.rerun()
 
 
 def _calendar_events_signature(calendar_events: list[dict]) -> str:
@@ -410,20 +378,17 @@ def _save_plan_result(draft) -> None:
         st.rerun()
 
 
-def render_add_item_tab(category_options: dict[str, int]) -> None:
-    status_message = st.session_state.pop("plan_status_message", None)
-    if status_message:
-        st.success(status_message)
-    with st.container(border=True, key="hq_plan_form"):
-        active_goals = list_active_goals()
-        form_result = render_plan_form(
-            category_options=category_options,
-            active_goals=active_goals,
-            selected_date=st.session_state["selected_date"],
-            goal_title_by_id={goal.id: goal.title for goal in active_goals},
-        )
-        if form_result is not None:
-            _save_plan_result(form_result)
+@st.dialog("Add item", width="medium", on_dismiss="rerun")
+def _add_item_dialog(category_options: dict[str, int]) -> None:
+    active_goals = list_active_goals()
+    form_result = render_plan_form(
+        category_options=category_options,
+        active_goals=active_goals,
+        selected_date=st.session_state["selected_date"],
+        goal_title_by_id={goal.id: goal.title for goal in active_goals},
+    )
+    if form_result is not None:
+        _save_plan_result(form_result)
 
 
 def _display_status(quest) -> str:
@@ -440,7 +405,7 @@ def _category_name(quest) -> str:
     return quest.category.name if quest.category else "Uncategorized"
 
 
-def _render_planned_item_list(quests: list) -> None:
+def _render_planned_item_list(quests: list, category_options: dict[str, int]) -> None:
     if not quests:
         render_empty_state("No items for this day.", "Choose another date or add a new item.")
         return
@@ -460,89 +425,67 @@ def _render_planned_item_list(quests: list) -> None:
                     continue
                 if is_recurring:
                     st.caption("Edit the routine in Projects & Routines")
-                elif st.button("Edit", key=f"edit_planned_quest_{quest.id}", use_container_width=True):
-                    st.session_state.pop("deleting_planned_quest_id", None)
-                    st.session_state["editing_planned_quest_id"] = quest.id
-                    st.rerun()
-                if st.button("Remove", key=f"remove_planned_quest_{quest.id}", use_container_width=True):
-                    st.session_state.pop("editing_planned_quest_id", None)
-                    st.session_state["deleting_planned_quest_id"] = quest.id
-                    st.rerun()
+                elif st.button("Edit", key=f"edit_planned_quest_{quest.id}", width="stretch"):
+                    _edit_planned_item_dialog(quest, category_options)
+                if st.button("Remove", key=f"remove_planned_quest_{quest.id}", width="stretch"):
+                    _remove_planned_item_dialog(quest)
 
 
-def _render_planned_item_editor(quests: list, category_options: dict[str, int]) -> None:
-    quest_id = st.session_state.get("editing_planned_quest_id")
-    if quest_id is None:
-        return
+@st.dialog("Edit planned item", width="medium", on_dismiss="rerun")
+def _edit_planned_item_dialog(quest, category_options: dict[str, int]) -> None:
+    key_prefix = f"edit_planned_quest_{quest.id}"
+    is_goal_session = quest.goal_id is not None
+    if is_goal_session:
+        st.text_input("Title", value=quest.title, disabled=True, key=f"{key_prefix}_title")
+        title = quest.title
+    else:
+        title = st.text_input("Title", value=quest.title, key=f"{key_prefix}_title")
 
-    quest = next((item for item in quests if item.id == quest_id), None)
-    if quest is None:
-        st.session_state.pop("editing_planned_quest_id", None)
-        return
-    if _display_status(quest) != "Planned":
-        st.warning("Only unresolved planned items can be edited.")
-        return
-    if quest.recurring_habit_instance is not None:
-        st.info("Edit the routine template in Projects & Routines. Existing routine days are preserved.")
-        return
+    category_names = list(category_options)
+    current_category_name = next(
+        (name for name, category_id in category_options.items() if category_id == quest.category_id),
+        category_names[0],
+    )
+    category_name = st.selectbox(
+        "Category",
+        category_names,
+        index=category_names.index(current_category_name),
+        disabled=is_goal_session,
+        key=f"{key_prefix}_category",
+    )
+    planned_date = st.date_input(
+        "Date",
+        value=quest.due_date or st.session_state["planner_manage_date"],
+        key=f"{key_prefix}_date",
+    )
+    default_start_time = (quest.planned_start_at or datetime.combine(planned_date, time(9, 0))).time()
+    default_end_time = (quest.planned_end_at or datetime.combine(planned_date, time(10, 0))).time()
+    start_col, end_col = st.columns(2)
+    with start_col:
+        start_time = st.time_input("Start time", value=default_start_time, step=300, key=f"{key_prefix}_start")
+    with end_col:
+        end_time = st.time_input("End time", value=default_end_time, step=300, key=f"{key_prefix}_end")
 
-    st.divider()
-    render_section_title("Edit planned item", "Changes remain available only while the item is still planned.")
-    with st.container(border=True):
-        key_prefix = f"edit_planned_quest_{quest.id}"
-        is_goal_session = quest.goal_id is not None
-        if is_goal_session:
-            st.text_input("Title", value=quest.title, disabled=True, key=f"{key_prefix}_title")
-            title = quest.title
-        else:
-            title = st.text_input("Title", value=quest.title, key=f"{key_prefix}_title")
-
-        category_names = list(category_options)
-        current_category_name = next(
-            (name for name, category_id in category_options.items() if category_id == quest.category_id),
-            category_names[0],
+    estimated_minutes = int(
+        (datetime.combine(planned_date, end_time) - datetime.combine(planned_date, start_time)).total_seconds() // 60
+    )
+    has_valid_time_range = estimated_minutes > 0
+    if not has_valid_time_range:
+        st.error("End time must be after start time.")
+    notes = st.text_area("Notes (optional)", value=quest.description or "", height=72, key=f"{key_prefix}_notes")
+    save_col, cancel_col = st.columns(2)
+    with save_col:
+        save_clicked = st.button(
+            "Save changes",
+            type="primary",
+            use_container_width=True,
+            disabled=not has_valid_time_range,
+            key=f"{key_prefix}_save",
         )
-        category_name = st.selectbox(
-            "Category",
-            category_names,
-            index=category_names.index(current_category_name),
-            disabled=is_goal_session,
-            key=f"{key_prefix}_category",
-        )
-        planned_date = st.date_input(
-            "Date",
-            value=quest.due_date or st.session_state["planner_manage_date"],
-            key=f"{key_prefix}_date",
-        )
-        default_start_time = (quest.planned_start_at or datetime.combine(planned_date, time(9, 0))).time()
-        default_end_time = (quest.planned_end_at or datetime.combine(planned_date, time(10, 0))).time()
-        start_col, end_col = st.columns(2)
-        with start_col:
-            start_time = st.time_input("Start time", value=default_start_time, step=300, key=f"{key_prefix}_start")
-        with end_col:
-            end_time = st.time_input("End time", value=default_end_time, step=300, key=f"{key_prefix}_end")
-
-        estimated_minutes = int(
-            (datetime.combine(planned_date, end_time) - datetime.combine(planned_date, start_time)).total_seconds() // 60
-        )
-        has_valid_time_range = estimated_minutes > 0
-        if not has_valid_time_range:
-            st.error("End time must be after start time.")
-        notes = st.text_area("Notes (optional)", value=quest.description or "", height=72, key=f"{key_prefix}_notes")
-        save_col, cancel_col = st.columns(2)
-        with save_col:
-            save_clicked = st.button(
-                "Save changes",
-                type="primary",
-                use_container_width=True,
-                disabled=not has_valid_time_range,
-                key=f"{key_prefix}_save",
-            )
-        with cancel_col:
-            cancel_clicked = st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel")
+    with cancel_col:
+        cancel_clicked = st.button("Cancel", use_container_width=True, key=f"{key_prefix}_cancel")
 
     if cancel_clicked:
-        st.session_state.pop("editing_planned_quest_id", None)
         st.rerun()
     if not save_clicked:
         return
@@ -565,49 +508,33 @@ def _render_planned_item_editor(quests: list, category_options: dict[str, int]) 
         st.error(str(error))
         return
 
-    st.session_state.pop("editing_planned_quest_id", None)
     st.session_state["pending_planner_manage_date"] = planned_date
-    st.session_state["selected_date"] = planned_date
+    _set_planner_day(planned_date)
     st.session_state["planner_overview_status_message"] = "Planned item updated."
     st.rerun()
 
 
-def _render_planned_item_delete_action(quests: list) -> None:
-    quest_id = st.session_state.get("deleting_planned_quest_id")
-    if quest_id is None:
-        return
-
-    quest = next((item for item in quests if item.id == quest_id), None)
-    if quest is None:
-        st.session_state.pop("deleting_planned_quest_id", None)
-        return
-
-    st.divider()
-    with st.container(border=True):
-        st.subheader("Remove planned item")
-        if _display_status(quest) != "Planned":
-            st.warning("Only unresolved planned items can be removed.")
-            return
-
-        is_recurring = quest.recurring_habit_instance is not None
-        item_label = "this routine day" if is_recurring else "this planned task"
-        st.warning(f"Remove {item_label}? This cannot be undone.")
-        st.caption("Completed, skipped, failed, and XP-awarded items are always preserved.")
-        confirmed = st.checkbox(f"Confirm removal of {item_label}", key=f"confirm_remove_planned_quest_{quest.id}")
-        remove_col, cancel_col = st.columns(2)
-        with remove_col:
-            remove_clicked = st.button(
-                "Remove planned item",
-                type="primary",
-                use_container_width=True,
-                disabled=not confirmed,
-                key=f"confirm_remove_planned_quest_button_{quest.id}",
-            )
-        with cancel_col:
-            cancel_clicked = st.button("Cancel", use_container_width=True, key=f"cancel_remove_planned_quest_{quest.id}")
+@st.dialog("Remove planned item", on_dismiss="rerun")
+def _remove_planned_item_dialog(quest) -> None:
+    st.write(quest.title)
+    is_recurring = quest.recurring_habit_instance is not None
+    item_label = "this routine day" if is_recurring else "this planned task"
+    st.warning(f"Remove {item_label}? This cannot be undone.")
+    st.caption("Completed, skipped, failed, and XP-awarded items are always preserved.")
+    confirmed = st.checkbox(f"Confirm removal of {item_label}", key=f"confirm_remove_planned_quest_{quest.id}")
+    remove_col, cancel_col = st.columns(2)
+    with remove_col:
+        remove_clicked = st.button(
+            "Remove planned item",
+            type="primary",
+            use_container_width=True,
+            disabled=not confirmed,
+            key=f"confirm_remove_planned_quest_button_{quest.id}",
+        )
+    with cancel_col:
+        cancel_clicked = st.button("Cancel", use_container_width=True, key=f"cancel_remove_planned_quest_{quest.id}")
 
     if cancel_clicked:
-        st.session_state.pop("deleting_planned_quest_id", None)
         st.rerun()
     if not remove_clicked:
         return
@@ -625,48 +552,31 @@ def _render_planned_item_delete_action(quests: list) -> None:
         st.warning(summary.get("reason") or "This planned item could not be removed.")
         return
 
-    st.session_state.pop("deleting_planned_quest_id", None)
     st.session_state["planner_overview_status_message"] = "Planned item removed."
     st.rerun()
 
 
-def _render_day_management_panel() -> list:
-    st.subheader("Selected day")
+def _set_planner_day(selected_day: date) -> None:
+    """Reset the calendar's previous event when the day changes outside the calendar."""
+    st.session_state["selected_date"] = selected_day
+    st.session_state["planner_calendar_revision"] = st.session_state.get("planner_calendar_revision", 0) + 1
+
+
+def _render_day_management_panel(category_options: dict[str, int]) -> None:
     pending_date = st.session_state.pop("pending_planner_manage_date", None)
     if pending_date is not None:
         st.session_state["planner_manage_date"] = pending_date
     if "planner_manage_date" not in st.session_state:
         st.session_state["planner_manage_date"] = st.session_state["selected_date"]
-    selected_day = st.date_input("Selected day", key="planner_manage_date")
-    st.session_state["selected_date"] = selected_day
-    quests = get_quests_for_day(selected_day)
-    _render_planned_item_list(quests)
-    return quests
+    selected_day = st.date_input(
+        "Selected day",
+        key="planner_manage_date",
+        on_change=lambda: _set_planner_day(st.session_state["planner_manage_date"]),
+    )
+    _render_planned_item_list(get_quests_for_day(selected_day), category_options)
 
 
-def render_month_overview_tab(category_options: dict[str, int]) -> None:
-    status_message = st.session_state.pop("planner_overview_status_message", None)
-    if status_message:
-        st.success(status_message)
-    selected_year, selected_month = render_month_review_controls(st.session_state["selected_date"])
-    selected_month_date = date(selected_year, selected_month, 1)
-    calendar_col, day_col = st.container(key="hq_calendar").columns([0.68, 0.32], gap="large")
-    with calendar_col:
-        render_calendar(get_quests_for_calendar(), selected_month_date, fixed_view_label="Month")
-    with day_col:
-        quests = _render_day_management_panel()
-
-    _render_planned_item_editor(quests, category_options)
-    _render_planned_item_delete_action(quests)
-
-    render_month_checklist(selected_year, selected_month)
-
-
-render_page_header(
-    "Plan your day",
-    "Quest Planner",
-    "Schedule one-time tasks, routines, and project sessions in one place.",
-)
+render_page_header("Planner", "Schedule tasks, routines, and project sessions.")
 
 init_db()
 ensure_default_categories()
@@ -680,24 +590,31 @@ if not category_options:
 if "selected_date" not in st.session_state:
     st.session_state["selected_date"] = date.today()
 
-if hasattr(st, "segmented_control"):
-    planner_view = st.segmented_control(
-        "Quest Planner view",
-        ["Add item", "Month overview"],
-        default="Add item",
-        key="quest_planner_view",
-        label_visibility="collapsed",
-    )
-else:
-    planner_view = st.radio(
-        "Quest Planner view",
-        ["Add item", "Month overview"],
-        horizontal=True,
-        key="quest_planner_view",
-        label_visibility="collapsed",
-    )
+month_col, action_col = st.container(key="hq_planner_toolbar").columns(
+    [0.68, 0.32], gap="large", vertical_alignment="bottom"
+)
+with month_col:
+    selected_year, selected_month = render_month_review_controls(st.session_state["selected_date"])
+with action_col:
+    if st.button("Add item", type="primary", icon=":material/add:", width="stretch"):
+        _add_item_dialog(category_options)
 
-if planner_view == "Add item":
-    render_add_item_tab(category_options)
-elif planner_view == "Month overview":
-    render_month_overview_tab(category_options)
+for message_key in ("plan_status_message", "planner_overview_status_message"):
+    if message := st.session_state.pop(message_key, None):
+        st.success(message)
+
+calendar_tab, checklist_tab = st.tabs(
+    ["Calendar", "Monthly checklist"], key="planner_tab", on_change="rerun"
+)
+
+if calendar_tab.open:
+    with calendar_tab:
+        calendar_col, day_col = st.container(key="hq_calendar").columns([0.68, 0.32], gap="large")
+        with calendar_col:
+            render_calendar(get_quests_for_calendar(), date(selected_year, selected_month, 1))
+        with day_col:
+            _render_day_management_panel(category_options)
+
+if checklist_tab.open:
+    with checklist_tab:
+        render_month_checklist(selected_year, selected_month)

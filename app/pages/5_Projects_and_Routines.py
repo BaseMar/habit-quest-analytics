@@ -16,9 +16,8 @@ from src.ui import render_page_header
 
 
 render_page_header(
-    "Manage your system",
     "Projects & Routines",
-    "Review projects, maintain routines, and generate the future schedule when you need it.",
+    "Track your projects and manage recurring work.",
 )
 
 init_db()

@@ -31,30 +31,13 @@
     padding: 2rem clamp(1rem, 3vw, 3rem) 3rem;
 }
 
-.st-key-hq_plan_form {
-    margin-inline: auto;
-    max-width: 46rem;
-}
-
-@container hq-main (min-width: 88rem) {
-    .st-key-hq_analytics_breakdown {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .st-key-hq_analytics_breakdown > :only-child {
-        grid-column: 1 / -1;
-        max-width: 84rem;
-    }
-}
-
 @container hq-main (max-width: 54rem) {
-    :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_analytics_charts,
+    :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_planner_toolbar, .st-key-hq_analytics_charts,
         .st-key-hq_character_stats) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {
         flex-direction: column;
     }
 
-    :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_analytics_charts,
+    :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_planner_toolbar, .st-key-hq_analytics_charts,
         .st-key-hq_character_stats) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         flex: none;
         width: 100%;
@@ -72,6 +55,20 @@
     .st-key-hq_analytics_filters [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         min-width: 0;
         width: 100%;
+    }
+
+    .st-key-hq_project_toolbar [data-testid="stHorizontalBlock"] {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .st-key-hq_project_toolbar [data-testid="stColumn"]:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .st-key-hq_project_toolbar [data-testid="stColumn"] {
+        width: 100%;
+        min-width: 0;
     }
 }
 
@@ -226,48 +223,25 @@ section[data-testid="stSidebar"] > div {
 }
 
 .hq-page-header {
-    margin-bottom: 1.1rem;
-    padding-top: 0.35rem;
+    margin-bottom: 0.5rem;
 }
 
-h1,
 .hq-page-title {
-    color: var(--hq-text-primary) !important;
-    font-size: 2rem !important;
-    font-weight: 700 !important;
-    line-height: 1.15 !important;
-    margin-bottom: 0.35rem !important;
-    letter-spacing: -0.5px;
-}
-
-h2 {
-    color: var(--hq-text-primary) !important;
-    font-size: 1.25rem !important;
-    margin-top: 1.65rem !important;
-    padding-top: 0.2rem !important;
-}
-
-h3 {
-    color: var(--hq-text-primary) !important;
-    font-size: 1.02rem !important;
-}
-
-.hq-page-kicker {
-    color: var(--hq-accent-text);
-    font-size: 0.76rem;
-    font-weight: 760;
-    letter-spacing: 0.06em;
-    line-height: 1.35;
-    margin-bottom: 0.3rem;
-    text-transform: uppercase;
+    color: var(--hq-text-primary);
+    font-size: clamp(1.55rem, 1.3rem + 1vw, 2rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    margin: 0 0 0.35rem;
+    padding: 0;
 }
 
 .hq-page-subtitle {
     color: var(--hq-text-secondary);
-    font-size: 1rem;
+    font-size: 0.95rem;
     line-height: 1.5;
-    margin-bottom: 0;
-    max-width: 920px;
+    margin: 0;
+    max-width: 65ch;
 }
 
 .hq-section-title {
@@ -278,7 +252,8 @@ h3 {
     font-weight: 700;
     gap: 0.75rem;
     letter-spacing: 0.09em;
-    margin: 1.4rem 0 0.25rem;
+    margin: 0.75rem 0 0.15rem;
+    padding: 0;
     text-transform: uppercase;
 }
 
@@ -510,38 +485,6 @@ div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlock"] 
     gap: 0.65rem;
 }
 
-:is([data-testid="stButtonGroup"], [data-testid="stSegmentedControl"]) {
-    margin: 0.15rem 0 0.75rem;
-}
-
-:is([data-testid="stButtonGroup"], [data-testid="stSegmentedControl"])
-:is([role="group"], [role="radiogroup"], [role="tablist"]) {
-    flex-wrap: wrap;
-}
-
-:is([data-testid="stButtonGroup"], [data-testid="stSegmentedControl"])
-button:is([kind^="segmented_control"], [aria-pressed], [role="radio"], [role="tab"]) {
-    background: var(--hq-surface);
-    border-color: var(--hq-border);
-    color: var(--hq-text-secondary);
-    min-height: 40px;
-}
-
-:is([data-testid="stButtonGroup"], [data-testid="stSegmentedControl"])
-button:is([kind^="segmented_control"], [aria-pressed], [role="radio"], [role="tab"]):not(:disabled):hover {
-    background: var(--hq-accent-soft);
-    border-color: var(--hq-accent-border);
-    color: var(--hq-accent-text);
-}
-
-:is([data-testid="stButtonGroup"], [data-testid="stSegmentedControl"])
-button:is([kind="segmented_controlActive"], [aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]) {
-    background: var(--hq-accent-soft);
-    border-color: var(--hq-accent-border);
-    color: var(--hq-accent-text);
-    font-weight: 700;
-}
-
 input[type="checkbox"],
 input[type="radio"] {
     accent-color: var(--hq-accent);
@@ -577,40 +520,78 @@ input[type="radio"] {
     border-top-color: var(--hq-border);
 }
 
-.stTabs [data-baseweb="tab-list"] {
+[data-testid="stTabs"] [role="tablist"] {
     background: transparent;
-    gap: 0.45rem;
-    margin-bottom: 0.85rem;
+    border-bottom: 1px solid var(--hq-border);
+    gap: clamp(0.85rem, 1.8vw, 1.5rem);
 }
 
-.stTabs [data-baseweb="tab"] {
+[data-testid="stTabs"] [role="tab"] {
     color: var(--hq-text-secondary);
-    min-height: 48px;
-    padding-inline: 0.9rem;
+    flex-shrink: 0;
+    min-height: 42px;
+    padding-inline: 0.15rem;
 }
 
-.stTabs [data-baseweb="tab"] p {
-    color: inherit !important;
+[data-testid="stTabs"] [role="tab"] p {
+    color: inherit;
 }
 
-.stTabs [data-baseweb="tab"]:hover {
-    color: var(--hq-text-primary);
-}
-
-.stTabs [data-baseweb="tab"][aria-selected="true"] {
+[data-testid="stTabs"] [role="tab"]:hover,
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
     color: var(--hq-accent-text);
+}
+
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] p {
     font-weight: 700;
 }
 
-.stTabs [data-baseweb="tab-border"] {
-    background-color: var(--hq-border);
-}
-
-.stTabs [data-baseweb="tab-highlight"] {
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] .react-aria-SelectionIndicator {
     background-color: var(--hq-accent);
 }
 
-:is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stPopover"]) > button {
+[data-testid="stTabs"] [role="tab"]:focus-visible {
+    outline: 2px solid var(--hq-accent-border);
+    outline-offset: -2px;
+    border-radius: var(--hq-radius-small);
+}
+
+[data-testid="stTabs"] [role="tabpanel"] {
+    padding-top: 0.75rem;
+}
+
+[data-testid="stDialog"] {
+    background-color: rgb(12 18 22 / 55%);
+}
+
+[data-testid="stDialog"] > :has([role="dialog"]),
+[data-testid="stDialog"] [role="dialog"] {
+    background: var(--hq-surface);
+    color: var(--hq-text-primary);
+}
+
+[data-testid="stDialog"] > :has([role="dialog"]) {
+    border: 1px solid var(--hq-border);
+    border-radius: var(--hq-radius-large);
+}
+
+[data-testid="stDialog"] [role="dialog"] :is(h1, h2, h3, button[aria-label="Close"]) {
+    color: var(--hq-text-primary);
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background: var(--hq-input-background);
+    border: 1px dashed var(--hq-border-strong);
+    border-radius: var(--hq-radius);
+    color: var(--hq-text-primary);
+}
+
+[data-testid="stFileUploaderDropzone"]:focus-within {
+    border-color: var(--hq-accent-border);
+}
+
+:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stFileUploaderDropzone"] button) {
     background: linear-gradient(145deg, var(--hq-surface-elevated), var(--hq-surface));
     border: 1px solid var(--hq-border);
     border-radius: var(--hq-radius);
@@ -629,18 +610,21 @@ input[type="radio"] {
     color: var(--hq-accent-foreground);
 }
 
-:is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stPopover"]) > button:not(:disabled):hover {
+:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stFileUploaderDropzone"] button):not(:disabled):hover {
     border-color: var(--hq-accent-border);
     box-shadow: 0 5px 16px var(--hq-accent-glow);
     transform: translateY(-1px);
 }
 
-:is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stPopover"]) > button:focus-visible {
+:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stFileUploaderDropzone"] button):focus-visible {
     outline: 2px solid var(--hq-accent-border);
     outline-offset: 2px;
 }
 
-:is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stPopover"]) > button:disabled {
+:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+    [data-testid="stFileUploaderDropzone"] button):disabled {
     background: var(--hq-muted-surface);
     border-color: var(--hq-border);
     box-shadow: none;
@@ -654,12 +638,50 @@ button :is(p, span) {
 
 :is([data-testid="stSelectbox"], [data-testid="stMultiSelect"], [data-testid="stDateInput"],
     [data-testid="stTimeInput"], [data-testid="stTextInput"], [data-testid="stTextArea"],
-    [data-testid="stNumberInput"]) [data-testid="stWidgetLabel"] p {
+    [data-testid="stNumberInput"], [data-testid="stFileUploader"]) [data-testid="stWidgetLabel"] p {
     color: var(--hq-text-secondary);
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
+}
+
+:is([data-testid="stTextInputRootElement"], [data-testid="stTextAreaRootElement"],
+    [data-testid="stNumberInputContainer"], [data-testid="stDateInputField"],
+    [data-testid="stTimeInputTimeDisplay"]),
+:is([data-testid="stSelectbox"], [data-testid="stMultiSelect"]) div:has(> input[role="combobox"]) {
+    background: var(--hq-input-background);
+    border-color: var(--hq-border-strong);
+    color: var(--hq-text-primary);
+}
+
+:is([data-testid="stTextInputRootElement"], [data-testid="stTextAreaRootElement"],
+    [data-testid="stNumberInputContainer"], [data-testid="stDateInputField"],
+    [data-testid="stTimeInputTimeDisplay"]):focus-within,
+:is([data-testid="stSelectbox"], [data-testid="stMultiSelect"]) div:has(> input[role="combobox"]):focus-within {
+    border-color: var(--hq-accent-border);
+}
+
+:is([data-testid="stDateInputField"], [data-testid="stTimeInputTimeDisplay"],
+    [data-testid="stNumberInputContainer"], [data-testid="stSelectbox"],
+    [data-testid="stMultiSelect"]) button {
+    color: var(--hq-text-primary);
+}
+
+:is([data-testid="stSelectboxVirtualDropdown"], [data-testid="stDateInputCalendar"],
+    [data-testid="stDateInputQuickSelectPopover"]) {
+    background: var(--hq-surface);
+    border-color: var(--hq-border);
+    color: var(--hq-text-primary);
+}
+
+[data-testid="stSelectboxVirtualDropdown"] [role="option"] {
+    color: var(--hq-text-primary);
+}
+
+[data-testid="stSelectboxVirtualDropdown"] [role="option"]:is([aria-selected="true"], [data-hovered], [data-focused]) [data-item-hl] {
+    background-color: var(--hq-accent-soft);
+    color: var(--hq-accent-text);
 }
 
 div[data-baseweb="select"] > div,
@@ -1323,31 +1345,8 @@ div[role="option"][aria-selected="true"] {
 }
 
 @media (max-width: 768px) {
-    h1,
-    .hq-page-title {
-        font-size: 1.55rem !important;
-    }
-
-    .hq-page-subtitle {
-        font-size: 0.92rem;
-    }
-
-    .hq-section-title {
-        margin-top: 1.2rem;
-    }
-
     .hq-empty-state {
         padding: 0.85rem 0.9rem;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        min-height: 40px;
-        padding-left: 0.72rem;
-        padding-right: 0.72rem;
-    }
-
-    .stTabs [data-baseweb="tab-list"] {
-        overflow-x: auto;
     }
 }
 
@@ -1355,7 +1354,8 @@ div[role="option"][aria-selected="true"] {
     :is([data-testid="stMetric"], .hq-metric-card, [data-testid="stExpander"] details),
     :is([data-testid="stMetric"], .hq-metric-card)::after,
     [data-testid="stSidebar"] [data-testid="stPageLink"] a,
-    :is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stPopover"]) > button {
+    :is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+        [data-testid="stFileUploaderDropzone"] button) {
         transform: none !important;
         transition: none;
     }

@@ -132,26 +132,20 @@ def apply_theme() -> None:
     apply_global_styles()
 
 
-def render_page_header(kicker: str, title: str, subtitle: str) -> None:
-    st.markdown(
+def render_page_header(title: str, subtitle: str) -> None:
+    st.html(
         f"""
-        <div class="hq-page-header">
-            <div class="hq-page-kicker">{escape(kicker)}</div>
+        <header class="hq-page-header">
             <h1 class="hq-page-title">{escape(title)}</h1>
-            <div class="hq-page-subtitle">{escape(subtitle)}</div>
-        </div>
+            <p class="hq-page-subtitle">{escape(subtitle)}</p>
+        </header>
         """,
-        unsafe_allow_html=True,
     )
 
 
 def render_section_title(title: str, description: str | None = None) -> None:
-    st.markdown(f'<div class="hq-section-title">{escape(title)}</div>', unsafe_allow_html=True)
-    if description:
-        st.markdown(
-            f'<div class="hq-section-description">{escape(description)}</div>',
-            unsafe_allow_html=True,
-        )
+    description_html = f'<p class="hq-section-description">{escape(description)}</p>' if description else ""
+    st.html(f'<h2 class="hq-section-title">{escape(title)}</h2>{description_html}')
 
 
 def render_empty_state(title: str, message: str) -> None:

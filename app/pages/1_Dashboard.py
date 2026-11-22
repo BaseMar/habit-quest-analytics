@@ -212,11 +212,7 @@ def render_status_kpis(command_center: dict, compact: bool = False) -> None:
     )
 
 
-render_page_header(
-    "Today",
-    "Command Center",
-    "Keep today's work visible and resolve anything that needs review.",
-)
+render_page_header("Command Center", "Manage today's work and review past check-ins.")
 
 init_db()
 command_center = get_command_center_data()
@@ -224,7 +220,7 @@ command_center = get_command_center_data()
 if not command_center["has_quests"]:
     render_empty_state(
         "No quest data yet",
-        "Create a quest in Quest Planner to start today's mission.",
+        "Add an item in Planner to get started.",
     )
 else:
     status_message = st.session_state.pop("command_status_message", None)
@@ -233,41 +229,43 @@ else:
 
     work_col, summary_col = st.container(key="hq_command").columns([0.68, 0.32], gap="large")
     with work_col:
-        render_section_title("Today's work", "Complete, skip, fail, or reset planned work without leaving this page.")
-        render_work_items(
-            command_center["today_work_items"],
-            "No work planned for today",
-            "Schedule tasks in Quest Planner to build today's focus.",
-            "command_today",
-        )
+        today_tab, review_tab = st.tabs(["Today", "Review"], key="command_tab", on_change="rerun")
+    if today_tab.open:
+        with today_tab:
+            render_work_items(
+                command_center["today_work_items"],
+                "No work planned for today",
+                "Schedule tasks in Planner.",
+                "command_today",
+            )
 
-        render_section_title("Needs review", "Resolve overdue planned work before it disappears from your daily flow.")
-        render_work_items(
-            command_center["attention_items"],
-            "No overdue planned work",
-            "Your previous planned work has been resolved.",
-            "command_attention",
-        )
+    if review_tab.open:
+        with review_tab:
+            render_section_title("Overdue work")
+            render_work_items(
+                command_center["attention_items"],
+                "No overdue planned work",
+                "Your previous planned work has been resolved.",
+                "command_attention",
+            )
+            render_section_title("Review another day")
+            review_date = st.date_input(
+                "Review date",
+                value=st.session_state.get("command_review_selected_date", date.today()),
+                max_value=date.today(),
+                key="command_review_date",
+            )
+            st.session_state["command_review_selected_date"] = review_date
+            if review_date != date.today():
+                render_work_items(
+                    get_command_center_items_for_date(review_date),
+                    "No work recorded for this day",
+                    "Choose another date to review.",
+                    f"command_review_{review_date.isoformat()}",
+                )
 
     with summary_col:
         render_mission_brief(command_center)
         render_status_kpis(command_center, compact=True)
-        render_section_title("Review another day")
-        review_date = st.date_input(
-            "Review date",
-            value=date.today(),
-            max_value=date.today(),
-            key="command_review_date",
-        )
-
-    if review_date != date.today():
-        with work_col:
-            render_section_title("Selected day", review_date.strftime("%a, %b %d"))
-            render_work_items(
-                get_command_center_items_for_date(review_date),
-                "No work recorded for this day",
-                "Choose another date or create future work in Planner.",
-                f"command_review_{review_date.isoformat()}",
-            )
 
 st.caption("Data source: local SQLite quest check-in records.")

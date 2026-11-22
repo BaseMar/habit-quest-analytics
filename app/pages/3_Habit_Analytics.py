@@ -33,24 +33,10 @@ WORK_TYPE_OPTIONS = {
 
 def render_analytics_filters(categories: list, today: date) -> dict:
     period_col, category_col, type_col = st.container(key="hq_analytics_filters").columns(
-        [0.46, 0.27, 0.27], vertical_alignment="bottom"
+        [1, 1, 1], vertical_alignment="bottom"
     )
     with period_col:
-        if hasattr(st, "segmented_control"):
-            period = st.segmented_control(
-                "Period",
-                ["7 days", "30 days", "90 days", "Custom"],
-                default="30 days",
-                key="analytics_period",
-            )
-        else:
-            period = st.radio(
-                "Period",
-                ["7 days", "30 days", "90 days", "Custom"],
-                horizontal=True,
-                key="analytics_period",
-            )
-        period = period or "30 days"
+        period = st.selectbox("Period", ["7 days", "30 days", "90 days", "Custom"], index=1, key="analytics_period")
 
     category_options = {"All categories": None} | {category.name: category.id for category in categories}
     with category_col:
@@ -302,7 +288,7 @@ def render_activity_overview(analytics: dict) -> None:
     if not analytics["has_quests"]:
         render_empty_state(
             "No checklist data yet",
-            "Plan quests in Quest Planner and update them in Monthly Checklist to generate analytics.",
+            "Schedule work in Planner and record check-ins in Command Center.",
         )
         return
 
@@ -330,25 +316,24 @@ def render_activity_overview(analytics: dict) -> None:
         render_section_title("Weekly consistency", "Completion rate for resolved check-ins, grouped by weekday.")
         render_weekday_chart(analytics["completion_rate_by_weekday"])
 
-    with st.container(key="hq_analytics_breakdown"):
-        with st.container():
-            render_section_title("Category performance", "Planned and completed planned time, outcomes, and XP by category.")
-            render_category_performance(analytics["category_performance"])
-
-        if not analytics["routine_performance"].empty:
-            with st.container():
-                render_section_title("Routine performance", "Completion, misses, and recent routine history in the selected period.")
-                render_routine_performance(analytics["routine_performance"])
-
-
 render_page_header(
-    "Review progress",
     "Habit Analytics",
-    "See current consistency, time allocation, and recent habit performance.",
+    "Review your workload, consistency, and completion rates.",
 )
 
 init_db()
 today = date.today()
 filters = render_analytics_filters(get_categories(), today)
 analytics = get_habit_analytics_data(today=today, **filters)
-render_activity_overview(analytics)
+overview_tab, categories_tab, routines_tab = st.tabs(
+    ["Overview", "Categories", "Routines"], key="analytics_tab", on_change="rerun"
+)
+if overview_tab.open:
+    with overview_tab:
+        render_activity_overview(analytics)
+if categories_tab.open:
+    with categories_tab:
+        render_category_performance(analytics["category_performance"])
+if routines_tab.open:
+    with routines_tab:
+        render_routine_performance(analytics["routine_performance"])

@@ -56,7 +56,7 @@ def render_month_checklist(year: int, month: int) -> None:
     if not checklist["rows"]:
         render_empty_state(
             "No planned items for this month yet.",
-            "Add tasks in the Add item tab to start tracking this month.",
+            "Use Add item to start planning this month.",
         )
         return
     _render_checklist_table(checklist)

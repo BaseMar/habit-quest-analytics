@@ -300,24 +300,22 @@ def render_avatar(profile: dict) -> None:
         )
 
 
-def render_avatar_controls(profile: dict) -> None:
-    with st.popover("Change avatar", use_container_width=True):
-        uploaded_avatar = st.file_uploader(
-            "Avatar image",
-            type=["png", "jpg", "jpeg"],
-            accept_multiple_files=False,
-        )
-        if uploaded_avatar is not None:
-            try:
-                save_avatar(uploaded_avatar.name, uploaded_avatar.getvalue())
-                st.success("Avatar uploaded.")
-                st.rerun()
-            except ValueError as error:
-                st.error(str(error))
-
-        if profile.get("avatar_path") and st.button("Remove Avatar", use_container_width=True):
-            remove_avatar()
+@st.dialog("Change avatar", on_dismiss="rerun")
+def _change_avatar_dialog(has_avatar: bool) -> None:
+    uploaded_avatar = st.file_uploader("Avatar image", type=["png", "jpg", "jpeg"])
+    if st.button("Save avatar", type="primary", width="stretch", disabled=uploaded_avatar is None):
+        try:
+            save_avatar(uploaded_avatar.name, uploaded_avatar.getvalue())
+        except ValueError as error:
+            st.error(str(error))
+        else:
+            st.session_state["avatar_status_message"] = "Avatar updated."
             st.rerun()
+
+    if has_avatar and st.button("Remove avatar", width="stretch"):
+        remove_avatar()
+        st.session_state["avatar_status_message"] = "Avatar removed."
+        st.rerun()
 
 
 def render_character_hero(profile: dict) -> None:
@@ -327,7 +325,8 @@ def render_character_hero(profile: dict) -> None:
         avatar_col, identity_col, xp_col = st.columns([0.16, 0.51, 0.33], gap="medium")
         with avatar_col:
             render_avatar(profile)
-            render_avatar_controls(profile)
+            if st.button("Change avatar", width="stretch"):
+                _change_avatar_dialog(bool(profile.get("avatar_path")))
 
         with identity_col:
             st.markdown(
@@ -378,7 +377,7 @@ def render_character_hero(profile: dict) -> None:
 
 
 def render_rpg_stats_section(profile: dict) -> None:
-    render_section_title("RPG Stats", "Stat levels from completed quest-day XP by category.")
+    render_section_title("RPG stats", "Stat levels from completed quest-day XP by category.")
     stats_col, radar_col = st.container(key="hq_character_stats").columns([1.45, 1], gap="medium")
 
     with stats_col:
@@ -386,7 +385,7 @@ def render_rpg_stats_section(profile: dict) -> None:
         st.html(f'<div class="hq-stat-panel">{rows}</div>')
 
     with radar_col:
-        st.subheader("Stat Level Radar")
+        render_section_title("Stat level radar")
         st.plotly_chart(
             _build_radar_figure(profile, height=260),
             width="stretch",
@@ -466,7 +465,7 @@ def _render_stat_row(row: dict) -> str:
 
 
 def render_how_stats_are_calculated() -> None:
-    with st.expander("How Stats Are Calculated"):
+    with st.expander("How stats are calculated"):
         st.markdown(
             """
             <div class="hq-explainer">
@@ -481,14 +480,15 @@ def render_how_stats_are_calculated() -> None:
 
 apply_character_profile_styles()
 render_page_header(
-    "Your progress",
     "Character Profile",
-    "Follow XP, levels, and the categories where your completed work is growing.",
+    "See your level, XP, and RPG stats.",
 )
 
 init_db()
 profile = get_character_profile_data()
 
+if message := st.session_state.pop("avatar_status_message", None):
+    st.success(message)
 render_character_hero(profile)
 render_rpg_stats_section(profile)
 render_how_stats_are_calculated()

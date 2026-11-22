@@ -83,7 +83,7 @@ Implemented:
 
 - Command Center as the default operational workspace.
 - Custom Streamlit navigation/sidebar with explicit page labels.
-- Calendar-based Quest Planner.
+- Calendar-based Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - Recurring Habit templates with automatic generation for the creation month and
   explicit future-month generation from Projects & Routines.
@@ -194,7 +194,7 @@ The app is designed to answer questions such as:
   weekdays.
 - Creating a routine generates its days for the selected creation month.
 - Projects & Routines generates missing routine days for future months.
-- Monthly Review is a read-only matrix of planned and completed work.
+- The Monthly checklist tab is a read-only matrix of planned and completed work.
 - Recurring habits can be all-day or use a planned start/end time window.
 - Routine templates can be edited without changing already generated days or
   their history; new settings apply to later month generation.
@@ -263,7 +263,8 @@ The app is designed to answer questions such as:
 ### Navigation / UI
 
 - Explicit Streamlit navigation using polished page labels.
-- Dark RPG dashboard theme.
+- Light and dark themes with a sidebar switch.
+- Tabs for related views and dialogs for editing, generation, and confirmations.
 - Tile-like sidebar navigation styling.
 - Card-based sections and compact helper text.
 
@@ -276,15 +277,14 @@ The app is designed to answer questions such as:
 
 ## App Sections
 
-- `Command Center` - default screen for daily and overdue status actions.
-- `Planner` - calendar, unified Add to plan form, selected-day editing and
-  removal of unresolved work, plus read-only Monthly Review.
-- `Projects & Routines` - project creation, editing, progress, lifecycle,
-  comparison, bulk project-session scheduling, routine templates, and
-  future-month routine generation.
-- `Habit Analytics` - date-filtered plan versus completion trends, category and
-  routine performance, and insights.
-- `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
+- `Command Center` - Today and Review tabs for daily work, overdue check-ins, and past dates.
+- `Planner` - Calendar and Monthly checklist tabs. Use Add item to plan work and
+  the selected-day list to edit or remove unresolved items.
+- `Projects & Routines` - Projects, Routines, and Portfolio tabs, with dialogs for
+  editing, lifecycle actions, and generating scheduled work.
+- `Habit Analytics` - Overview, Categories, and Routines tabs with shared filters.
+- `Character Profile` - avatar, XP, level, RPG stats, and radar chart. Use Change
+  avatar to upload or remove the profile image.
 
 ## Key Technical Decisions
 
@@ -519,15 +519,17 @@ See [docs/data_model.md](docs/data_model.md) for deeper model notes.
 git clone https://github.com/BaseMar/habit-quest-analytics.git
 cd habit-quest-analytics
 python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ## Running The App
 
 ```bash
-streamlit run app/main.py
+python run_streamlit.py
 ```
+
+The launcher uses the project's `.venv` when present. You can also run
+`streamlit run app/main.py` from an environment with Streamlit 1.66.1 or newer.
 
 The app initializes SQLite tables and default categories on startup. Default
 categories can also be seeded manually:

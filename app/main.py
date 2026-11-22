@@ -1,4 +1,5 @@
 import sys
+from inspect import signature
 from pathlib import Path
 
 import streamlit as st
@@ -15,6 +16,12 @@ st.set_page_config(
     page_icon="HQ",
     layout="wide",
 )
+
+if "on_change" not in signature(st.tabs).parameters:
+    st.error(f"The app needs Streamlit 1.66.1 or newer. This process is using {st.__version__}.")
+    st.markdown("From the project directory, start the app with its local virtual environment.")
+    st.code("python run_streamlit.py", language="bash")
+    st.stop()
 
 
 def render_sidebar_brand() -> None:

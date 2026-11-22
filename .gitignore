@@ -30,8 +30,3 @@ data/uploads/
 Thumbs.db
 .vscode/
 .idea/
-
-# documentation
-
-# files
-run_streamlit.py

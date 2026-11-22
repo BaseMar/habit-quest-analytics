@@ -48,33 +48,16 @@ def render_plan_form(
     key_prefix: str = "plan",
 ) -> PlanDraft | None:
     """Render one planning form for one-time tasks, routines, and project sessions."""
-    project_options = [None] + [goal.id for goal in active_goals]
-    project_selection_disabled = st.session_state.get(f"{key_prefix}_type") == "Repeat"
-    selected_goal_id = st.selectbox(
-        "Project",
-        project_options,
-        format_func=lambda value: "No project" if value is None else goal_title_by_id[value],
-        key=f"{key_prefix}_goal",
-        disabled=project_selection_disabled,
-    )
-
-    if hasattr(st, "segmented_control"):
-        planning_type = st.segmented_control(
-            "Schedule",
-            ["One time", "Repeat"],
-            default="One time",
-            key=f"{key_prefix}_type",
-        )
-    else:
-        planning_type = st.radio(
-            "Schedule",
-            ["One time", "Repeat"],
-            horizontal=True,
-            key=f"{key_prefix}_type",
-        )
-    planning_type = planning_type or "One time"
+    planning_type = st.selectbox("Schedule", ["One time", "Repeat"], key=f"{key_prefix}_type")
     is_recurring = planning_type == "Repeat"
-    goal_id = selected_goal_id if not is_recurring else None
+    goal_id = None
+    if not is_recurring:
+        goal_id = st.selectbox(
+            "Project",
+            [None] + [goal.id for goal in active_goals],
+            format_func=lambda value: "No project" if value is None else goal_title_by_id[value],
+            key=f"{key_prefix}_goal",
+        )
     selected_goal = next((goal for goal in active_goals if goal.id == goal_id), None)
     category_names_by_id = {category_id: name for name, category_id in category_options.items()}
     locked_category_name = (
@@ -138,10 +121,9 @@ def render_plan_form(
     weekdays = None
     end_date = None
     if is_recurring:
-        recurrence_preset = st.radio(
+        recurrence_preset = st.selectbox(
             "Repeat",
             ["Every day", "Weekdays", "Custom days"],
-            horizontal=True,
             key=f"{key_prefix}_recurrence",
         )
         if recurrence_preset == "Custom days":
