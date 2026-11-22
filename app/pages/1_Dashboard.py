@@ -13,7 +13,7 @@ from src.database.db import init_db
 from app.components.checkin_actions import render_checkin_status_actions
 from src.services.analytics_service import get_command_center_data, get_command_center_items_for_date
 from src.services.checklist_service import update_checkin_status
-from src.ui import apply_theme, render_empty_state, render_page_header, render_section_title
+from src.ui import render_empty_state, render_page_header, render_section_title
 
 
 def render_mission_brief(command_center: dict) -> None:
@@ -212,7 +212,6 @@ def render_status_kpis(command_center: dict, compact: bool = False) -> None:
     )
 
 
-apply_theme()
 render_page_header(
     "Today",
     "Command Center",

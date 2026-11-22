@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.database.db import init_db
 from src.services.analytics_service import get_character_profile_data
 from src.services.profile_service import remove_avatar, resolve_avatar_path, save_avatar
-from src.ui import apply_theme, get_theme_tokens, render_page_header, render_section_title
+from src.ui import get_theme_tokens, render_page_header, render_section_title
 
 
 def apply_character_profile_styles() -> None:
@@ -479,7 +479,6 @@ def render_how_stats_are_calculated() -> None:
         )
 
 
-apply_theme()
 apply_character_profile_styles()
 render_page_header(
     "Your progress",

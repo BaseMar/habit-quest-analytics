@@ -12,10 +12,9 @@ from app.components.project_routine_workspace import render_project_routine_work
 from src.database.db import init_db
 from src.database.seed import ensure_default_categories
 from src.services.quest_service import get_categories
-from src.ui import apply_theme, render_page_header
+from src.ui import render_page_header
 
 
-apply_theme()
 render_page_header(
     "Manage your system",
     "Projects & Routines",

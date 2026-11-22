@@ -15,7 +15,6 @@ from src.services.analytics_service import (
 )
 from src.services.quest_service import get_categories
 from src.ui import (
-    apply_theme,
     get_theme_tokens,
     render_empty_state,
     render_metric_card,
@@ -342,7 +341,6 @@ def render_activity_overview(analytics: dict) -> None:
                 render_routine_performance(analytics["routine_performance"])
 
 
-apply_theme()
 render_page_header(
     "Review progress",
     "Habit Analytics",

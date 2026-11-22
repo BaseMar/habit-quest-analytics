@@ -32,7 +32,7 @@ from src.services.recurring_habit_service import (
     delete_recurring_generated_occurrence_if_unresolved,
     generate_recurring_habit_for_month,
 )
-from src.ui import apply_theme, get_theme_tokens, render_empty_state, render_page_header, render_section_title
+from src.ui import get_theme_tokens, render_empty_state, render_page_header, render_section_title
 
 
 CALENDAR_VIEW_OPTIONS = {
@@ -215,7 +215,7 @@ def render_calendar(
         .fc .fc-button-primary:not(:disabled):active {
             background: var(--hq-accent);
             border-color: var(--hq-accent-border);
-            color: white;
+            color: var(--hq-accent-foreground);
         }
         .fc .fc-timegrid-slot {
             height: 2rem;
@@ -306,6 +306,7 @@ def render_calendar(
         .replace("var(--hq-surface-elevated)", tokens["surface_elevated"])
         .replace("var(--hq-surface)", tokens["surface"])
         .replace("var(--hq-accent)", tokens["accent"])
+        .replace("var(--hq-accent-foreground)", tokens["accent_foreground"])
         .replace("var(--hq-warning)", tokens["warning"])
     )
 
@@ -315,7 +316,7 @@ def render_calendar(
             options=calendar_options,
             custom_css=custom_css,
             key=(
-                f"quest_calendar_{tokens['mode']}_{tokens['accent_name']}_"
+                f"quest_calendar_{tokens['mode']}_"
                 f"{selected_view_label}_{selected_date.isoformat()}_"
                 f"{_calendar_events_signature(calendar_events)}"
             ),
@@ -661,7 +662,6 @@ def render_month_overview_tab(category_options: dict[str, int]) -> None:
     render_month_checklist(selected_year, selected_month)
 
 
-apply_theme()
 render_page_header(
     "Plan your day",
     "Quest Planner",

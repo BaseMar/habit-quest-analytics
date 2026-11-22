@@ -29,13 +29,13 @@ def render_sidebar_brand() -> None:
     )
 
 
-def render_sidebar_navigation(pages: list) -> None:
+def render_sidebar_navigation(pages: list, current_page) -> None:
     """Render navigation below the fixed sidebar branding."""
     for page in pages:
-        st.sidebar.page_link(page)
+        target = st.sidebar.container(key="hq_active_page") if page is current_page else st.sidebar
+        target.page_link(page)
 
 
-apply_theme()
 pages = [
     st.Page(
         "pages/1_Dashboard.py",
@@ -72,6 +72,7 @@ pages = [
 
 current_page = st.navigation(pages, position="hidden")
 render_sidebar_brand()
-render_sidebar_navigation(pages)
+render_sidebar_navigation(pages, current_page)
 render_appearance_controls()
+apply_theme()
 current_page.run()

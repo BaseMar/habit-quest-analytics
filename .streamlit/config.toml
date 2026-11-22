@@ -1,8 +1,9 @@
 [theme]
-primaryColor = "#8B5CF6"
-backgroundColor = "#0F172A"
-secondaryBackgroundColor = "#111827"
-textColor = "#F9FAFB"
+base = "light"
+primaryColor = "#00777D"
+backgroundColor = "#F2F5F6"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#222831"
 font = "sans serif"
 
 [logger]
