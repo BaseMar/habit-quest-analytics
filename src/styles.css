@@ -28,7 +28,9 @@
     container: hq-main / inline-size;
     max-width: 1600px;
     width: 100%;
-    padding: 2rem clamp(1rem, 3vw, 3rem) 3rem;
+    /* Streamlit reserves space above the content for its toolbar. */
+    padding-inline: clamp(1rem, 3vw, 3rem);
+    padding-bottom: 3rem;
 }
 
 @container hq-main (max-width: 54rem) {
@@ -74,9 +76,7 @@
 
 @media (max-width: 768px) {
     .block-container {
-        padding-top: 1.5rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
+        padding-inline: 1rem;
     }
 }
 
