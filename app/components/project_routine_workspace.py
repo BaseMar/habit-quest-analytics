@@ -4,7 +4,6 @@ from calendar import month_name
 from datetime import date, datetime, time, timedelta
 from html import escape
 
-import plotly.express as px
 import streamlit as st
 
 from app.components.plan_form import WEEKDAY_OPTIONS
@@ -19,7 +18,6 @@ from src.services.goal_service import (
     reopen_goal,
     update_goal,
 )
-from src.services.analytics_service import build_goal_progress_dataset, get_goal_analytics_summary
 from src.services.goal_session_planner_service import (
     build_goal_session_plan_preview,
     get_goal_session_planning_summary,
@@ -315,6 +313,10 @@ def _render_goal_completion_forecast(goal) -> None:
 
 
 def _render_project_comparison() -> None:
+    import plotly.express as px
+
+    from src.services.analytics_service import get_goal_analytics_summary
+
     summary = get_goal_analytics_summary(statuses=("Active", "Completed"))
     if summary["included_goals_count"] < 2:
         render_empty_state(
@@ -334,9 +336,9 @@ def _render_project_comparison() -> None:
         with column:
             render_metric_card(label, value)
 
-    progress_dataset = build_goal_progress_dataset(summary["goal_rows"])
-    if progress_dataset.empty:
-        return
+    progress_dataset = summary["goal_table"].sort_values(
+        ["Progress Percent", "Completed Effort", "Goal"], ascending=[False, False, True]
+    )
 
     chart_data = progress_dataset.melt(
         id_vars=["Goal", "Progress Percent"],

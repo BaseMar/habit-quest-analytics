@@ -20,7 +20,7 @@ from src.services.goal_service import (
     reopen_goal,
     update_goal,
 )
-from src.services.quest_service import create_scheduled_quest
+from src.services.quest_service import create_quest, create_scheduled_quest
 
 
 @pytest.fixture()
@@ -452,6 +452,21 @@ def test_goal_completion_forecast_requires_target_effort_date_and_history(sessio
     assert get_goal_completion_forecast(target_without_history.id, session=session)["reason"] == (
         "Complete at least one project session to calculate a forecast."
     )
+
+
+def test_goal_completion_forecast_handles_completed_session_without_duration(session):
+    completed_date = date(2026, 7, 1)
+    goal = create_goal("Untimed history", 120, target_end_date=date(2026, 7, 10), session=session)
+    quest = create_quest(
+        "Untimed session", planned_date=completed_date, goal_id=goal.id, category_id=goal.category_id, session=session
+    )
+    complete_checkin(quest.id, completed_date, session=session)
+
+    forecast = get_goal_completion_forecast(goal.id, today=completed_date, session=session)
+
+    assert forecast["available"] is False
+    assert forecast["remaining_minutes"] == 120
+    assert "planned duration" in forecast["reason"]
 
 
 @pytest.mark.parametrize(

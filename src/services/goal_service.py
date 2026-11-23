@@ -248,6 +248,9 @@ def get_goal_completion_forecast(goal_id: int, today: date | None = None, sessio
         if not completed_dates:
             base_forecast["reason"] = "Complete at least one project session to calculate a forecast."
             return base_forecast
+        if progress["completed_minutes"] <= 0:
+            base_forecast["reason"] = "Complete a project session with a planned duration to calculate a forecast."
+            return base_forecast
 
         first_completed_date = completed_dates[0]
         observed_days = max((today - first_completed_date).days + 1, 1)
