@@ -10,7 +10,7 @@ from src.services.goal_service import (
     archive_goal,
     complete_goal,
     create_goal as service_create_goal,
-    delete_goal_if_unused,
+    delete_goal,
     get_goal,
     get_goal_completion_forecast,
     get_goal_history_summary,
@@ -283,27 +283,59 @@ def test_reopen_goal_sets_status_active(session):
     assert reopened.status == "Active"
 
 
-def test_delete_goal_if_unused_deletes_goal(session):
+def test_delete_goal_without_linked_sessions(session):
     goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
 
-    summary = delete_goal_if_unused(goal.id, session=session)
-
-    assert summary["deleted"] is True
-    assert summary["linked_quests_count"] == 0
+    assert delete_goal(goal.id, session=session) == 0
     assert session.get(Goal, goal.id) is None
 
 
-def test_delete_goal_if_unused_blocks_goal_with_linked_quest(session):
+def test_delete_goal_detaches_sessions_and_preserves_planning_and_checkin_history(session):
+    goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
+    completed_date = date(2026, 7, 1)
+    planned_date = date(2026, 7, 2)
+    completed = _create_goal_session(session, goal, planned_date=completed_date)
+    planned = _create_goal_session(session, goal, planned_date=planned_date)
+    completed_checkin = complete_checkin(completed.id, completed_date, session=session)
+    earned_xp = completed_checkin.xp_awarded
+    other_goal = create_goal("Other Project", planned_total_minutes=1200, session=session)
+    other_quest = _create_goal_session(session, other_goal)
+    archive_goal(goal.id, session=session)
+
+    assert earned_xp > 0
+    assert delete_goal(goal.id, session=session) == 2
+
+    assert session.get(Goal, goal.id) is None
+    assert completed.goal_id is None
+    assert completed.goal_session_number is None
+    assert completed.title == "Portfolio Project Session 1"
+    assert completed_checkin.status == "Completed"
+    assert completed_checkin.xp_awarded == earned_xp
+    assert planned.goal_id is None
+    assert planned.goal_session_number is None
+    assert planned.due_date == planned_date
+    assert planned.planned_start_at.time() == time(9, 0)
+    assert planned.estimated_minutes == 120
+    assert [checkin.status for checkin in planned.checkins] == ["Planned"]
+    assert other_quest.goal_id == other_goal.id
+    assert other_quest.goal_session_number == 1
+
+
+def test_delete_goal_rolls_back_detaching_sessions_if_deletion_fails(session, monkeypatch):
     goal = create_goal("Portfolio Project", planned_total_minutes=1200, session=session)
     quest = _create_goal_session(session, goal)
 
-    summary = delete_goal_if_unused(goal.id, session=session)
+    def reject_commit():
+        session.flush()
+        raise RuntimeError("Could not commit")
 
-    assert summary["deleted"] is False
-    assert summary["linked_quests_count"] == 1
-    assert summary["reason"] == "This goal has linked quest sessions and cannot be deleted safely."
+    monkeypatch.setattr(session, "commit", reject_commit)
+    with pytest.raises(RuntimeError, match="Could not commit"):
+        delete_goal(goal.id, session=session)
+
     assert session.get(Goal, goal.id) is not None
-    assert session.get(Quest, quest.id) is not None
+    assert quest.goal_id == goal.id
+    assert quest.goal_session_number == 1
 
 
 def test_archive_goal_with_linked_quest_preserves_quest_and_checkin(session):

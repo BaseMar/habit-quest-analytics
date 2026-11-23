@@ -12,9 +12,8 @@ from src.services.goal_service import (
     archive_goal,
     complete_goal,
     create_goal,
-    delete_goal_if_unused,
+    delete_goal,
     get_goal_completion_forecast,
-    get_goal_history_summary,
     get_goal_progress,
     list_goals,
     reopen_goal,
@@ -477,8 +476,6 @@ def _render_goal_session_plan_preview(preview: dict) -> None:
 @st.dialog("Project actions", on_dismiss="rerun")
 def _project_actions_dialog(goal) -> None:
     st.text(goal.title)
-    history = get_goal_history_summary(goal.id)
-    can_delete = history["linked_quests_count"] == 0
     if goal.status == "Active":
         complete_col, archive_col = st.columns(2)
         with complete_col:
@@ -508,15 +505,23 @@ def _project_actions_dialog(goal) -> None:
         st.session_state["goal_status_message"] = "Project reopened."
         st.rerun()
 
-    if can_delete:
-        st.caption("This project has no linked sessions and can be deleted.")
-        confirmed = st.checkbox("Confirm delete project", key=f"goal_confirm_delete_{goal.id}")
-        if st.button("Delete project", use_container_width=True, disabled=not confirmed, key=f"goal_delete_{goal.id}"):
-            delete_goal_if_unused(goal.id)
-            st.session_state["goal_status_message"] = "Unused project deleted."
-            st.rerun()
-    else:
-        st.caption("Projects with linked sessions keep their history and cannot be deleted.")
+    st.warning(
+        "Deleting this project is permanent. Linked sessions become one-time tasks in Planner "
+        "and keep their status and earned XP."
+    )
+    confirmed = st.checkbox("Confirm delete project", key=f"goal_confirm_delete_{goal.id}")
+    if st.button("Delete project", width="stretch", disabled=not confirmed, key=f"goal_delete_{goal.id}"):
+        try:
+            detached_count = delete_goal(goal.id)
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+
+        message = "Project deleted."
+        if detached_count:
+            message += " Linked sessions were kept as one-time tasks in Planner."
+        st.session_state["goal_status_message"] = message
+        st.rerun()
 
 
 @st.dialog("Generate routine days", width="medium", on_dismiss="rerun")

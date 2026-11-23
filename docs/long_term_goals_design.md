@@ -18,7 +18,7 @@ Current implementation status:
 - Goal session titles are generated automatically as
   `{Goal Title} Session {N}`.
 - The same project workspace includes lifecycle actions to archive, complete,
-  reopen, and safely delete unused goals.
+  reopen, and delete goals.
 - Recurring habits are not linked to goals.
 - A deeper standalone project dashboard is not implemented yet.
 
@@ -177,8 +177,8 @@ Current backend/minimal UI behavior:
 - Goal/project creation and linked goal sessions reject missing categories.
 - Project lifecycle actions appear in the selected project workspace alongside
   progress and session-planning controls.
-- Delete is allowed only for goals with no linked quests; goals with linked
-  quest sessions should be archived instead.
+- Project deletion requires confirmation and leaves linked sessions in Planner
+  as one-time tasks.
 - Recurring habit template creation does not show or set a goal link.
 - Linked quest sessions continue to create normal planned `QuestCheckin` rows.
 - Bulk-planned sessions also create separate normal `Quest` and
@@ -289,16 +289,10 @@ of truth.
 
 ## Safe Deletion / Archive Rules
 
-Goals should follow the same conservative deletion philosophy as recurring
-habits and planned quest cleanup.
-
-Rules:
-
-- Goals with no linked quests can be hard-deleted.
-- Goals with linked history should be archived, not hard-deleted.
-- Deleting a goal should not delete completed quest/check-in history by default.
-- Unlinking unresolved planned sessions may be allowed.
-- Completed, skipped, failed, and XP-awarded history must be preserved.
+- Archiving keeps the project and its session links for project reporting.
+- Deleting a project detaches all sessions in the same transaction. Their titles,
+  schedules, check-in history, and awarded XP are preserved. They appear as
+  one-time tasks in Planner and Analytics.
 
 ## Implementation Phases
 

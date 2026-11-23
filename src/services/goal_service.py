@@ -5,7 +5,12 @@ from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
 from src.database.models import Category, Goal, Quest, QuestCheckin, utc_now
-from src.services.goal_session_data import get_linked_goal_quests, get_quest_checkins, get_quest_planned_minutes
+from src.services.goal_session_data import (
+    get_linked_goal_quests,
+    get_quest_checkins,
+    get_quest_planned_minutes,
+    lock_goal_for_session_changes,
+)
 from src.services.xp_service import calculate_time_based_xp
 
 
@@ -161,30 +166,18 @@ def reopen_goal(goal_id: int, session=None) -> Goal:
     return _set_goal_status(goal_id, "Active", session=session)
 
 
-def delete_goal_if_unused(goal_id: int, session=None) -> dict:
-    """Hard-delete a goal only when it has no linked quests."""
+def delete_goal(goal_id: int, session=None) -> int:
+    """Delete a goal and return the number of sessions kept as one-time quests."""
     owns_session = session is None
     session = session or get_session()
     try:
-        goal = session.get(Goal, goal_id)
-        if goal is None:
-            raise ValueError(f"Goal with id {goal_id} was not found.")
-
-        linked_quests_count = _get_linked_quests_count(session, goal_id)
-        summary = {
-            "goal_id": goal_id,
-            "linked_quests_count": linked_quests_count,
-            "deleted": False,
-            "reason": None,
-        }
-        if linked_quests_count > 0:
-            summary["reason"] = "This goal has linked quest sessions and cannot be deleted safely."
-            return summary
-
+        goal = lock_goal_for_session_changes(session, goal_id)
+        detached_count = session.query(Quest).filter(Quest.goal_id == goal_id).update(
+            {Quest.goal_id: None, Quest.goal_session_number: None},
+        )
         session.delete(goal)
         session.commit()
-        summary["deleted"] = True
-        return summary
+        return detached_count
     except Exception:
         session.rollback()
         raise
@@ -372,10 +365,6 @@ def _build_goal_progress(session, goal: Goal) -> dict:
         "earned_xp": earned_xp,
         "expected_total_xp": calculate_time_based_xp(planned_total_minutes) if planned_total_minutes > 0 else 0,
     }
-
-
-def _get_linked_quests_count(session, goal_id: int) -> int:
-    return session.query(Quest).filter(Quest.goal_id == goal_id).count()
 
 
 def _normalize_title(title: str) -> str:

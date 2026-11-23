@@ -7,6 +7,7 @@ from src.database.db import get_session
 from src.database.models import Category, Goal, Quest, QuestCheckin, RecurringHabitInstance, utc_now
 from src.constants import QUEST_STATUSES
 from src.services.checklist_service import ensure_checkin
+from src.services.goal_session_data import lock_goal_for_session_changes
 from src.services.xp_service import calculate_time_based_xp
 
 
@@ -80,9 +81,17 @@ def backfill_goal_session_numbers(session=None) -> dict:
             )
             for quest in sorted(unnumbered_quests, key=_goal_session_backfill_sort_key):
                 _validate_goal_session_number_unique(session, goal.id, next_number, quest_id=quest.id)
-                quest.goal_session_number = next_number
-                next_number += 1
-                assigned_count += 1
+                updated_count = (
+                    session.query(Quest)
+                    .filter(
+                        Quest.id == quest.id,
+                        Quest.goal_id == goal.id,
+                        Quest.goal_session_number.is_(None),
+                    )
+                    .update({Quest.goal_session_number: next_number})
+                )
+                next_number += updated_count
+                assigned_count += updated_count
 
         session.commit()
         return {"goals_checked": goals_checked, "assigned_count": assigned_count}
@@ -637,7 +646,7 @@ def _prepare_goal_session_values(
         return None, _normalize_title(title), None
 
     _validate_goal_session_category(category_id)
-    goal = _get_active_goal_for_link(session, goal_id)
+    goal = _get_active_goal_for_link(session, goal_id, lock=True)
     session_number = get_next_goal_session_number(goal.id, session=session)
     _validate_goal_session_number_unique(session, goal.id, session_number)
     return goal.id, build_goal_session_title(goal.title, session_number), session_number
@@ -648,8 +657,8 @@ def _validate_goal_session_category(category_id: int | None) -> None:
         raise ValueError("Goal sessions require a category.")
 
 
-def _get_active_goal_for_link(session, goal_id: int) -> Goal:
-    goal = session.get(Goal, goal_id)
+def _get_active_goal_for_link(session, goal_id: int, *, lock: bool = False) -> Goal:
+    goal = lock_goal_for_session_changes(session, goal_id) if lock else session.get(Goal, goal_id)
     if goal is None:
         raise ValueError(f"Goal with id {goal_id} was not found.")
     if goal.status != "Active":
