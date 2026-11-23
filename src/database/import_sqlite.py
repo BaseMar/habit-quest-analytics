@@ -9,9 +9,11 @@ from tempfile import TemporaryDirectory
 from sqlalchemy import create_engine, func, inspect, select
 from sqlalchemy.engine import Connection, Engine, URL
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from src.database.db import engine, init_sqlite_db
+from src.database.db import get_engine
 from src.database.models import Base
+from src.services.quest_service import backfill_goal_session_numbers
 
 
 def import_sqlite(source_path: Path, destination: Engine) -> dict[str, int]:
@@ -34,11 +36,37 @@ def import_sqlite(source_path: Path, destination: Engine) -> dict[str, int]:
         try:
             if not inspect(snapshot_engine).has_table("quests"):
                 raise ValueError("The source file has no quests table.")
-            init_sqlite_db(snapshot_engine)
+            _prepare_sqlite_snapshot(snapshot_engine)
             with snapshot_engine.connect() as source, destination.begin() as target:
                 return _copy_rows(source, target)
         finally:
             snapshot_engine.dispose()
+
+
+def _prepare_sqlite_snapshot(bind: Engine) -> None:
+    """Add fields missing from older backups before reading the snapshot."""
+    Base.metadata.create_all(bind)
+    legacy_columns = {
+        "quests": {
+            "estimated_minutes": "INTEGER",
+            "planned_start_at": "DATETIME",
+            "planned_end_at": "DATETIME",
+            "goal_id": "INTEGER",
+            "goal_session_number": "INTEGER",
+        },
+        "recurring_habits": {"planned_start_time": "TIME", "planned_end_time": "TIME"},
+        "player_profiles": {"avatar_path": "VARCHAR(255)"},
+    }
+    with bind.begin() as connection:
+        inspector = inspect(connection)
+        for table, fields in legacy_columns.items():
+            existing = {column["name"] for column in inspector.get_columns(table)}
+            for field, sql_type in fields.items():
+                if field not in existing:
+                    connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {field} {sql_type}")
+
+    with Session(bind, autoflush=False) as session:
+        backfill_goal_session_numbers(session=session)
 
 
 def _copy_rows(source: Connection, target: Connection) -> dict[str, int]:
@@ -76,7 +104,7 @@ def main() -> None:
     parser.add_argument("source", type=Path, help="Path to the SQLite database file.")
     args = parser.parse_args()
     try:
-        counts = import_sqlite(args.source, engine)
+        counts = import_sqlite(args.source, get_engine())
     except (OSError, sqlite3.Error, SQLAlchemyError, ValueError) as exc:
         parser.exit(1, f"Import failed: {exc}\n")
 

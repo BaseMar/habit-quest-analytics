@@ -9,7 +9,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.database.db import init_db
 from src.services.analytics_service import get_character_profile_data
 from src.services.profile_service import remove_avatar, resolve_avatar_path, save_avatar
 from src.ui import get_theme_tokens, render_page_header, render_section_title
@@ -484,7 +483,6 @@ render_page_header(
     "See your level, XP, and RPG stats.",
 )
 
-init_db()
 profile = get_character_profile_data()
 
 if message := st.session_state.pop("avatar_status_message", None):

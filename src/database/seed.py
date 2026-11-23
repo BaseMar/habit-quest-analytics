@@ -1,6 +1,6 @@
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
-from src.database.db import get_session, init_db
+from src.database.db import get_session
 from src.database.models import Category
 from src.constants import DEFAULT_CATEGORIES
 
@@ -31,11 +31,6 @@ def ensure_default_categories(session=None) -> None:
             session.close()
 
 
-def seed_default_categories() -> None:
-    init_db()
-    ensure_default_categories()
-
-
 if __name__ == "__main__":
-    seed_default_categories()
+    ensure_default_categories()
     print("Seeded default categories.")

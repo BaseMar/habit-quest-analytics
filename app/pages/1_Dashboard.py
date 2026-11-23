@@ -9,7 +9,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.database.db import init_db
 from app.components.checkin_actions import render_checkin_status_actions
 from src.services.analytics_service import get_command_center_data, get_command_center_items_for_date
 from src.services.checklist_service import update_checkin_status
@@ -214,7 +213,6 @@ def render_status_kpis(command_center: dict, compact: bool = False) -> None:
 
 render_page_header("Command Center", "Manage today's work and review past check-ins.")
 
-init_db()
 command_center = get_command_center_data()
 
 if not command_center["has_quests"]:

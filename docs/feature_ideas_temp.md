@@ -270,8 +270,8 @@ Positive value:
 
 ## Priority 13. Production Database
 
-The app supports PostgreSQL through Alembic and can import an existing SQLite
-database. Configuring the target deployment remains open.
+The Streamlit deployment uses PostgreSQL on Supabase. The app manages its schema
+through Alembic and can import SQLite backups.
 
 What it adds:
 
@@ -429,7 +429,7 @@ Implementation note:
 
 1. Long-term Goals / Projects
 2. Recurring habit editing (implemented)
-3. Configure PostgreSQL for the target deployment
+3. Configure PostgreSQL for the target deployment (implemented)
 4. Authentication
 5. Google Calendar sync
 6. AI planning assistant

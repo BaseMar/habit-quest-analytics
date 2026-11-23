@@ -9,8 +9,6 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.components.project_routine_workspace import render_project_routine_workspace
-from src.database.db import init_db
-from src.database.seed import ensure_default_categories
 from src.services.quest_service import get_categories
 from src.ui import render_page_header
 
@@ -20,8 +18,6 @@ render_page_header(
     "Track your projects and manage recurring work.",
 )
 
-init_db()
-ensure_default_categories()
 categories = get_categories()
 category_options = {category.name: category.id for category in categories}
 

@@ -23,7 +23,7 @@ The target user is a single person who wants a local-first productivity dashboar
 
 ## Current State
 
-The MVP is functional and deployed as a public Streamlit Cloud portfolio demo.
+The MVP is deployed on Streamlit Community Cloud with PostgreSQL on Supabase.
 
 Implemented:
 
@@ -49,7 +49,7 @@ Implemented:
   trends, category and routine performance, and insights.
 - Character Profile using check-in XP for total XP, nonlinear level, RPG stat
   levels, and stat-level radar chart.
-- Local SQLite and optional PostgreSQL through SQLAlchemy, with Alembic schema
+- PostgreSQL through SQLAlchemy, with Alembic schema
   upgrades and a SQLite importer for PostgreSQL.
 - Default category seeding.
 - Pytest coverage for model, service, metric, profile, and analytics behavior.
@@ -71,11 +71,10 @@ Compatibility:
 
 ## Future Roadmap
 
-1. Configure PostgreSQL for the target deployment.
-2. Authentication and user-specific data isolation.
-3. Google Calendar sync for scheduled quests.
-4. AI planning assistant for natural-language scheduling.
-5. Voice quest capture / microphone input.
-6. Streak system / bonus XP.
-7. Optional automatic stale planned failure workflow.
-8. Legacy `Quest.status` cleanup after the check-in migration is stable.
+1. Authentication and user-specific data isolation.
+2. Google Calendar sync for scheduled quests.
+3. AI planning assistant for natural-language scheduling.
+4. Voice quest capture / microphone input.
+5. Streak system / bonus XP.
+6. Optional automatic stale planned failure workflow.
+7. Legacy `Quest.status` cleanup after the check-in migration is stable.

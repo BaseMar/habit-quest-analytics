@@ -9,7 +9,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.database.db import init_db
 from src.services.analytics_service import (
     get_habit_analytics_data,
 )
@@ -321,7 +320,6 @@ render_page_header(
     "Review your workload, consistency, and completion rates.",
 )
 
-init_db()
 today = date.today()
 filters = render_analytics_filters(get_categories(), today)
 analytics = get_habit_analytics_data(today=today, **filters)

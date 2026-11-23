@@ -16,8 +16,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.components.plan_form import render_plan_form
 from app.components.planner_month_review import render_month_checklist, render_month_review_controls
-from src.database.db import init_db
-from src.database.seed import ensure_default_categories
 from src.services.goal_service import list_active_goals
 from src.services.quest_service import (
     create_scheduled_quest,
@@ -578,8 +576,6 @@ def _render_day_management_panel(category_options: dict[str, int]) -> None:
 
 render_page_header("Planner", "Schedule tasks, routines, and project sessions.")
 
-init_db()
-ensure_default_categories()
 categories = get_categories()
 category_options = {category.name: category.id for category in categories}
 

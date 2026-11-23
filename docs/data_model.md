@@ -1,6 +1,6 @@
 # Data Model
 
-Habit Quest Analytics uses SQLAlchemy with local SQLite or PostgreSQL.
+Habit Quest Analytics uses SQLAlchemy with PostgreSQL.
 `QuestCheckin` tracks daily status.
 
 ## Source Of Truth
@@ -366,11 +366,12 @@ erDiagram
     }
 ```
 
-## SQLite Startup Schema Helpers
+## SQLite Import Compatibility
 
-The app uses lightweight idempotent schema helpers for local SQLite databases.
+The SQLite importer prepares a temporary snapshot of older backups before
+transferring their data into PostgreSQL.
 
-Startup can:
+Snapshot preparation can:
 
 - create missing tables through SQLAlchemy metadata,
 - create `quest_checkins` for existing local databases if the table is missing,
@@ -381,7 +382,7 @@ Startup can:
 - add missing `goal_session_number` to `quests`,
 - add missing `avatar_path` to `player_profiles`.
 
-These helpers do not drop existing data.
+All schema changes during preparation apply to the snapshot.
 
 ## PostgreSQL Schema
 
@@ -410,4 +411,4 @@ The radar chart displays calculated stat levels, not raw XP.
 - `estimated_minutes` stores planned workload for scheduled tasks and routines.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
 - Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.
-- On Streamlit Community Cloud, local SQLite and file storage may not persist across reboots, redeploys, or instance resets.
+- On Streamlit Community Cloud, avatar uploads may reset when the instance changes.

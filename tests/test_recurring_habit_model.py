@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
-import src.database.db as database_db
+from src.database.import_sqlite import _prepare_sqlite_snapshot
 from src.database.models import Base, Category, Quest, RecurringHabit, RecurringHabitInstance
 
 
@@ -104,17 +104,14 @@ def test_recurring_habit_instances_table_exists():
     assert "recurring_habit_instances" in inspector.get_table_names()
 
 
-def test_sqlite_schema_helper_adds_recurring_habit_tables_to_existing_database(tmp_path, monkeypatch):
+def test_sqlite_schema_helper_adds_recurring_habit_tables_to_existing_database(tmp_path):
     database_path = tmp_path / "existing.db"
     engine = create_engine(f"sqlite:///{database_path}")
     Base.metadata.tables["categories"].create(bind=engine)
     Base.metadata.tables["quests"].create(bind=engine)
 
-    monkeypatch.setattr(database_db, "DATABASE_URL", f"sqlite:///{database_path}")
-    monkeypatch.setattr(database_db, "engine", engine)
-
-    database_db._ensure_sqlite_schema()
-    database_db._ensure_sqlite_schema()
+    _prepare_sqlite_snapshot(engine)
+    _prepare_sqlite_snapshot(engine)
 
     inspector = inspect(engine)
     table_names = inspector.get_table_names()

@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
-import src.database.db as database_db
+from src.database.import_sqlite import _prepare_sqlite_snapshot
 from src.database.models import Base, Category, Goal, Quest
 
 
@@ -84,17 +84,14 @@ def test_quest_can_link_to_goal_and_relationships_work():
         session.close()
 
 
-def test_sqlite_schema_helper_adds_goals_table_to_existing_database(tmp_path, monkeypatch):
+def test_sqlite_schema_helper_adds_goals_table_to_existing_database(tmp_path):
     database_path = tmp_path / "existing.db"
     engine = create_engine(f"sqlite:///{database_path}")
     Base.metadata.tables["categories"].create(bind=engine)
     Base.metadata.tables["quests"].create(bind=engine)
 
-    monkeypatch.setattr(database_db, "DATABASE_URL", f"sqlite:///{database_path}")
-    monkeypatch.setattr(database_db, "engine", engine)
-
-    database_db._ensure_sqlite_schema()
-    database_db._ensure_sqlite_schema()
+    _prepare_sqlite_snapshot(engine)
+    _prepare_sqlite_snapshot(engine)
 
     inspector = inspect(engine)
     table_names = inspector.get_table_names()
@@ -115,7 +112,7 @@ def test_sqlite_schema_helper_adds_goals_table_to_existing_database(tmp_path, mo
     }.issubset(goal_columns)
 
 
-def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path, monkeypatch):
+def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path):
     database_path = tmp_path / "existing.db"
     engine = create_engine(f"sqlite:///{database_path}")
     with engine.begin() as connection:
@@ -149,88 +146,11 @@ def test_sqlite_schema_helper_adds_goal_id_to_existing_quests_table(tmp_path, mo
             )
         )
 
-    monkeypatch.setattr(database_db, "DATABASE_URL", f"sqlite:///{database_path}")
-    monkeypatch.setattr(database_db, "engine", engine)
-
-    database_db._ensure_sqlite_schema()
-    database_db._ensure_sqlite_schema()
+    _prepare_sqlite_snapshot(engine)
+    _prepare_sqlite_snapshot(engine)
 
     inspector = inspect(engine)
     quest_columns = {column["name"] for column in inspector.get_columns("quests")}
 
     assert "goal_id" in quest_columns
     assert "goal_session_number" in quest_columns
-
-
-def test_sqlite_schema_helper_updates_goal_planned_time_constraint(tmp_path, monkeypatch):
-    database_path = tmp_path / "existing.db"
-    engine = create_engine(f"sqlite:///{database_path}")
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                CREATE TABLE categories (
-                    id INTEGER PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL UNIQUE,
-                    description TEXT
-                )
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                CREATE TABLE quests (
-                    id INTEGER PRIMARY KEY,
-                    title VARCHAR(200) NOT NULL,
-                    status VARCHAR(30) NOT NULL DEFAULT 'active',
-                    is_habit BOOLEAN NOT NULL DEFAULT 0,
-                    xp_reward INTEGER NOT NULL DEFAULT 10
-                )
-                """
-            )
-        )
-        connection.execute(
-            text(
-                """
-                CREATE TABLE goals (
-                    id INTEGER PRIMARY KEY,
-                    title VARCHAR(200) NOT NULL,
-                    description TEXT,
-                    planned_total_minutes INTEGER NOT NULL,
-                    start_date DATE,
-                    target_end_date DATE,
-                    status VARCHAR(30) NOT NULL DEFAULT 'Active',
-                    created_at DATETIME NOT NULL,
-                    updated_at DATETIME NOT NULL,
-                    category_id INTEGER,
-                    CONSTRAINT ck_goal_planned_total_minutes_positive CHECK (planned_total_minutes > 0)
-                )
-                """
-            )
-        )
-
-    monkeypatch.setattr(database_db, "DATABASE_URL", f"sqlite:///{database_path}")
-    monkeypatch.setattr(database_db, "engine", engine)
-
-    database_db._ensure_sqlite_schema()
-    database_db._ensure_sqlite_schema()
-
-    with engine.begin() as connection:
-        connection.execute(
-            text(
-                """
-                INSERT INTO goals (
-                    title,
-                    planned_total_minutes,
-                    status,
-                    created_at,
-                    updated_at
-                )
-                VALUES ('Open ended', 0, 'Active', '2026-07-10 00:00:00', '2026-07-10 00:00:00')
-                """
-            )
-        )
-        count = connection.execute(text("SELECT COUNT(*) FROM goals WHERE planned_total_minutes = 0")).scalar()
-
-    assert count == 1

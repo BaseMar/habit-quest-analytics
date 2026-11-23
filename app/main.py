@@ -8,6 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.database import db
 from src.ui import apply_theme, render_appearance_controls
 
 
@@ -21,6 +22,10 @@ if "on_change" not in signature(st.tabs).parameters:
     st.error(f"The app needs Streamlit 1.66.1 or newer. This process is using {st.__version__}.")
     st.markdown("From the project directory, start the app with its local virtual environment.")
     st.code("python run_streamlit.py", language="bash")
+    st.stop()
+
+if db.engine is None:
+    st.error("Set DATABASE_URL in Streamlit secrets or the environment to connect to PostgreSQL.")
     st.stop()
 
 

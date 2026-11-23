@@ -15,7 +15,7 @@ The current usable version includes:
 - player profile with XP, nonlinear level, avatar, and RPG stat levels,
 - Command Center operational actions and KPIs,
 - Habit Analytics trends and consistency metrics,
-- local SQLite persistence and optional PostgreSQL,
+- PostgreSQL persistence and import of SQLite backups,
 - pytest coverage for business rules.
 
 ## User Stories
@@ -61,7 +61,7 @@ Status: implemented.
 - Create project structure.
 - Add Streamlit pages.
 - Add SQLAlchemy models.
-- Add SQLite initialization.
+- Add database migrations and SQLite import.
 - Add default category seeding.
 - Add XP and level formulas.
 - Add initial tests.
@@ -173,5 +173,5 @@ Legacy quest-based fallback remains only for databases with no check-ins.
   completed, skipped, failed, or XP-awarded history.
 - Completed check-ins award XP once.
 - Command Center, Habit Analytics, and Character Profile use check-ins when available.
-- Quest records and check-ins persist in SQLite.
+- Quest records and check-ins persist in PostgreSQL.
 - Core formulas and service behavior remain covered by tests.

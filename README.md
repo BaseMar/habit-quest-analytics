@@ -8,7 +8,7 @@ operational metrics, trend analysis, and character growth.
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-ff4b4b)
 ![Pandas](https://img.shields.io/badge/Pandas-Data%20Analysis-purple)
 ![Tests](https://img.shields.io/badge/tests-pytest-brightgreen)
-![SQLite](https://img.shields.io/badge/SQLite-SQLAlchemy-003B57)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-003B57)
 ![Plotly](https://img.shields.io/badge/Plotly-Charts-3F4F75)
 ![Deployment](https://img.shields.io/badge/Deployment-Streamlit%20Cloud-ff4b4b)
 
@@ -49,7 +49,7 @@ behavior through dashboards and charts.
 
 I designed and implemented the current MVP, including:
 
-- SQLAlchemy persistence with local SQLite and configurable PostgreSQL.
+- SQLAlchemy persistence with PostgreSQL and an importer for SQLite backups.
 - Streamlit app shell, custom navigation, and dark RPG dashboard UI.
 - Quest planning workflow with calendar scheduling.
 - Monthly Checklist tracking system backed by daily `QuestCheckin` records.
@@ -65,10 +65,9 @@ I designed and implemented the current MVP, including:
 
 Live app: https://habit-quest-analytics-sai5h3bl7wjykw4fbruabd.streamlit.app
 
-This is a public portfolio demo deployed on Streamlit Community Cloud. The demo
-uses SQLite and a shared workspace. Local SQLite data and uploaded avatar files
-may reset after redeploys, reboots, or instance changes. A deployment can use
-PostgreSQL to persist its database records.
+The Streamlit Community Cloud deployment uses PostgreSQL on Supabase and a
+shared workspace for people with access to the app. Uploaded avatar files use
+local storage and may reset when the Streamlit instance changes.
 
 ## Project Status
 
@@ -118,7 +117,7 @@ Implemented:
 - Character Profile XP, level, and RPG stats powered by check-in XP.
 - Habit Analytics date filters, plan-versus-completion trends, category and
   routine performance, and insight data powered by check-ins.
-- Optional PostgreSQL persistence with Alembic migrations and a SQLite importer.
+- PostgreSQL persistence with Alembic migrations and a SQLite importer.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
@@ -141,7 +140,7 @@ the current UI.
 
 - Python
 - Streamlit
-- SQLite
+- PostgreSQL
 - SQLAlchemy
 - Pandas
 - Plotly
@@ -351,7 +350,7 @@ habit-quest-analytics/
     ui.py                    # Shared Streamlit UI/style helpers
   docs/                      # Project, model, metrics, and design documentation
   tests/                     # Pytest coverage
-  data/                      # Local SQLite database and local uploads
+  data/                      # Local uploads and optional SQLite backups
 ```
 
 ## Data Model
@@ -511,7 +510,7 @@ See [docs/data_model.md](docs/data_model.md) for deeper model notes.
   - Plotly
   - streamlit-calendar
   - pytest
-- SQLite database at `data/habit_quest.db` by default.
+- A PostgreSQL database configured through `DATABASE_URL`.
 
 ## Installation
 
@@ -530,13 +529,6 @@ python run_streamlit.py
 
 The launcher uses the project's `.venv` when present. You can also run
 `streamlit run app/main.py` from an environment with Streamlit 1.66.1 or newer.
-
-The app initializes SQLite tables and default categories on startup. Default
-categories can also be seeded manually:
-
-```bash
-python -m src.database.seed
-```
 
 ## PostgreSQL
 
@@ -560,10 +552,18 @@ and rejects a destination that already contains app data.
 python -m src.database.import_sqlite data/habit_quest.db
 ```
 
+For an empty database, add the default categories once before launching the app.
+The same command can fill in categories missing from an imported database.
+
+```bash
+python -m src.database.seed
+```
+
 Database records and avatar file paths are copied. Avatar image files are stored
-separately under `data/uploads/`. On Streamlit Community Cloud, configure
-`DATABASE_URL` as a top-level app secret for the chosen deployment. The public
-demo has a shared workspace, so use its own database for demo data.
+separately under `data/uploads/`. For local Streamlit runs, set `DATABASE_URL`
+in the shell or as a top-level key in the gitignored `.streamlit/secrets.toml`.
+On Streamlit Community Cloud, use a top-level app secret. The Alembic, import,
+and seed commands read the shell environment.
 [Streamlit Community Cloud secrets](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)
 
 ## Tests
@@ -593,7 +593,7 @@ python -m compileall -q app src tests
 - XP changes must be idempotent.
 - Analytics should avoid double-counting legacy quest status and check-in
   records.
-- Future work should stay small and testable. SQLite supports local use.
+- The app reads and writes PostgreSQL. SQLite is used for imports and tests.
 
 ## Limitations & Future Work
 
@@ -617,12 +617,11 @@ Current limitations:
 
 Suggested future order:
 
-1. Configure PostgreSQL for the target deployment
-2. Authentication
-3. Google Calendar sync
-4. AI planning assistant
-5. Voice quest capture / microphone input
-6. Streak system / bonus XP
-7. Achievement system
-8. Optional auto-fail activation workflow
-9. Legacy `Quest.status` cleanup
+1. Authentication
+2. Google Calendar sync
+3. AI planning assistant
+4. Voice quest capture / microphone input
+5. Streak system / bonus XP
+6. Achievement system
+7. Optional auto-fail activation workflow
+8. Legacy `Quest.status` cleanup

@@ -44,12 +44,15 @@ def test_planner_add_item_uses_manually_selected_day_after_calendar_click(tmp_pa
     import streamlit_calendar
 
     from src.database import db
+    from src.database.models import Base
+    from src.database.seed import ensure_default_categories
 
     db_path = tmp_path / "planner.db"
     db_url = f"sqlite:///{db_path.as_posix()}"
     engine = create_engine(db_url, connect_args={"check_same_thread": False})
-    monkeypatch.setattr(db, "DEFAULT_DATABASE_PATH", db_path)
-    monkeypatch.setattr(db, "DATABASE_URL", db_url)
+    Base.metadata.create_all(engine)
+    with sessionmaker(bind=engine)() as session:
+        ensure_default_categories(session)
     monkeypatch.setattr(db, "engine", engine)
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
 
@@ -78,3 +81,19 @@ def test_planner_add_item_uses_manually_selected_day_after_calendar_click(tmp_pa
         assert app.date_input(key="plan_date").value == manual_date
     finally:
         engine.dispose()
+
+
+def test_app_explains_how_to_configure_postgresql_when_url_is_missing(monkeypatch):
+    pytest.importorskip("streamlit", minversion="1.66.1")
+    from streamlit.testing.v1 import AppTest
+
+    from src.database import db
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(db, "engine", None)
+    main = Path(__file__).resolve().parents[1] / "app" / "main.py"
+
+    app = AppTest.from_file(str(main)).run()
+
+    assert not app.exception
+    assert "DATABASE_URL" in app.error[0].value
