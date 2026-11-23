@@ -1,0 +1,137 @@
+import os
+from datetime import date
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+from sqlalchemy import create_engine, inspect, select
+from sqlalchemy.engine import URL
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
+
+from src.database import db
+from src.database.import_sqlite import import_sqlite
+from src.database.models import Base, Category, Goal, PlayerProfile, Quest, QuestCheckin
+from src.database.seed import ensure_default_categories
+from src.services.goal_service import delete_goal, get_goal_progress
+from src.services.quest_service import create_quest
+
+
+@pytest.mark.parametrize("scheme", ["postgres", "postgresql", "postgresql+psycopg"])
+def test_postgresql_url_selects_psycopg_and_keeps_connection_parameters(monkeypatch, scheme):
+    monkeypatch.setenv("DATABASE_URL", f"{scheme}://user:p%40ss@localhost:5433/habits?sslmode=require")
+
+    url = db.get_database_url()
+
+    assert url.drivername == "postgresql+psycopg"
+    assert url.password == "p@ss"
+    assert url.port == 5433
+    assert url.query["sslmode"] == "require"
+
+
+@pytest.fixture
+def postgres(monkeypatch):
+    configured_url = os.getenv("TEST_POSTGRESQL_URL")
+    if not configured_url:
+        pytest.skip("Set TEST_POSTGRESQL_URL to run PostgreSQL integration tests.")
+
+    from alembic import command
+    from alembic.config import Config
+
+    monkeypatch.setenv("DATABASE_URL", configured_url)
+    url = db.get_database_url()
+    if url.get_backend_name() != "postgresql":
+        pytest.fail("TEST_POSTGRESQL_URL must point to a PostgreSQL database.")
+    admin = create_engine(url)
+    schema = f"hq_test_{uuid4().hex}"
+    options = f"{url.query.get('options', '')} -csearch_path={schema}".strip()
+    test_url = url.update_query_dict({"options": options})
+    engine = create_engine(test_url)
+    try:
+        with admin.begin() as connection:
+            connection.execute(CreateSchema(schema))
+        monkeypatch.setattr(db, "DATABASE_URL", test_url)
+        monkeypatch.setattr(db, "engine", engine)
+        config = Config(Path(__file__).resolve().parents[1] / "alembic.ini")
+        command.upgrade(config, "head")
+        command.check(config)
+        yield engine
+    finally:
+        engine.dispose()
+        with admin.begin() as connection:
+            connection.execute(DropSchema(schema, cascade=True, if_exists=True))
+        admin.dispose()
+
+
+def test_import_preserves_history_and_generates_new_ids(postgres, tmp_path):
+    source_path = tmp_path / "old habit quest.db"
+    sqlite = create_engine(URL.create("sqlite", database=str(source_path)))
+    completed_date = date(2026, 7, 1)
+    long_title = "Portfolio project " * 14
+    try:
+        Base.metadata.create_all(sqlite)
+        with Session(sqlite) as session:
+            category = Category(id=10, name="Work", description="My own description")
+            goal = Goal(id=20, title=long_title, planned_total_minutes=120, category=category)
+            quest = Quest(
+                id=40, title="Portfolio session", category=category, goal=goal, estimated_minutes=60
+            )
+            session.add_all([
+                QuestCheckin(id=80, quest=quest, checkin_date=completed_date, status="Completed", xp_awarded=20),
+                PlayerProfile(id=5, character_name="Explorer", avatar_path="data/uploads/avatar.png"),
+            ])
+            session.commit()
+        with sqlite.begin() as connection:
+            connection.exec_driver_sql("ALTER TABLE quests DROP COLUMN goal_session_number")
+    finally:
+        sqlite.dispose()
+
+    source_bytes = source_path.read_bytes()
+    counts = import_sqlite(source_path, postgres)
+
+    assert source_path.read_bytes() == source_bytes
+    assert counts["goals"] == counts["quests"] == counts["quest_checkins"] == counts["player_profiles"] == 1
+    with pytest.raises(ValueError, match="destination must be empty"):
+        import_sqlite(source_path, postgres)
+
+    with Session(postgres) as session:
+        assert session.get(Goal, 20).title == long_title
+        quest = session.get(Quest, 40)
+        assert quest.goal_id == 20
+        assert quest.goal_session_number == 1
+        assert quest.checkins[0].checkin_date == completed_date
+        assert get_goal_progress(20, session=session)["earned_xp"] == 20
+        assert session.get(PlayerProfile, 5).avatar_path == "data/uploads/avatar.png"
+
+        ensure_default_categories(session=session)
+        ensure_default_categories(session=session)
+        assert session.get(Category, 10).description == "My own description"
+        assert create_quest("New task", category_id=10, session=session).id > quest.id
+
+        assert delete_goal(20, session=session) == 1
+        assert quest.goal_id is None
+        assert quest.checkins[0].xp_awarded == 20
+
+
+def test_import_rolls_back_if_sqlite_contains_an_orphaned_checkin(postgres, tmp_path):
+    source_path = tmp_path / "orphaned.db"
+    sqlite = create_engine(URL.create("sqlite", database=str(source_path)))
+    try:
+        Base.metadata.create_all(sqlite)
+        with Session(sqlite) as session:
+            session.add_all([
+                Category(id=10, name="Work"),
+                QuestCheckin(id=20, quest_id=999, checkin_date=date(2026, 7, 1)),
+            ])
+            session.commit()
+    finally:
+        sqlite.dispose()
+
+    with pytest.raises(IntegrityError):
+        import_sqlite(source_path, postgres)
+
+    with postgres.connect() as connection:
+        assert connection.execute(select(Category)).first() is None
+        assert connection.execute(select(QuestCheckin)).first() is None
+        assert "goals" in inspect(connection).get_table_names()

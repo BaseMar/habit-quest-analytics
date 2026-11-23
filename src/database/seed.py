@@ -1,3 +1,5 @@
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+
 from src.database.db import get_session, init_db
 from src.database.models import Category
 from src.constants import DEFAULT_CATEGORIES
@@ -9,9 +11,17 @@ def ensure_default_categories(session=None) -> None:
     session = session or get_session()
     try:
         existing_names = {name for (name,) in session.query(Category.name).all()}
-        for name, description in DEFAULT_CATEGORIES:
-            if name not in existing_names:
-                session.add(Category(name=name, description=description))
+        missing = [
+            {"name": name, "description": description}
+            for name, description in DEFAULT_CATEGORIES
+            if name not in existing_names
+        ]
+        if missing:
+            if session.get_bind().dialect.name == "postgresql":
+                insert_defaults = postgresql_insert(Category).values(missing)
+                session.execute(insert_defaults.on_conflict_do_nothing(index_elements=[Category.name]))
+            else:
+                session.add_all(Category(**values) for values in missing)
         session.commit()
     except Exception:
         session.rollback()

@@ -49,7 +49,8 @@ Implemented:
   trends, category and routine performance, and insights.
 - Character Profile using check-in XP for total XP, nonlinear level, RPG stat
   levels, and stat-level radar chart.
-- SQLite/SQLAlchemy persistence and startup schema helpers.
+- Local SQLite and optional PostgreSQL through SQLAlchemy, with Alembic schema
+  upgrades and a SQLite importer for PostgreSQL.
 - Default category seeding.
 - Pytest coverage for model, service, metric, profile, and analytics behavior.
 
@@ -70,14 +71,11 @@ Compatibility:
 
 ## Future Roadmap
 
-These ideas are not currently implemented.
-
-1. True N-times-per-week routine scheduling.
-2. PostgreSQL / production persistence.
-3. Authentication and user-specific data isolation.
-4. Google Calendar sync for scheduled quests.
-5. AI planning assistant for natural-language scheduling.
-6. Voice quest capture / microphone input.
-7. Streak system / bonus XP.
-8. Optional automatic stale planned failure workflow.
-9. Legacy `Quest.status` cleanup after the check-in migration is stable.
+1. Configure PostgreSQL for the target deployment.
+2. Authentication and user-specific data isolation.
+3. Google Calendar sync for scheduled quests.
+4. AI planning assistant for natural-language scheduling.
+5. Voice quest capture / microphone input.
+6. Streak system / bonus XP.
+7. Optional automatic stale planned failure workflow.
+8. Legacy `Quest.status` cleanup after the check-in migration is stable.

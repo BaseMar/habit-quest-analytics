@@ -1,6 +1,6 @@
 # Temporary Feature Ideas Backlog
 
-This file stores proposed future features for Habit Quest Analytics, sorted from highest to lowest implementation priority.
+This file tracks proposed future features, their priorities, and deferred ideas.
 
 Rule: do not implement any item from this list without explicit user confirmation. Before implementation, discuss scope, priority, data model impact, UI impact, and tests.
 
@@ -153,7 +153,7 @@ Positive value:
 - Makes analytics more useful without changing the core quest model.
 - Helps compare recent behavior against long-term trends.
 
-## Priority 7. N-Times-Per-Week Routine Scheduling
+## Deferred. N-Times-Per-Week Routine Scheduling
 
 What it adds:
 
@@ -269,6 +269,9 @@ Positive value:
 - Helps users notice neglected areas earlier.
 
 ## Priority 13. Production Database
+
+The app supports PostgreSQL through Alembic and can import an existing SQLite
+database. Configuring the target deployment remains open.
 
 What it adds:
 
@@ -425,8 +428,8 @@ Implementation note:
 ### Suggested Implementation Order
 
 1. Long-term Goals / Projects
-2. Recurring habit editing and N-times-per-week scheduling
-3. PostgreSQL / production persistence
+2. Recurring habit editing (implemented)
+3. Configure PostgreSQL for the target deployment
 4. Authentication
 5. Google Calendar sync
 6. AI planning assistant

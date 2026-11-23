@@ -15,7 +15,7 @@ The current usable version includes:
 - player profile with XP, nonlinear level, avatar, and RPG stat levels,
 - Command Center operational actions and KPIs,
 - Habit Analytics trends and consistency metrics,
-- local SQLite persistence,
+- local SQLite persistence and optional PostgreSQL,
 - pytest coverage for business rules.
 
 ## User Stories
@@ -154,8 +154,6 @@ Legacy quest-based fallback remains only for databases with no check-ins.
 
 ## Future Features Outside MVP
 
-- True N-times-per-week recurring habit scheduling.
-- PostgreSQL / production persistence.
 - Authentication and user-specific data isolation.
 - Google Calendar sync.
 - AI planning assistant.

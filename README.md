@@ -49,7 +49,7 @@ behavior through dashboards and charts.
 
 I designed and implemented the current MVP, including:
 
-- SQLAlchemy data model and SQLite persistence.
+- SQLAlchemy persistence with local SQLite and configurable PostgreSQL.
 - Streamlit app shell, custom navigation, and dark RPG dashboard UI.
 - Quest planning workflow with calendar scheduling.
 - Monthly Checklist tracking system backed by daily `QuestCheckin` records.
@@ -65,11 +65,10 @@ I designed and implemented the current MVP, including:
 
 Live app: https://habit-quest-analytics-sai5h3bl7wjykw4fbruabd.streamlit.app
 
-This is a public portfolio demo deployed on Streamlit Community Cloud. The
-project is local-first and currently uses SQLite for local/demo persistence. It
-is not a production multi-user SaaS app. Local uploaded files and local SQLite
-data are not production-grade persistent storage on Streamlit Cloud and may reset
-after redeploys, reboots, or instance changes.
+This is a public portfolio demo deployed on Streamlit Community Cloud. The demo
+uses SQLite and a shared workspace. Local SQLite data and uploaded avatar files
+may reset after redeploys, reboots, or instance changes. A deployment can use
+PostgreSQL to persist its database records.
 
 ## Project Status
 
@@ -108,8 +107,9 @@ Implemented:
   actions, project comparison, and a Goal Session Planner that previews and
   bulk creates multiple scheduled one-time sessions from remaining unscheduled
   goal effort.
-- Goal lifecycle controls in Projects & Routines: archive, complete, reopen,
-  and safe delete for unused goals.
+- Goal lifecycle controls in Projects & Routines include archiving, completing,
+  reopening, and deleting projects. When a project is deleted, its sessions
+  become one-time tasks in Planner and keep their check-ins and earned XP.
 - Monthly Checklist groups goal-linked sessions into one visual row per goal
   while preserving separate underlying `Quest` and `QuestCheckin` records.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
@@ -118,13 +118,12 @@ Implemented:
 - Character Profile XP, level, and RPG stats powered by check-in XP.
 - Habit Analytics date filters, plan-versus-completion trends, category and
   routine performance, and insight data powered by check-ins.
+- Optional PostgreSQL persistence with Alembic migrations and a SQLite importer.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
 Still evolving:
 
-- True N-times-per-week routine scheduling.
-- Production persistence.
 - Authentication and user-specific data.
 - External calendar sync.
 - AI and voice planning assistants.
@@ -346,7 +345,7 @@ habit-quest-analytics/
     pages/                   # Command Center, Planner, Projects & Routines, Analytics, Profile
   src/
     analysis/                # Pure metric helpers
-    database/                # SQLAlchemy models, SQLite engine, startup schema helpers, seed data
+    database/                # SQLAlchemy models, database setup, SQLite import, seed data
     services/                # Quest, checklist, analytics, profile, and XP business logic
     constants.py             # Statuses, categories, RPG stat mapping
     ui.py                    # Shared Streamlit UI/style helpers
@@ -507,6 +506,7 @@ See [docs/data_model.md](docs/data_model.md) for deeper model notes.
 - Dependencies from `requirements.txt`:
   - Streamlit
   - SQLAlchemy
+  - Alembic and Psycopg for PostgreSQL
   - pandas
   - Plotly
   - streamlit-calendar
@@ -538,12 +538,43 @@ categories can also be seeded manually:
 python -m src.database.seed
 ```
 
+## PostgreSQL
+
+Set `DATABASE_URL` in your shell to the target PostgreSQL connection URL, for
+example `postgresql://user:password@db.example.com/habit_quest?sslmode=require`.
+The app accepts `postgresql://` and `postgres://` URLs using Psycopg. Apply the
+schema before starting the app, and apply later upgrades when deploying a new
+version. [SQLAlchemy PostgreSQL documentation](https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#module-sqlalchemy.dialects.postgresql.psycopg)
+
+```bash
+python -m alembic upgrade head
+```
+
+To move an existing SQLite database, stop writes to the source and run the import
+after the schema upgrade, before seeding categories or starting the app against
+the empty destination. The import reads a snapshot of SQLite and copies all
+database rows in one transaction. It keeps IDs, relationships, check-ins and XP,
+and rejects a destination that already contains app data.
+
+```bash
+python -m src.database.import_sqlite data/habit_quest.db
+```
+
+Database records and avatar file paths are copied. Avatar image files are stored
+separately under `data/uploads/`. On Streamlit Community Cloud, configure
+`DATABASE_URL` as a top-level app secret for the chosen deployment. The public
+demo has a shared workspace, so use its own database for demo data.
+[Streamlit Community Cloud secrets](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)
+
 ## Tests
 
 ```bash
 python -m pytest
-python -m compileall -q app src tests
+python -m compileall -q app src tests migrations
 ```
+
+Set `TEST_POSTGRESQL_URL` to run the PostgreSQL integration tests. They create
+and remove an isolated schema in that database.
 
 On Windows, if local pycache permissions cause compile issues, run with a
 temporary pycache prefix:
@@ -562,20 +593,19 @@ python -m compileall -q app src tests
 - XP changes must be idempotent.
 - Analytics should avoid double-counting legacy quest status and check-in
   records.
-- Future work should stay small, testable, and local-first until production
-  persistence is planned.
+- Future work should stay small and testable. SQLite supports local use.
 
 ## Limitations & Future Work
 
 Current limitations:
 
-- Recurring Habits v1 supports selected weekdays, template editing, and explicit
-  month generation; true N-times-per-week auto-scheduling is not implemented yet.
+- Recurring Habits supports selected weekdays, template editing, and explicit
+  month generation.
 - Projects & Routines provides a selected-project workspace. A broader portfolio
   dashboard with deeper drilldowns remains future work; the design is documented
   in [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
-- SQLite/local file storage is suitable for MVP and demo use, not production
-  multi-user persistence.
+- Database records can persist in PostgreSQL. Uploaded avatar files use local
+  storage.
 - Authentication and user-specific data isolation are not implemented.
 - Google Calendar sync is not implemented.
 - AI planning assistant and voice quest capture are not implemented.
@@ -587,13 +617,12 @@ Current limitations:
 
 Suggested future order:
 
-1. N-times-per-week recurring habit scheduling
-2. PostgreSQL / production persistence
-3. Authentication
-4. Google Calendar sync
-5. AI planning assistant
-6. Voice quest capture / microphone input
-7. Streak system / bonus XP
-8. Achievement system
-9. Optional auto-fail activation workflow
-10. Legacy `Quest.status` cleanup
+1. Configure PostgreSQL for the target deployment
+2. Authentication
+3. Google Calendar sync
+4. AI planning assistant
+5. Voice quest capture / microphone input
+6. Streak system / bonus XP
+7. Achievement system
+8. Optional auto-fail activation workflow
+9. Legacy `Quest.status` cleanup

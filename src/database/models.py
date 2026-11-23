@@ -7,6 +7,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Identity,
     Integer,
     String,
     Text,
@@ -20,14 +21,14 @@ Base = declarative_base()
 
 
 def utc_now() -> datetime:
-    """Return a UTC timestamp compatible with the current naive SQLite DateTime columns."""
+    """Return UTC in the schema's timezone-naive timestamp format."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Category(Base):
     __tablename__ = "categories"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     name = Column(String(100), nullable=False, unique=True)
     description = Column(Text, nullable=True)
 
@@ -50,8 +51,8 @@ class Goal(Base):
         ),
     )
 
-    id = Column(Integer, primary_key=True)
-    title = Column(String(200), nullable=False)
+    id = Column(Integer, Identity(), primary_key=True)
+    title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     planned_total_minutes = Column(Integer, nullable=False)
     start_date = Column(Date, nullable=True)
@@ -68,8 +69,8 @@ class Goal(Base):
 class Quest(Base):
     __tablename__ = "quests"
 
-    id = Column(Integer, primary_key=True)
-    title = Column(String(200), nullable=False)
+    id = Column(Integer, Identity(), primary_key=True)
+    title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(30), nullable=False, default="active")
     is_habit = Column(Boolean, nullable=False, default=False)
@@ -97,8 +98,8 @@ class Quest(Base):
 class RecurringHabit(Base):
     __tablename__ = "recurring_habits"
 
-    id = Column(Integer, primary_key=True)
-    title = Column(String(200), nullable=False)
+    id = Column(Integer, Identity(), primary_key=True)
+    title = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
     xp_reward = Column(Integer, nullable=False)
     estimated_minutes = Column(Integer, nullable=False)
@@ -124,7 +125,7 @@ class RecurringHabitInstance(Base):
         UniqueConstraint("quest_id", name="uq_recurring_habit_instance_quest"),
     )
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     recurring_habit_id = Column(Integer, ForeignKey("recurring_habits.id"), nullable=False)
     scheduled_date = Column(Date, nullable=False)
     quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
@@ -140,7 +141,7 @@ class QuestCheckin(Base):
         UniqueConstraint("quest_id", "checkin_date", name="uq_quest_checkin_date"),
     )
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
     checkin_date = Column(Date, nullable=False)
     status = Column(String(30), nullable=False, default="Planned")
@@ -157,7 +158,7 @@ class QuestCheckin(Base):
 class PlayerProfile(Base):
     __tablename__ = "player_profiles"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     character_name = Column(String(100), nullable=False, default="Adventurer")
     total_xp = Column(Integer, nullable=False, default=0)
     avatar_path = Column(String(255), nullable=True)
@@ -170,7 +171,7 @@ class PlayerProfile(Base):
 class Achievement(Base):
     __tablename__ = "achievements"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     name = Column(String(150), nullable=False, unique=True)
     description = Column(Text, nullable=True)
     xp_required = Column(Integer, nullable=False, default=0)
@@ -184,7 +185,7 @@ class UnlockedAchievement(Base):
         UniqueConstraint("player_profile_id", "achievement_id", name="uq_player_achievement"),
     )
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, Identity(), primary_key=True)
     player_profile_id = Column(Integer, ForeignKey("player_profiles.id"), nullable=False)
     achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False)
     unlocked_at = Column(DateTime, nullable=False, default=utc_now)

@@ -1,6 +1,7 @@
 # Data Model
 
-Habit Quest Analytics uses SQLite locally through SQLAlchemy. The model remains intentionally small, but daily status tracking now belongs to `QuestCheckin` rather than only to `Quest.status`.
+Habit Quest Analytics uses SQLAlchemy with local SQLite or PostgreSQL.
+`QuestCheckin` tracks daily status.
 
 ## Source Of Truth
 
@@ -98,6 +99,9 @@ Relationships:
 
 Retention behavior:
 
+- Deleting a project clears `goal_id` and `goal_session_number` on its sessions
+  in the same transaction. The sessions remain as one-time quests with their
+  titles, schedules, and check-ins.
 - Unresolved one-time planned quests can be hard-deleted only when their
   check-ins are still `Planned`, have `xp_awarded = 0`, and have no resolved
   timestamps.
@@ -364,7 +368,7 @@ erDiagram
 
 ## SQLite Startup Schema Helpers
 
-The app currently uses lightweight idempotent SQLite schema helpers instead of a full migration framework.
+The app uses lightweight idempotent schema helpers for local SQLite databases.
 
 Startup can:
 
@@ -378,6 +382,13 @@ Startup can:
 - add missing `avatar_path` to `player_profiles`.
 
 These helpers do not drop existing data.
+
+## PostgreSQL Schema
+
+Alembic version-controls the PostgreSQL schema. Primary keys use identity
+columns that accept explicit IDs during SQLite import. The importer preserves
+the IDs and resets the identity sequences to start above the imported IDs.
+See the [PostgreSQL setup and import instructions](../README.md#postgresql).
 
 ## Category To RPG Stat Mapping
 
@@ -398,6 +409,5 @@ The radar chart displays calculated stat levels, not raw XP.
 
 - `estimated_minutes` stores planned workload for scheduled tasks and routines.
 - Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
-- A production deployment with users should use a production database and a real migration strategy.
 - Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.
 - On Streamlit Community Cloud, local SQLite and file storage may not persist across reboots, redeploys, or instance resets.

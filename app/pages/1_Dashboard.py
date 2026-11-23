@@ -267,5 +267,3 @@ else:
     with summary_col:
         render_mission_brief(command_center)
         render_status_kpis(command_center, compact=True)
-
-st.caption("Data source: local SQLite quest check-in records.")
