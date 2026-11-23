@@ -1,7 +1,8 @@
+from collections import Counter
 from datetime import date, datetime, time, timedelta
 
 import pandas as pd
-from sqlalchemy import and_, or_
+from sqlalchemy import Date, and_, case, func, or_, type_coerce
 from sqlalchemy.orm import joinedload
 
 from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
@@ -15,21 +16,6 @@ from src.services.xp_service import calculate_level, get_character_level_progres
 STATUS_ORDER = QUEST_STATUSES
 DEFAULT_GOAL_ANALYTICS_STATUSES = ("Active", "Completed")
 GOAL_ANALYTICS_STATUSES = ("Active", "Completed", "Archived")
-
-
-def build_quest_summary(quests: pd.DataFrame) -> dict:
-    """Build a small summary from a quest dataframe."""
-    if quests.empty or "status" not in quests:
-        return {"total": 0, "completed": 0, "completion_rate": 0.0}
-
-    completed = int((quests["status"].fillna("").str.lower() == "completed").sum())
-    total = int(len(quests))
-
-    return {
-        "total": total,
-        "completed": completed,
-        "completion_rate": calculate_completion_rate(completed, total),
-    }
 
 
 def get_dashboard_kpis(today: date | None = None, session=None) -> dict:
@@ -72,92 +58,80 @@ def get_command_center_data(today: date | None = None, session=None) -> dict:
     """Return operational check-in metrics for the Command Center page."""
     today = today or date.today()
     week_start = today - timedelta(days=today.weekday())
-    week_end = week_start + timedelta(days=7)
 
     owns_session = session is None
     session = session or get_session()
     try:
         _ensure_legacy_command_center_checkins(session, today)
 
-        quests = session.query(Quest).all()
-        relevant_checkins = (
-            session.query(QuestCheckin)
-            .options(joinedload(QuestCheckin.quest).joinedload(Quest.category))
-            .filter(QuestCheckin.checkin_date <= today)
+        checkin_date = QuestCheckin.checkin_date
+        on_today = checkin_date == today
+        in_week = checkin_date >= week_start
+        xp = case(
+            (QuestCheckin.xp_awarded > 0, QuestCheckin.xp_awarded),
+            else_=func.coalesce(Quest.xp_reward, 0),
+        )
+        counts = (
+            session.query(
+                QuestCheckin.status,
+                func.count().label("total"),
+                func.count().filter(on_today).label("today_count"),
+                func.count().filter(in_week).label("weekly_count"),
+                func.sum(xp).filter(in_week).label("weekly_xp"),
+            )
+            .outerjoin(QuestCheckin.quest)
+            .filter(checkin_date <= today)
+            .group_by(QuestCheckin.status)
             .all()
         )
-        today_checkins = [checkin for checkin in relevant_checkins if checkin.checkin_date == today]
-        weekly_checkins = [
-            checkin
-            for checkin in relevant_checkins
-            if week_start <= checkin.checkin_date < week_end
-        ]
+        total_by_status = Counter()
+        today_by_status = Counter()
+        weekly_by_status = Counter()
+        planned_statuses = []
+        weekly_xp = 0
+        for raw_status, total, today_count, weekly_count, xp_sum in counts:
+            status = _normalize_status(raw_status)
+            total_by_status[status] += total
+            today_by_status[status] += today_count
+            weekly_by_status[status] += weekly_count
+            if status == "Planned":
+                planned_statuses.append(raw_status)
+            elif status == "Completed":
+                weekly_xp += xp_sum or 0
 
-        planned_today = [
-            checkin
-            for checkin in today_checkins
-            if _normalize_status(checkin.status) == "Planned"
-        ]
-        completed_today = [
-            checkin
-            for checkin in today_checkins
-            if _normalize_status(checkin.status) == "Completed"
-        ]
-        overdue_checkins = [
-            checkin
-            for checkin in relevant_checkins
-            if checkin.checkin_date < today and _normalize_status(checkin.status) == "Planned"
-        ]
-        failed_checkins = [
-            checkin
-            for checkin in relevant_checkins
-            if _normalize_status(checkin.status) == "Failed"
-        ]
-        skipped_checkins = [
-            checkin
-            for checkin in relevant_checkins
-            if _normalize_status(checkin.status) == "Skipped"
-        ]
-        completed_checkins = [
-            checkin
-            for checkin in relevant_checkins
-            if _normalize_status(checkin.status) == "Completed"
-        ]
-        completed_this_week = sum(
-            1 for checkin in weekly_checkins if _normalize_status(checkin.status) == "Completed"
+        actionable_checkins = (
+            session.query(QuestCheckin)
+            .options(joinedload(QuestCheckin.quest).joinedload(Quest.category))
+            .filter(or_(on_today, and_(checkin_date < today, QuestCheckin.status.in_(planned_statuses))))
+            .all()
         )
-        failed_this_week = sum(
-            1 for checkin in weekly_checkins if _normalize_status(checkin.status) == "Failed"
-        )
-        weekly_xp = sum(
-            _checkin_xp(checkin)
-            for checkin in weekly_checkins
-            if _normalize_status(checkin.status) == "Completed"
-        )
-        status_counts = {
-            "Planned": len(planned_today),
-            "Completed": len(completed_today),
-            "Failed": len(failed_checkins),
-            "Skipped": len(skipped_checkins),
-        }
+        today_checkins = [checkin for checkin in actionable_checkins if checkin.checkin_date == today]
+        overdue_checkins = [checkin for checkin in actionable_checkins if checkin.checkin_date < today]
+        total_count = sum(total_by_status.values())
+        weekly_total = sum(weekly_by_status.values())
 
         return {
-            "has_quests": bool(quests or relevant_checkins),
-            "total_quests": len(relevant_checkins),
-            "completed_quests": len(completed_checkins),
-            "planned_quests": len(planned_today),
-            "due_today": len(today_checkins),
-            "overdue_quests": len(overdue_checkins),
-            "completed_today": len(completed_today),
-            "failed_quests": len(failed_checkins),
-            "skipped_quests": len(skipped_checkins),
-            "completion_rate": calculate_completion_rate(len(completed_checkins), len(relevant_checkins)),
+            "has_quests": bool(total_count or session.query(Quest.id).first()),
+            "total_quests": total_count,
+            "completed_quests": total_by_status["Completed"],
+            "planned_quests": today_by_status["Planned"],
+            "due_today": sum(today_by_status.values()),
+            "overdue_quests": total_by_status["Planned"] - today_by_status["Planned"],
+            "completed_today": today_by_status["Completed"],
+            "failed_quests": total_by_status["Failed"],
+            "skipped_quests": total_by_status["Skipped"],
+            "completion_rate": calculate_completion_rate(total_by_status["Completed"], total_count),
             "weekly_xp": weekly_xp,
-            "completed_this_week": completed_this_week,
-            "failed_this_week": failed_this_week,
-            "total_quests_this_week": len(weekly_checkins),
-            "weekly_completion_rate": calculate_completion_rate(completed_this_week, len(weekly_checkins)),
-            "status_counts": status_counts,
+            "completed_this_week": weekly_by_status["Completed"],
+            "failed_this_week": weekly_by_status["Failed"],
+            "total_quests_this_week": weekly_total,
+            "weekly_completion_rate": calculate_completion_rate(weekly_by_status["Completed"], weekly_total),
+            "status_counts": {
+                "Planned": today_by_status["Planned"],
+                "Completed": today_by_status["Completed"],
+                "Failed": total_by_status["Failed"],
+                "Skipped": total_by_status["Skipped"],
+            },
             "today_quests": build_today_focus_rows(today_checkins),
             "today_work_items": build_operational_checkin_rows(today_checkins),
             "attention_items": build_operational_checkin_rows(overdue_checkins),
@@ -201,15 +175,11 @@ def get_habit_analytics_data(
     week_end = week_start + timedelta(days=7)
     week_start_at = datetime.combine(week_start, time.min)
     week_end_at = datetime.combine(week_end, time.min)
+    previous_start_date, previous_end_date = _previous_period(start_date, end_date)
 
     owns_session = session is None
     session = session or get_session()
     try:
-        quests = (
-            session.query(Quest)
-            .options(joinedload(Quest.category), joinedload(Quest.recurring_habit_instance))
-            .all()
-        )
         checkins = (
             session.query(QuestCheckin)
             .options(
@@ -218,9 +188,15 @@ def get_habit_analytics_data(
                 .joinedload(Quest.recurring_habit_instance)
                 .joinedload(RecurringHabitInstance.recurring_habit),
             )
+            .filter(
+                or_(
+                    QuestCheckin.checkin_date.between(previous_start_date, end_date),
+                    and_(QuestCheckin.checkin_date >= week_start, QuestCheckin.checkin_date < week_end),
+                )
+            )
             .all()
         )
-        if checkins:
+        if checkins or session.query(QuestCheckin.id).first() is not None:
             filtered_checkins = _filter_analytics_checkins(
                 checkins,
                 start_date=start_date,
@@ -228,7 +204,6 @@ def get_habit_analytics_data(
                 category_id=category_id,
                 work_type=normalized_work_type,
             )
-            previous_start_date, previous_end_date = _previous_period(start_date, end_date)
             previous_checkins = _filter_analytics_checkins(
                 checkins,
                 start_date=previous_start_date,
@@ -279,6 +254,11 @@ def get_habit_analytics_data(
                 ),
             }
 
+        quests = (
+            session.query(Quest)
+            .options(joinedload(Quest.category), joinedload(Quest.recurring_habit_instance))
+            .all()
+        )
         filtered_quests = _filter_analytics_quests(
             quests,
             start_date=start_date,
@@ -286,7 +266,6 @@ def get_habit_analytics_data(
             category_id=category_id,
             work_type=normalized_work_type,
         )
-        previous_start_date, previous_end_date = _previous_period(start_date, end_date)
         previous_quests = _filter_analytics_quests(
             quests,
             start_date=previous_start_date,
@@ -535,7 +514,7 @@ def get_goal_analytics_summary(
         overall_progress = _bounded_percent(completed_effort_minutes, planned_effort_minutes)
 
         return {
-            "has_goals": bool(session.query(Goal.id).first()),
+            "has_goals": bool(goals or session.query(Goal.id).first()),
             "included_goals_count": len(rows),
             "active_goals": sum(1 for row in rows if row["Status"] == "Active"),
             "completed_goals": sum(1 for row in rows if row["Status"] == "Completed"),
@@ -566,8 +545,13 @@ def get_goal_progress_dataset(
 ) -> pd.DataFrame:
     """Return per-goal completed and remaining effort rows for comparison charts."""
     summary = get_goal_analytics_summary(statuses=statuses, category_id=category_id, session=session)
+    return build_goal_progress_dataset(summary["goal_rows"])
+
+
+def build_goal_progress_dataset(goal_rows: list[dict]) -> pd.DataFrame:
+    """Build chart data from an already-loaded goal analytics summary."""
     rows = []
-    for row in summary["goal_rows"]:
+    for row in goal_rows:
         rows.append(
             {
                 "Goal ID": row["Goal ID"],
@@ -1461,22 +1445,18 @@ def _bounded_percent(numerator: int, denominator: int) -> float:
 
 def _ensure_legacy_command_center_checkins(session, today: date) -> None:
     """Create missing planned check-ins for legacy scheduled quests up to today."""
-    next_day_start = datetime.combine(today + timedelta(days=1), time.min)
-    legacy_quests = (
-        session.query(Quest)
+    scheduled_date = type_coerce(func.coalesce(func.date(Quest.planned_start_at), Quest.due_date), Date)
+    missing_checkins = (
+        session.query(Quest.id, scheduled_date)
         .filter(
-            or_(
-                and_(Quest.due_date.is_not(None), Quest.due_date <= today),
-                and_(Quest.planned_start_at.is_not(None), Quest.planned_start_at < next_day_start),
-            )
+            scheduled_date <= today,
+            ~Quest.checkins.any(QuestCheckin.checkin_date == scheduled_date),
         )
         .all()
     )
 
-    for quest in legacy_quests:
-        scheduled_date = _quest_scheduled_date(quest)
-        if scheduled_date is not None and scheduled_date <= today:
-            ensure_checkin(quest.id, scheduled_date, session=session)
+    for quest_id, checkin_date in missing_checkins:
+        ensure_checkin(quest_id, checkin_date, session=session)
 
 
 def _quest_scheduled_date(quest: Quest) -> date | None:

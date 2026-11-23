@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Category, Goal, Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance
@@ -653,6 +653,31 @@ def test_get_command_center_data_counts_checkin_status_kpis(session):
         "Failed": 1,
         "Skipped": 1,
     }
+
+
+def test_command_center_does_not_query_each_existing_checkin(session):
+    today = date(2026, 6, 26)
+    old_day = date(2026, 6, 22)
+    for number in range(20):
+        quest = _add_quest(session, f"Completed task {number}", due_date=old_day, xp_reward=20)
+        _add_checkin(session, quest, old_day, "Completed")
+
+    statements = []
+    engine = session.get_bind()
+
+    def count_statement(_connection, _cursor, statement, *_):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        result = get_command_center_data(today=today, session=session)
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+
+    assert result["completed_quests"] == 20
+    assert result["weekly_xp"] == 400
+    assert result["attention_items"] == []
+    assert len(statements) <= 3
 
 
 def test_get_command_center_items_for_date_returns_only_requested_day(session):

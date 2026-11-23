@@ -250,7 +250,7 @@ def get_quests_for_day(planned_date: date, session=None) -> list[Quest]:
             .options(
                 joinedload(Quest.category),
                 selectinload(Quest.checkins),
-                selectinload(Quest.recurring_habit_instance),
+                joinedload(Quest.recurring_habit_instance),
             )
             .filter(
                 or_(
@@ -261,13 +261,8 @@ def get_quests_for_day(planned_date: date, session=None) -> list[Quest]:
             )
             .all()
         )
-        statuses_by_quest_id = _get_checkin_statuses_for_date(
-            session,
-            [quest.id for quest in quests],
-            planned_date,
-        )
         for quest in quests:
-            quest.display_status = statuses_by_quest_id.get(quest.id, _normalize_status(quest.status))
+            quest.display_status = get_quest_status_for_date(quest, planned_date)
         return sorted(
             quests,
             key=lambda quest: (
@@ -302,17 +297,7 @@ def get_quests_for_calendar(session=None) -> list[dict]:
             )
             .all()
         )
-        statuses_by_quest_and_date = _get_checkin_statuses_for_quest_dates(
-            session,
-            [(quest.id, _quest_event_date(quest)) for quest in quests],
-        )
-        return [
-            quest_to_calendar_event(
-                quest,
-                status_override=statuses_by_quest_and_date.get((quest.id, _quest_event_date(quest))),
-            )
-            for quest in quests
-        ]
+        return [quest_to_calendar_event(quest) for quest in quests]
     finally:
         if owns_session:
             session.close()
@@ -522,47 +507,6 @@ def get_quest_status_for_date(quest: Quest, target_date: date) -> str:
     return _normalize_status(quest.status)
 
 
-def _get_checkin_statuses_for_date(session, quest_ids: list[int], target_date: date) -> dict[int, str]:
-    if not quest_ids:
-        return {}
-
-    checkins = (
-        session.query(QuestCheckin)
-        .filter(
-            QuestCheckin.quest_id.in_(quest_ids),
-            QuestCheckin.checkin_date == target_date,
-        )
-        .all()
-    )
-    return {checkin.quest_id: _normalize_status(checkin.status) for checkin in checkins}
-
-
-def _get_checkin_statuses_for_quest_dates(
-    session,
-    quest_date_pairs: list[tuple[int, date | None]],
-) -> dict[tuple[int, date], str]:
-    normalized_pairs = [(quest_id, target_date) for quest_id, target_date in quest_date_pairs if target_date is not None]
-    if not normalized_pairs:
-        return {}
-
-    quest_ids = {quest_id for quest_id, _ in normalized_pairs}
-    target_dates = {target_date for _, target_date in normalized_pairs}
-    checkins = (
-        session.query(QuestCheckin)
-        .filter(
-            QuestCheckin.quest_id.in_(quest_ids),
-            QuestCheckin.checkin_date.in_(target_dates),
-        )
-        .all()
-    )
-    requested_pairs = set(normalized_pairs)
-    return {
-        (checkin.quest_id, checkin.checkin_date): _normalize_status(checkin.status)
-        for checkin in checkins
-        if (checkin.quest_id, checkin.checkin_date) in requested_pairs
-    }
-
-
 def _build_one_time_quest_deletion_summary(session, quest: Quest) -> dict:
     summary = {
         "quest_id": quest.id,
@@ -664,12 +608,6 @@ def _get_active_goal_for_link(session, goal_id: int, *, lock: bool = False) -> G
     if goal.status != "Active":
         raise ValueError("Only active goals can receive new quest sessions.")
     return goal
-
-
-def _validate_goal_for_link(session, goal_id: int | None) -> int | None:
-    if goal_id is None:
-        return None
-    return _get_active_goal_for_link(session, goal_id).id
 
 
 def _validate_goal_session_number_unique(
