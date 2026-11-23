@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.components.checkin_actions import render_checkin_status_actions
-from src.services.analytics_service import get_command_center_data, get_command_center_items_for_date
+from src.services.command_center_service import get_command_center_data, get_command_center_items_for_date
 from src.services.checklist_service import update_checkin_status
 from src.ui import render_empty_state, render_page_header, render_section_title
 
