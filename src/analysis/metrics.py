@@ -1,3 +1,6 @@
+from collections.abc import Iterable
+from datetime import date
+
 from src.services.xp_service import get_character_level_progress
 
 
@@ -20,3 +23,19 @@ def calculate_consistency_score(completed_days: int, tracked_days: int) -> float
         return 0.0
 
     return round((completed_days / tracked_days) * 100, 2)
+
+
+def calculate_routine_streaks(
+    occurrences: Iterable[tuple[date, str]], today: date
+) -> tuple[int, int]:
+    """Return the current and best streak from scheduled occurrences in date order."""
+    current = best = 0
+    for scheduled_date, status in occurrences:
+        if scheduled_date > today:
+            break
+        if status == "Completed":
+            current += 1
+            best = max(best, current)
+        elif status != "Planned" or scheduled_date < today:
+            current = 0
+    return current, best

@@ -1,10 +1,15 @@
 from datetime import date, datetime, time, timedelta
+from itertools import groupby
 
 import pandas as pd
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import joinedload
 
-from src.analysis.metrics import calculate_completion_rate, calculate_xp_to_next_level
+from src.analysis.metrics import (
+    calculate_completion_rate,
+    calculate_routine_streaks,
+    calculate_xp_to_next_level,
+)
 from src.constants import CATEGORY_TO_RPG_STAT, QUEST_STATUSES, RPG_STATS
 from src.database.db import get_session
 from src.database.models import Goal, PlayerProfile, Quest, QuestCheckin, RecurringHabitInstance
@@ -125,7 +130,13 @@ def get_habit_analytics_data(
             )
             resolved_this_week = completed_this_week + failed_this_week
             category_performance = build_category_performance_from_checkins(filtered_checkins)
-            routine_performance = build_routine_performance_from_checkins(filtered_checkins, end_date)
+            routine_ids = {
+                instance.recurring_habit_id
+                for checkin in filtered_checkins
+                if checkin.quest is not None and (instance := checkin.quest.recurring_habit_instance) is not None
+            }
+            routine_streaks = _get_routine_streaks(session, routine_ids, today)
+            routine_performance = build_routine_performance_from_checkins(filtered_checkins, end_date, routine_streaks)
             weekday_performance = build_completion_rate_by_weekday_from_checkins(filtered_checkins)
             return {
                 "has_quests": bool(filtered_checkins),
@@ -962,7 +973,40 @@ def _finalize_category_performance(rows_by_category: dict[str, dict]) -> pd.Data
     )
 
 
-def build_routine_performance_from_checkins(checkins: list[QuestCheckin], as_of_date: date) -> pd.DataFrame:
+def _get_routine_streaks(session, routine_ids: set[int], today: date) -> dict[int, tuple[int, int]]:
+    if not routine_ids:
+        return {}
+
+    occurrences = (
+        session.query(
+            RecurringHabitInstance.recurring_habit_id,
+            RecurringHabitInstance.scheduled_date,
+            QuestCheckin.status,
+        )
+        .outerjoin(
+            QuestCheckin,
+            and_(
+                QuestCheckin.quest_id == RecurringHabitInstance.quest_id,
+                QuestCheckin.checkin_date == RecurringHabitInstance.scheduled_date,
+            ),
+        )
+        .filter(
+            RecurringHabitInstance.recurring_habit_id.in_(routine_ids),
+            RecurringHabitInstance.scheduled_date <= today,
+        )
+        .order_by(RecurringHabitInstance.recurring_habit_id, RecurringHabitInstance.scheduled_date)
+    )
+    return {
+        routine_id: calculate_routine_streaks(
+            ((occurrence.scheduled_date, _normalize_status(occurrence.status)) for occurrence in history), today
+        )
+        for routine_id, history in groupby(occurrences, key=lambda occurrence: occurrence.recurring_habit_id)
+    }
+
+
+def build_routine_performance_from_checkins(
+    checkins: list[QuestCheckin], as_of_date: date, streaks_by_routine: dict[int, tuple[int, int]]
+) -> pd.DataFrame:
     """Return routine-level outcomes from generated recurring habit instances."""
     rows_by_routine: dict[int, dict] = {}
     for checkin in checkins:
@@ -1000,7 +1044,8 @@ def build_routine_performance_from_checkins(checkins: list[QuestCheckin], as_of_
         return _empty_routine_performance_dataset()
 
     rows = list(rows_by_routine.values())
-    for row in rows:
+    for routine_id, row in rows_by_routine.items():
+        row["Current Streak"], row["Best Streak"] = streaks_by_routine.get(routine_id, (0, 0))
         row["Completion Rate"] = calculate_completion_rate(row["Completed"], row["Completed"] + row["Failed"])
         row["Needs Attention"] = row["Active"] and (row["Failed"] > 0 or row["Overdue Planned"] > 0)
     return (
@@ -1022,6 +1067,8 @@ def _empty_routine_performance_dataset() -> pd.DataFrame:
             "Skipped",
             "Planned",
             "Overdue Planned",
+            "Current Streak",
+            "Best Streak",
             "Completion Rate",
             "Last Scheduled",
             "Last Completed",

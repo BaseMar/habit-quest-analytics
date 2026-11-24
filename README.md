@@ -126,7 +126,7 @@ Still evolving:
 - Authentication and user-specific data.
 - External calendar sync.
 - AI and voice planning assistants.
-- Streak system / bonus XP.
+- Bonus XP for streaks.
 - Optional automatic stale planned failure workflow.
 - Eventual cleanup of legacy `Quest.status` once the check-in migration is fully
   stable.
@@ -246,6 +246,7 @@ The app is designed to answer questions such as:
 - Planned minutes by category.
 - Date-range period review with prior-period comparison, active-day consistency,
   workload execution, weekday patterns, category performance, and one clear focus item.
+- Current and best streaks for routines, calculated from their scheduled history through today.
 - Project completion forecasts based on completed planned effort and target dates.
 - Insight summaries based on completed and failed check-ins.
 
@@ -609,7 +610,7 @@ Current limitations:
 - Authentication and user-specific data isolation are not implemented.
 - Google Calendar sync is not implemented.
 - AI planning assistant and voice quest capture are not implemented.
-- Streak tracking and bonus XP are not implemented.
+- Streaks currently provide analytics. Bonus XP for streaks is planned.
 - Achievement unlock rules are not implemented.
 - Auto-fail exists as service logic but is not automatically enabled.
 - `Quest.status` still exists for compatibility/fallback and should be cleaned
@@ -621,7 +622,7 @@ Suggested future order:
 2. Google Calendar sync
 3. AI planning assistant
 4. Voice quest capture / microphone input
-5. Streak system / bonus XP
+5. Bonus XP for streaks
 6. Achievement system
 7. Optional auto-fail activation workflow
 8. Legacy `Quest.status` cleanup

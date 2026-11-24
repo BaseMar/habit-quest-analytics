@@ -172,11 +172,11 @@ Positive value:
 - Reduces accidental data loss because template edits can be designed around
   historical preservation rules.
 
-## Priority 8. Streak Tracking
+## Priority 8. Streak Tracking (implemented)
 
 What it adds:
 
-- Current streak and best streak for completed habit quests.
+- Current and best streaks for scheduled routines in Habit Analytics.
 
 Why it matters:
 
@@ -434,7 +434,7 @@ Implementation note:
 5. Google Calendar sync
 6. AI planning assistant
 7. Voice input
-8. Streak system / bonus XP
+8. Bonus XP for streaks
 9. Optional auto-fail activation workflow
 10. Legacy `Quest.status` cleanup
 

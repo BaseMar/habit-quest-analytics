@@ -555,10 +555,54 @@ def test_habit_analytics_builds_routine_performance_and_attention_signal(session
             "Last Scheduled": date(2026, 6, 24),
             "Last Completed": date(2026, 6, 22),
             "Overdue Planned": 1,
+            "Current Streak": 0,
+            "Best Streak": 1,
             "Completion Rate": 50.0,
             "Needs Attention": True,
         }
     ]
+
+
+def test_routine_streaks_use_full_scheduled_history_and_allow_today_to_be_pending(session):
+    habit = RecurringHabit(
+        title="Walk",
+        xp_reward=10,
+        estimated_minutes=15,
+        recurrence_type="selected_weekdays",
+        weekdays="0,2,4",
+        start_date=date(2026, 6, 1),
+    )
+    session.add(habit)
+    session.flush()
+    for day, status in (
+        (1, "Completed"),
+        (3, "Completed"),
+        (5, "Skipped"),
+        (8, "Completed"),
+        (10, "Planned"),
+        (12, "Completed"),
+    ):
+        scheduled_date = date(2026, 6, day)
+        quest = _add_quest(session, "Walk", due_date=scheduled_date)
+        session.add(
+            RecurringHabitInstance(
+                recurring_habit_id=habit.id,
+                quest_id=quest.id,
+                scheduled_date=scheduled_date,
+            )
+        )
+        _add_checkin(session, quest, scheduled_date, status)
+
+    pending_day = date(2026, 6, 10)
+    filters = {"start_date": pending_day, "end_date": pending_day, "session": session}
+    pending = get_habit_analytics_data(today=pending_day, **filters)["routine_performance"].iloc[0]
+    overdue = get_habit_analytics_data(today=date(2026, 6, 11), **filters)["routine_performance"].iloc[0]
+
+    assert pending["Completed"] == 0
+    assert pending["Current Streak"] == 1
+    assert pending["Best Streak"] == 2
+    assert overdue["Current Streak"] == 0
+    assert overdue["Best Streak"] == 2
 
 
 def test_build_xp_by_day_uses_completed_or_planned_date(session):

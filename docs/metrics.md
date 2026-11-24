@@ -310,14 +310,11 @@ chart displays stat levels, not raw stat XP.
 consistency_score = completed_days / tracked_days * 100
 ```
 
-Status: implemented as a pure metric helper. UI-level consistency currently uses check-in analytics views rather than a standalone streak system.
+## Routine Streaks
 
-## Planned Metrics
-
-### Current Streak
-
-```text
-current_streak = consecutive days with at least one completed habit quest day
-```
-
-Status: planned.
+Habit Analytics shows the current and best streak for each routine in the selected
+period. The streak values use its full recorded history through today. Each
+completed scheduled occurrence extends the current streak. A skipped, failed,
+or overdue planned occurrence resets it. Today's planned occurrence leaves it
+open until the next day. Days without scheduled occurrences are ignored. The
+best streak is the longest run in that history.

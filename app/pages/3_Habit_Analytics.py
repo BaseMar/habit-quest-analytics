@@ -225,7 +225,9 @@ def render_routine_performance(routine_performance) -> None:
         x="Completion Rate",
         y="Routine",
         orientation="h",
-        hover_data=["Scheduled", "Completed", "Failed", "Skipped", "Planned", "Overdue Planned"],
+        hover_data=[
+            "Current Streak", "Best Streak", "Scheduled", "Completed", "Failed", "Skipped", "Planned", "Overdue Planned",
+        ],
         color_discrete_sequence=[tokens["accent"]],
         title="Routine Completion Rate",
     )
@@ -237,6 +239,8 @@ def render_routine_performance(routine_performance) -> None:
     table_data = routine_performance[
         [
             "Routine",
+            "Current Streak",
+            "Best Streak",
             "Category",
             "Active",
             "Completion Rate",
@@ -254,8 +258,20 @@ def render_routine_performance(routine_performance) -> None:
     table_data["Last Completed"] = table_data["Last Completed"].map(
         lambda value: value.isoformat() if value is not None else "Not completed"
     )
-    with st.expander("View routine data"):
-        st.dataframe(table_data, hide_index=True, width="stretch")
+    with st.expander("View routine data", expanded=True):
+        st.dataframe(
+            table_data,
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "Current Streak": st.column_config.NumberColumn(
+                    help="Consecutive scheduled occurrences completed through today."
+                ),
+                "Best Streak": st.column_config.NumberColumn(
+                    help="Longest run of completed scheduled occurrences across all recorded history."
+                ),
+            },
+        )
 
 
 def render_review_focus(review_focus: dict | None) -> None:
