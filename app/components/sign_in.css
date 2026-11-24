@@ -1,0 +1,93 @@
+.stApp:has(.st-key-hq_sign_in) {
+    background:
+        radial-gradient(ellipse at 16% 18%, #244c4d 0%, transparent 50%),
+        radial-gradient(ellipse at 84% 95%, #194043 0%, transparent 46%),
+        #12262b;
+}
+
+.stApp:has(.st-key-hq_sign_in) :is(
+    [data-testid="stHeader"],
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarCollapsedControl"]
+) {
+    display: none;
+}
+
+.stApp:has(.st-key-hq_sign_in) [data-testid="stMainBlockContainer"] {
+    display: grid;
+    align-content: center;
+    box-sizing: border-box;
+    max-width: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 1.25rem;
+}
+
+.st-key-hq_sign_in {
+    box-sizing: border-box;
+    width: min(100%, 27rem);
+    margin-inline: auto;
+    padding: clamp(1.5rem, 6vw, 2.75rem);
+    border: 1px solid #e0e9e6;
+    border-radius: 1.5rem;
+    background: #fcfefd;
+    box-shadow: 0 1.5rem 4.5rem rgb(6 21 24 / 36%);
+    color-scheme: light;
+}
+
+.st-key-hq_sign_in .hq-sign-in-intro {
+    color: #142f33;
+    text-align: center;
+}
+
+.st-key-hq_sign_in .hq-sign-in-mark {
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 0 auto 1.25rem;
+    border: 1px solid #c5e4de;
+    border-radius: 1rem;
+    background: #e2f4ef;
+    color: #005a5d;
+    font-size: 1.125rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.st-key-hq_sign_in .hq-sign-in-intro h1 {
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    font-size: clamp(1.55rem, 5.5vw, 1.875rem);
+    font-weight: 750;
+    letter-spacing: -0.045em;
+    line-height: 1.16;
+}
+
+.st-key-hq_sign_in .hq-sign-in-intro p {
+    max-width: 17rem;
+    margin: 0.7rem auto 0.35rem;
+    color: #50656a;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.st-key-hq_sign_in [data-testid="stButton"] button[kind="primary"] {
+    min-height: 3rem;
+    border: 1px solid #005f62;
+    border-radius: 0.7rem;
+    background: #005f62;
+    color: #fff;
+    font-weight: 650;
+}
+
+.st-key-hq_sign_in [data-testid="stButton"] button[kind="primary"]:hover {
+    border-color: #004c50;
+    background: #004c50;
+}
+
+.st-key-hq_sign_in [data-testid="stButton"] button:focus-visible {
+    outline: 2px solid #007c80;
+    outline-offset: 3px;
+}

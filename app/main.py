@@ -10,7 +10,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.auth import bind_account, current_user_id, google_identity, google_login_configured, log_out
+from app.components.sign_in import render_sign_in
+from src.auth import bind_account, current_user_id, google_identity, log_out
 from src.database import db
 from src.services.account_service import register_google_account
 from src.ui import apply_theme, render_appearance_controls
@@ -29,21 +30,13 @@ if "on_change" not in signature(st.tabs).parameters:
     st.stop()
 
 if db.engine is None:
-    st.error("Set DATABASE_URL in Streamlit secrets or the environment to connect to PostgreSQL.")
+    render_sign_in("Set DATABASE_URL in Streamlit secrets or the environment to connect to PostgreSQL.")
     st.stop()
 
 
 identity = google_identity()
 if identity is None:
-    apply_theme()
-    st.title("Habit Quest Analytics")
-    if st.user.get("is_logged_in"):
-        st.error("Sign in with a Google account that has a verified email address.")
-        st.button("Log out", on_click=log_out)
-    elif google_login_configured():
-        st.button("Log in with Google", type="primary", on_click=st.login)
-    else:
-        st.info("Configure Google sign-in in the Streamlit secrets.")
+    render_sign_in()
     st.stop()
 
 try:
@@ -58,7 +51,7 @@ except PermissionError:
             type(error).__name__,
             getattr(getattr(error, "orig", None), "sqlstate", None),
         )
-        st.error("Unable to load your account. Check the database connection and apply the latest migrations.")
+        render_sign_in("Unable to load your account. Check the database connection and apply the latest migrations.")
         st.stop()
 
 
