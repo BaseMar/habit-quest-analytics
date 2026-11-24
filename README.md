@@ -82,6 +82,7 @@ Implemented:
 
 - Command Center as the default operational workspace.
 - Custom Streamlit navigation/sidebar with explicit page labels.
+- Full-screen loading indicator when opening the workspace or switching pages.
 - Calendar-based Planner.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - Recurring Habit templates with automatic generation for the creation month and

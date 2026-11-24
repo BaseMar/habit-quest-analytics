@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from app.components.loading_screen import loading_screen
 from app.components.sign_in import render_sign_in
 from src.auth import bind_account, current_user_id, google_identity, log_out
 from src.database import db
@@ -39,20 +40,21 @@ if identity is None:
     render_sign_in()
     st.stop()
 
-try:
-    current_user_id()
-except PermissionError:
-    subject, email = identity
+def ensure_account(identity: tuple[str, str]) -> None:
     try:
-        bind_account(subject, register_google_account(subject, email))
-    except SQLAlchemyError as error:
-        logging.getLogger(__name__).error(
-            "Account database operation failed (%s, SQLSTATE %s).",
-            type(error).__name__,
-            getattr(getattr(error, "orig", None), "sqlstate", None),
-        )
-        render_sign_in("Unable to load your account. Check the database connection and apply the latest migrations.")
-        st.stop()
+        current_user_id()
+    except PermissionError:
+        subject, email = identity
+        try:
+            bind_account(subject, register_google_account(subject, email))
+        except SQLAlchemyError as error:
+            logging.getLogger(__name__).error(
+                "Account database operation failed (%s, SQLSTATE %s).",
+                type(error).__name__,
+                getattr(getattr(error, "orig", None), "sqlstate", None),
+            )
+            render_sign_in("Unable to load your account. Check the database connection and apply the latest migrations.")
+            st.stop()
 
 
 def render_sidebar_brand() -> None:
@@ -109,10 +111,21 @@ pages = [
 ]
 
 current_page = st.navigation(pages, position="hidden")
-render_sidebar_brand()
-render_sidebar_navigation(pages, current_page)
-render_appearance_controls()
-st.sidebar.text(identity[1])
-st.sidebar.button("Log out", on_click=log_out, width="stretch")
-apply_theme()
-current_page.run()
+route = current_page.url_path
+route_changed = st.session_state.get("_hq_loaded_route") != route
+if route_changed:
+    st.session_state.pop("_hq_loaded_route", None)
+
+with loading_screen(f"Loading {current_page.title}", enabled=route_changed):
+    ensure_account(identity)
+    render_sidebar_brand()
+    render_sidebar_navigation(pages, current_page)
+    render_appearance_controls()
+    st.sidebar.text(identity[1])
+    st.sidebar.button("Log out", on_click=log_out, width="stretch")
+    apply_theme()
+    # Replace the previous page as soon as the next route starts rendering.
+    page = st.empty()
+    with page.container(key=f"hq_page_{route}"):
+        current_page.run()
+    st.session_state["_hq_loaded_route"] = route

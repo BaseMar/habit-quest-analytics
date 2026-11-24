@@ -116,15 +116,20 @@ def render_appearance_controls() -> None:
     st.session_state[THEME_MODE_KEY] = "Dark" if dark_mode else "Light"
 
 
-def apply_global_styles() -> None:
-    """Apply the current session's palette and the shared stylesheet."""
+def theme_css_declarations() -> str:
+    """Return the current session's theme as CSS declarations."""
     tokens = get_theme_tokens()
     palette = "\n".join(
         f"--hq-{name.replace('_', '-')}: {value};"
         for name, value in tokens.items()
         if name != "mode"
     )
-    st.html(f'<style>:root {{ color-scheme: {tokens["mode"].lower()}; {palette} }}\n{STYLES}</style>')
+    return f'color-scheme: {tokens["mode"].lower()};\n{palette}'
+
+
+def apply_global_styles() -> None:
+    """Apply the current session's palette and the shared stylesheet."""
+    st.html(f'<style>:root {{ {theme_css_declarations()} }}\n{STYLES}</style>')
 
 
 def apply_theme() -> None:

@@ -123,3 +123,70 @@ def test_app_requires_login_before_showing_navigation(monkeypatch):
     assert not app.exception
     assert [button.label for button in app.button] == ["Log in with Google"]
     assert not app.sidebar.get("page_link")
+
+
+def test_loading_screen_follows_page_navigation(monkeypatch):
+    from contextlib import contextmanager
+
+    import streamlit as st
+    from sqlalchemy.pool import StaticPool
+    from streamlit.runtime.pages_manager import PagesManager
+    from streamlit.testing.v1 import AppTest
+
+    from app.components import loading_screen as loading_component
+    from src.database import db
+    from src.database.models import Base
+    from src.services import quest_service
+
+    loads = []
+    show_loading = loading_component.loading_screen
+    initialize_pages = PagesManager.__init__
+
+    def initialize_navigation(*args, **kwargs):
+        # AppTest resets this flag on every run. A live st.navigation session keeps it false.
+        PagesManager.uses_pages_directory = False
+        initialize_pages(*args, **kwargs)
+
+    @contextmanager
+    def track_loading(title, *, enabled):
+        if enabled:
+            loads.append(title)
+        with show_loading(title, enabled=enabled):
+            yield
+
+    monkeypatch.setattr(loading_component, "loading_screen", track_loading)
+    monkeypatch.setattr(PagesManager, "__init__", initialize_navigation)
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(st, "user", {
+        "is_logged_in": True,
+        "iss": "https://accounts.google.com",
+        "sub": "loading-test",
+        "email": "loading@example.com",
+        "email_verified": True,
+    })
+
+    main = Path(__file__).resolve().parents[1] / "app" / "main.py"
+    try:
+        app = AppTest.from_file(str(main)).run()
+        app.toggle(key="hq_dark_mode").set_value(True).run()
+        assert not app.exception
+        assert loads == ["Loading Command Center"]
+
+        app.switch_page("pages/2_Quest_Log.py").run()
+        assert not app.exception
+        assert loads == ["Loading Command Center", "Loading Planner"]
+        assert all('class="hq-loading-screen"' not in item.proto.body for item in app.get("html"))
+
+        with monkeypatch.context() as patch:
+            patch.setattr(quest_service, "get_categories", lambda: [])
+            app.switch_page("pages/5_Projects_and_Routines.py").run()
+            assert not app.exception
+            assert app.warning[0].value == "Run python -m src.database.seed to create default categories."
+
+        app.switch_page("pages/2_Quest_Log.py").run()
+        assert not app.exception
+        assert loads == ["Loading Command Center", "Loading Planner", "Loading Projects & Routines", "Loading Planner"]
+    finally:
+        engine.dispose()
