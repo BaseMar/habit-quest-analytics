@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from src.database.db import get_engine
-from src.database.models import Base
+from src.database.models import Base, UserAccount
 from src.services.quest_service import backfill_goal_session_numbers
 
 
@@ -57,6 +57,9 @@ def _prepare_sqlite_snapshot(bind: Engine) -> None:
         "recurring_habits": {"planned_start_time": "TIME", "planned_end_time": "TIME"},
         "player_profiles": {"avatar_path": "VARCHAR(255)"},
     }
+    for table in Base.metadata.sorted_tables:
+        if "user_id" in table.c:
+            legacy_columns.setdefault(table.name, {})["user_id"] = "INTEGER"
     with bind.begin() as connection:
         inspector = inspect(connection)
         for table, fields in legacy_columns.items():
@@ -70,16 +73,17 @@ def _prepare_sqlite_snapshot(bind: Engine) -> None:
 
 
 def _copy_rows(source: Connection, target: Connection) -> dict[str, int]:
-    tables = Base.metadata.sorted_tables
-    missing_tables = set(table.name for table in tables) - set(inspect(target).get_table_names())
+    all_tables = Base.metadata.sorted_tables
+    tables = [table for table in all_tables if table is not UserAccount.__table__]
+    missing_tables = set(table.name for table in all_tables) - set(inspect(target).get_table_names())
     if missing_tables:
         raise ValueError("Run python -m alembic upgrade head before importing.")
 
     prepare = target.dialect.identifier_preparer
-    table_names = ", ".join(prepare.format_table(table) for table in tables)
+    table_names = ", ".join(prepare.format_table(table) for table in all_tables)
     # Serialize imports and keep application writes out until the ID generators are reset.
     target.exec_driver_sql(f"LOCK TABLE {table_names} IN ACCESS EXCLUSIVE MODE")
-    for table in tables:
+    for table in all_tables:
         if target.scalar(select(table.c.id).limit(1)) is not None:
             raise ValueError(f"The destination must be empty. The {table.name} table already contains data.")
 
@@ -87,6 +91,8 @@ def _copy_rows(source: Connection, target: Connection) -> dict[str, int]:
     for table in tables:
         counts[table.name] = 0
         for batch in source.execute(table.select()).mappings().partitions(500):
+            if "user_id" in table.c:
+                batch = [dict(row, user_id=None) for row in batch]
             target.execute(table.insert(), batch)
             counts[table.name] += len(batch)
 

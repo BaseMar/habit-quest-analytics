@@ -2,7 +2,8 @@ import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine, URL, make_url
-from sqlalchemy.orm import sessionmaker
+
+from src.database.user_session import UserSession
 
 
 def get_database_url() -> URL | None:
@@ -24,7 +25,6 @@ engine = (
     if DATABASE_URL is not None
     else None
 )
-SessionLocal = sessionmaker(bind=engine, autoflush=False)
 
 
 def get_engine() -> Engine:
@@ -33,7 +33,8 @@ def get_engine() -> Engine:
     return engine
 
 
-def get_session():
-    """Return a SQLAlchemy session for scripts and services."""
-    get_engine()
-    return SessionLocal()
+def get_session() -> UserSession:
+    """Return an account-scoped session for app services."""
+    from src.auth import current_user_id
+
+    return UserSession(bind=get_engine(), user_id=current_user_id(), autoflush=False)

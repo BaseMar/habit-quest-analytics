@@ -172,12 +172,13 @@ def delete_goal(goal_id: int, session=None) -> int:
     session = session or get_session()
     try:
         goal = lock_goal_for_session_changes(session, goal_id)
-        detached_count = session.query(Quest).filter(Quest.goal_id == goal_id).update(
-            {Quest.goal_id: None, Quest.goal_session_number: None},
-        )
+        quests = session.query(Quest).filter(Quest.goal_id == goal_id).all()
+        for quest in quests:
+            quest.goal_id = None
+            quest.goal_session_number = None
         session.delete(goal)
         session.commit()
-        return detached_count
+        return len(quests)
     except Exception:
         session.rollback()
         raise

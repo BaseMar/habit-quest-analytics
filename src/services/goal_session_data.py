@@ -1,17 +1,18 @@
 from src.database.models import Goal, Quest, QuestCheckin
+from src.database.user_session import UserSession
 
 
 def lock_goal_for_session_changes(session, goal_id: int) -> Goal:
     """Lock an existing goal until the current transaction finishes."""
-    # A write also acquires the lock on SQLite, where SELECT FOR UPDATE is unavailable.
-    updated_count = (
-        session.query(Goal)
-        .filter(Goal.id == goal_id)
-        .update({Goal.updated_at: Goal.updated_at}, synchronize_session=False)
-    )
-    if updated_count == 0:
+    if session.get_bind().dialect.name == "sqlite" and not isinstance(session, UserSession):
+        # A write acquires the lock for legacy SQLite maintenance sessions.
+        session.query(Goal).filter(Goal.id == goal_id).update(
+            {Goal.updated_at: Goal.updated_at}, synchronize_session=False,
+        )
+    goal = session.get(Goal, goal_id, populate_existing=True, with_for_update=True)
+    if goal is None:
         raise ValueError(f"Goal with id {goal_id} was not found.")
-    return session.get(Goal, goal_id, populate_existing=True)
+    return goal
 
 
 def get_linked_goal_quests(session, goal_id: int) -> list[Quest]:

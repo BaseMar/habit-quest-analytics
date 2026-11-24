@@ -14,6 +14,16 @@ Habit Quest Analytics uses SQLAlchemy with PostgreSQL.
 
 ## Tables
 
+### user_accounts
+
+Stores the verified Google subject and email. The subject is unique and
+identifies the account across changes to its email address.
+
+Personal tables carry a `user_id` foreign key to `user_accounts.id`. Related
+personal rows share an owner. Account sessions filter every personal query by
+that owner. Rows from the single-user schema have a null owner until explicitly
+assigned by the [legacy claim command](../README.md#google-sign-in).
+
 ### categories
 
 Stores labels used to group quests.
@@ -21,7 +31,7 @@ Stores labels used to group quests.
 | Field | Purpose |
 | --- | --- |
 | `id` | Primary key. |
-| `name` | Unique category name, such as Health, Work, Learning, Home, or Social. |
+| `name` | Category name, unique within the account. |
 | `description` | Optional explanation of what belongs in the category. |
 
 Relationships:

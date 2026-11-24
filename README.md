@@ -31,6 +31,7 @@ operational metrics, trend analysis, and character growth.
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Running The App](#running-the-app)
+- [Google Sign-In](#google-sign-in)
 - [Tests](#tests)
 - [Design Principles](#design-principles)
 - [Limitations & Future Work](#limitations--future-work)
@@ -65,9 +66,9 @@ I designed and implemented the current MVP, including:
 
 Live app: https://habit-quest-analytics-sai5h3bl7wjykw4fbruabd.streamlit.app
 
-The Streamlit Community Cloud deployment uses PostgreSQL on Supabase and a
-shared workspace for people with access to the app. Uploaded avatar files use
-local storage and may reset when the Streamlit instance changes.
+The Streamlit Community Cloud deployment uses PostgreSQL on Supabase. See
+[Google Sign-In](#google-sign-in) for configuring the account-enabled version.
+Uploaded avatars use local storage and may reset when the Streamlit instance changes.
 
 ## Project Status
 
@@ -118,12 +119,12 @@ Implemented:
 - Habit Analytics date filters, plan-versus-completion trends, category and
   routine performance, and insight data powered by check-ins.
 - PostgreSQL persistence with Alembic migrations and a SQLite importer.
+- Google sign-in and per-account data, including categories, check-ins, and XP.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
 Still evolving:
 
-- Authentication and user-specific data.
 - External calendar sync.
 - AI and voice planning assistants.
 - Bonus XP for streaks.
@@ -252,7 +253,7 @@ The app is designed to answer questions such as:
 
 ### Character Profile
 
-- Avatar upload stored locally for the demo profile.
+- Avatar upload stored locally in each account's own directory.
 - Total XP from `QuestCheckin.xp_awarded`.
 - Level, XP to next level, and level progress.
 - RPG stat XP from completed check-ins joined to quest categories.
@@ -531,6 +532,50 @@ python run_streamlit.py
 The launcher uses the project's `.venv` when present. You can also run
 `streamlit run app/main.py` from an environment with Streamlit 1.66.1 or newer.
 
+## Google Sign-In
+
+Create a **Web application** client in Google Auth Platform. Register
+`http://localhost:8501/oauth2callback` for local development and the deployed
+app URL with the same `/oauth2callback` path for Community Cloud. While the client
+is in Testing mode, add the Google accounts you intend to use as test users.
+[Streamlit's Google setup guide](https://docs.streamlit.io/develop/tutorials/authentication/google)
+
+Keep `DATABASE_URL` at the top level in the gitignored
+`.streamlit/secrets.toml`. Add the following section, replacing the example
+values. Generate `cookie_secret` with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+
+```toml
+[auth]
+redirect_uri = "http://localhost:8501/oauth2callback"
+cookie_secret = "your-generated-cookie-secret"
+client_id = "your-google-client-id"
+client_secret = "your-google-client-secret"
+server_metadata_url = "https://accounts.google.com/.well-known/openid-configuration"
+```
+
+Configure the same section in Community Cloud secrets with that deployment's
+redirect URI and a separate cookie secret. Use a separate database for local
+testing while any single-user deployment is still running. During rollout,
+stop the single-user app on every instance that shares the database, apply the
+latest PostgreSQL migration, then start the account-enabled versions.
+
+Use a server-side database role for the connection. The migration enables
+row-level security on app tables so direct queries from public API roles are
+denied. The app scopes its server-side sessions to the signed-in account.
+
+New accounts receive their own default categories and profile. For an existing
+database or an imported SQLite backup, sign in once as the intended owner. Before
+adding items to that account, assign the previous records from a shell with the
+appropriate `DATABASE_URL`.
+
+```bash
+python -m src.database.claim_legacy --email "owner@example.com"
+```
+
+The command matches the verified Google email of an existing account. Previously
+unassigned rows remain hidden in the app until this step. Keep any existing
+avatar files available at their stored paths during the transition.
+
 ## PostgreSQL
 
 Set `DATABASE_URL` in your shell to the target PostgreSQL connection URL, for
@@ -544,27 +589,20 @@ python -m alembic upgrade head
 ```
 
 To move an existing SQLite database, stop writes to the source and run the import
-after the schema upgrade, before seeding categories or starting the app against
-the empty destination. The import reads a snapshot of SQLite and copies all
-database rows in one transaction. It keeps IDs, relationships, check-ins and XP,
-and rejects a destination that already contains app data.
+after the schema upgrade and before the first sign-in. The import reads a
+snapshot and copies all app data in one transaction. It keeps IDs, relationships,
+check-ins and XP, and requires an empty destination. After importing, assign the
+records with the [legacy claim command](#google-sign-in).
 
 ```bash
 python -m src.database.import_sqlite data/habit_quest.db
-```
-
-For an empty database, add the default categories once before launching the app.
-The same command can fill in categories missing from an imported database.
-
-```bash
-python -m src.database.seed
 ```
 
 Database records and avatar file paths are copied. Avatar image files are stored
 separately under `data/uploads/`. For local Streamlit runs, set `DATABASE_URL`
 in the shell or as a top-level key in the gitignored `.streamlit/secrets.toml`.
 On Streamlit Community Cloud, use a top-level app secret. The Alembic, import,
-and seed commands read the shell environment.
+and legacy claim commands read the shell environment.
 [Streamlit Community Cloud secrets](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)
 
 ## Tests
@@ -607,7 +645,6 @@ Current limitations:
   in [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
 - Database records can persist in PostgreSQL. Uploaded avatar files use local
   storage.
-- Authentication and user-specific data isolation are not implemented.
 - Google Calendar sync is not implemented.
 - AI planning assistant and voice quest capture are not implemented.
 - Streaks currently provide analytics. Bonus XP for streaks is planned.
@@ -618,11 +655,10 @@ Current limitations:
 
 Suggested future order:
 
-1. Authentication
-2. Google Calendar sync
-3. AI planning assistant
-4. Voice quest capture / microphone input
-5. Bonus XP for streaks
-6. Achievement system
-7. Optional auto-fail activation workflow
-8. Legacy `Quest.status` cleanup
+1. Google Calendar sync
+2. AI planning assistant
+3. Voice quest capture / microphone input
+4. Bonus XP for streaks
+5. Achievement system
+6. Optional auto-fail activation workflow
+7. Legacy `Quest.status` cleanup

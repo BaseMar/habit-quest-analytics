@@ -51,6 +51,7 @@ Implemented:
   levels, and stat-level radar chart.
 - PostgreSQL through SQLAlchemy, with Alembic schema
   upgrades and a SQLite importer for PostgreSQL.
+- Google sign-in with personal records and progression for each account.
 - Default category seeding.
 - Pytest coverage for model, service, metric, profile, and analytics behavior.
 
@@ -62,8 +63,6 @@ Compatibility:
 
 ## Non-Goals For The MVP
 
-- Authentication.
-- Multi-user accounts.
 - External APIs.
 - Machine learning.
 - Cloud sync.
@@ -71,10 +70,9 @@ Compatibility:
 
 ## Future Roadmap
 
-1. Authentication and user-specific data isolation.
-2. Google Calendar sync for scheduled quests.
-3. AI planning assistant for natural-language scheduling.
-4. Voice quest capture / microphone input.
-5. Streak system / bonus XP.
-6. Optional automatic stale planned failure workflow.
-7. Legacy `Quest.status` cleanup after the check-in migration is stable.
+1. Google Calendar sync for scheduled quests.
+2. AI planning assistant for natural-language scheduling.
+3. Voice quest capture / microphone input.
+4. Bonus XP for streaks.
+5. Optional automatic stale planned failure workflow.
+6. Legacy `Quest.status` cleanup after the check-in migration is stable.

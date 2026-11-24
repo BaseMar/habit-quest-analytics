@@ -11,9 +11,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.schema import CreateSchema, DropSchema
 
 from src.database import db
+from src.database.claim_legacy import claim_legacy_data
 from src.database.import_sqlite import import_sqlite
 from src.database.models import Base, Category, Goal, PlayerProfile, Quest, QuestCheckin
 from src.database.seed import ensure_default_categories
+from src.database.user_session import UserSession
+from src.services.account_service import register_google_account
 from src.services.goal_service import delete_goal, get_goal_progress
 from src.services.quest_service import create_quest
 
@@ -135,3 +138,31 @@ def test_import_rolls_back_if_sqlite_contains_an_orphaned_checkin(postgres, tmp_
         assert connection.execute(select(Category)).first() is None
         assert connection.execute(select(QuestCheckin)).first() is None
         assert "goals" in inspect(connection).get_table_names()
+
+
+def test_legacy_data_stays_hidden_until_assigned_to_the_selected_google_account(postgres):
+    with Session(postgres) as admin, admin.begin():
+        category = Category(name="Work", description="Legacy description")
+        quest = Quest(title="Legacy task", category=category)
+        admin.add_all([QuestCheckin(quest=quest, checkin_date=date(2026, 11, 23)), PlayerProfile(character_name="Explorer")])
+
+    other_id = register_google_account("other-google-account", "other@example.com")
+    owner_id = register_google_account("owner-google-account", "owner@example.com")
+    with UserSession(bind=postgres, user_id=owner_id) as owner:
+        assert owner.scalars(select(Quest)).all() == []
+    with pytest.raises(ValueError):
+        claim_legacy_data("unknown@example.com")
+    assert claim_legacy_data("owner@example.com") == 4
+    assert claim_legacy_data("owner@example.com") == 0
+
+    with UserSession(bind=postgres, user_id=owner_id) as owner:
+        quest = owner.scalars(select(Quest)).one()
+        assert quest.category.description == "Legacy description"
+        assert quest.checkins[0].user_id == owner_id
+        assert owner.scalars(select(PlayerProfile)).one().character_name == "Explorer"
+        assert len(owner.scalars(select(Category)).all()) == 5
+    with UserSession(bind=postgres, user_id=other_id) as other:
+        assert other.scalars(select(Quest)).all() == []
+        assert other.scalars(select(PlayerProfile)).one().character_name == "Adventurer"
+    with postgres.connect() as connection:
+        assert connection.exec_driver_sql("SELECT relrowsecurity FROM pg_class WHERE oid = 'quests'::regclass").scalar_one()

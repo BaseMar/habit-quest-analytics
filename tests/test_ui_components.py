@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from app.components.checkin_actions import get_checkin_status_actions
 from app.components.scheduling import duration_crosses_midnight, end_at_for_duration
@@ -41,20 +40,24 @@ def test_scheduling_helpers_detect_midnight_crossing():
 def test_planner_add_item_uses_manually_selected_day_after_calendar_click(tmp_path, monkeypatch):
     pytest.importorskip("streamlit", minversion="1.66.1")
     from streamlit.testing.v1 import AppTest
+    import streamlit as st
     import streamlit_calendar
 
     from src.database import db
     from src.database.models import Base
-    from src.database.seed import ensure_default_categories
 
     db_path = tmp_path / "planner.db"
     db_url = f"sqlite:///{db_path.as_posix()}"
     engine = create_engine(db_url, connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
-    with sessionmaker(bind=engine)() as session:
-        ensure_default_categories(session)
     monkeypatch.setattr(db, "engine", engine)
-    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(st, "user", {
+        "is_logged_in": True,
+        "iss": "https://accounts.google.com",
+        "sub": "planner-test",
+        "email": "planner@example.com",
+        "email_verified": True,
+    })
 
     clicked_date = date.today() - timedelta(days=1)
     manual_date = date.today() + timedelta(days=1)
@@ -97,3 +100,26 @@ def test_app_explains_how_to_configure_postgresql_when_url_is_missing(monkeypatc
 
     assert not app.exception
     assert "DATABASE_URL" in app.error[0].value
+
+
+def test_app_requires_login_before_showing_navigation(monkeypatch):
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+    from src.database import db
+
+    monkeypatch.setattr(db, "engine", object())
+    monkeypatch.setattr(st, "user", {"is_logged_in": False})
+    main = Path(__file__).resolve().parents[1] / "app" / "main.py"
+    app = AppTest.from_file(str(main))
+    app.secrets["auth"] = {
+        "redirect_uri": "http://localhost:8501/oauth2callback",
+        "cookie_secret": "test-only",
+        "client_id": "test-only",
+        "client_secret": "test-only",
+        "server_metadata_url": "https://accounts.google.com/.well-known/openid-configuration",
+    }
+    app.run()
+
+    assert not app.exception
+    assert [button.label for button in app.button] == ["Log in with Google"]
+    assert not app.sidebar.get("page_link")

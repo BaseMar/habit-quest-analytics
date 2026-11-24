@@ -1,7 +1,9 @@
 from pathlib import Path
+from uuid import uuid4
 
 from src.database.db import get_session
 from src.database.models import PlayerProfile
+from src.database.user_session import UserSession
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -9,12 +11,13 @@ DEFAULT_UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 ALLOWED_AVATAR_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 
-def get_or_create_player_profile(session=None) -> PlayerProfile:
-    """Return the single local player profile, creating it when needed."""
+def get_or_create_player_profile(session=None, *, for_update: bool = False) -> PlayerProfile:
+    """Return the active profile, creating it when needed."""
     owns_session = session is None
     session = session or get_session()
     try:
-        profile = session.query(PlayerProfile).order_by(PlayerProfile.id).first()
+        query = session.query(PlayerProfile).order_by(PlayerProfile.id)
+        profile = (query.with_for_update() if for_update else query).first()
         if profile is None:
             profile = PlayerProfile(character_name="Adventurer")
             session.add(profile)
@@ -39,22 +42,26 @@ def save_avatar(
     if not content:
         raise ValueError("Avatar file cannot be empty.")
 
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    _remove_existing_avatar_files(upload_dir)
-
-    avatar_path = upload_dir / f"avatar{extension}"
-    avatar_path.write_bytes(content)
-    try:
-        stored_path = avatar_path.relative_to(PROJECT_ROOT).as_posix()
-    except ValueError:
-        stored_path = str(avatar_path)
-
     owns_session = session is None
     session = session or get_session()
     try:
-        profile = get_or_create_player_profile(session=session)
-        profile.avatar_path = stored_path
-        session.commit()
+        profile = get_or_create_player_profile(session=session, for_update=True)
+        previous_path = profile.avatar_path
+        directory = _avatar_directory(upload_dir, session)
+        directory.mkdir(parents=True, exist_ok=True)
+        avatar_path = directory / f"{uuid4().hex}{extension}"
+        stored_path = str(avatar_path)
+        if avatar_path.is_relative_to(PROJECT_ROOT):
+            stored_path = avatar_path.relative_to(PROJECT_ROOT).as_posix()
+        try:
+            avatar_path.write_bytes(content)
+            profile.avatar_path = stored_path
+            session.commit()
+        except Exception:
+            session.rollback()
+            avatar_path.unlink(missing_ok=True)
+            raise
+        _remove_managed_avatar(previous_path, directory)
         return stored_path
     finally:
         if owns_session:
@@ -63,15 +70,14 @@ def save_avatar(
 
 def remove_avatar(upload_dir: Path = DEFAULT_UPLOAD_DIR, session=None) -> None:
     """Remove the stored avatar file and clear the profile avatar path."""
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    _remove_existing_avatar_files(upload_dir)
-
     owns_session = session is None
     session = session or get_session()
     try:
-        profile = get_or_create_player_profile(session=session)
+        profile = get_or_create_player_profile(session=session, for_update=True)
+        previous_path = profile.avatar_path
         profile.avatar_path = None
         session.commit()
+        _remove_managed_avatar(previous_path, _avatar_directory(upload_dir, session))
     finally:
         if owns_session:
             session.close()
@@ -89,8 +95,13 @@ def resolve_avatar_path(avatar_path: str | None) -> Path | None:
     return path if path.exists() else None
 
 
-def _remove_existing_avatar_files(upload_dir: Path) -> None:
-    for extension in ALLOWED_AVATAR_EXTENSIONS:
-        path = upload_dir / f"avatar{extension}"
-        if path.exists():
-            path.unlink()
+def _avatar_directory(upload_dir: Path, session) -> Path:
+    if isinstance(session, UserSession):
+        return (upload_dir / "users" / str(session.user_id)).resolve()
+    return upload_dir.resolve()
+
+
+def _remove_managed_avatar(stored_path: str | None, directory: Path) -> None:
+    avatar = resolve_avatar_path(stored_path)
+    if avatar is not None and avatar.resolve().parent == directory:
+        avatar.unlink(missing_ok=True)

@@ -1,14 +1,18 @@
+import logging
 import sys
 from inspect import signature
 from pathlib import Path
 
 import streamlit as st
+from sqlalchemy.exc import SQLAlchemyError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.auth import bind_account, current_user_id, google_identity, google_login_configured, log_out
 from src.database import db
+from src.services.account_service import register_google_account
 from src.ui import apply_theme, render_appearance_controls
 
 
@@ -27,6 +31,35 @@ if "on_change" not in signature(st.tabs).parameters:
 if db.engine is None:
     st.error("Set DATABASE_URL in Streamlit secrets or the environment to connect to PostgreSQL.")
     st.stop()
+
+
+identity = google_identity()
+if identity is None:
+    apply_theme()
+    st.title("Habit Quest Analytics")
+    if st.user.get("is_logged_in"):
+        st.error("Sign in with a Google account that has a verified email address.")
+        st.button("Log out", on_click=log_out)
+    elif google_login_configured():
+        st.button("Log in with Google", type="primary", on_click=st.login)
+    else:
+        st.info("Configure Google sign-in in the Streamlit secrets.")
+    st.stop()
+
+try:
+    current_user_id()
+except PermissionError:
+    subject, email = identity
+    try:
+        bind_account(subject, register_google_account(subject, email))
+    except SQLAlchemyError as error:
+        logging.getLogger(__name__).error(
+            "Account database operation failed (%s, SQLSTATE %s).",
+            type(error).__name__,
+            getattr(getattr(error, "orig", None), "sqlstate", None),
+        )
+        st.error("Unable to load your account. Check the database connection and apply the latest migrations.")
+        st.stop()
 
 
 def render_sidebar_brand() -> None:
@@ -86,5 +119,7 @@ current_page = st.navigation(pages, position="hidden")
 render_sidebar_brand()
 render_sidebar_navigation(pages, current_page)
 render_appearance_controls()
+st.sidebar.text(identity[1])
+st.sidebar.button("Log out", on_click=log_out, width="stretch")
 apply_theme()
 current_page.run()
