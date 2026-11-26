@@ -1,7 +1,9 @@
-from datetime import date
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, time
+from threading import Barrier, local
 
 import pytest
-from sqlalchemy import create_engine, inspect, select
+from sqlalchemy import create_engine, event, func, inspect, select
 from sqlalchemy.engine import URL
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,8 +15,9 @@ from src.database.models import Base, Category, Goal, PlayerProfile, Quest, Ques
 from src.database.seed import ensure_default_categories
 from src.database.user_session import UserSession
 from src.services.account_service import register_google_account
-from src.services.goal_service import delete_goal, get_goal_progress
-from src.services.quest_service import create_quest
+from src.services.goal_service import create_goal, delete_goal, get_goal_progress
+from src.services.goal_session_planner_service import plan_goal_sessions
+from src.services.quest_service import create_quest, create_scheduled_quest, get_categories
 
 
 @pytest.mark.parametrize("scheme", ["postgres", "postgresql", "postgresql+psycopg"])
@@ -128,3 +131,115 @@ def test_legacy_data_stays_hidden_until_assigned_to_the_selected_google_account(
         assert other.scalars(select(PlayerProfile)).one().character_name == "Adventurer"
     with postgres.connect() as connection:
         assert connection.exec_driver_sql("SELECT relrowsecurity FROM pg_class WHERE oid = 'quests'::regclass").scalar_one()
+
+
+DAY = date(2026, 11, 23)
+
+
+def _race(postgres, marker, action):
+    """Release both workers at their first competing database statement."""
+    barrier = Barrier(2)
+    worker = local()
+
+    def synchronize(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if not getattr(worker, "synchronized", False) and marker(statement):
+            worker.synchronized = True
+            barrier.wait(timeout=10)
+
+    event.listen(postgres, "before_cursor_execute", synchronize)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(action) for _ in range(2)]
+            return [future.result(timeout=30) for future in futures]
+    finally:
+        event.remove(postgres, "before_cursor_execute", synchronize)
+
+
+@pytest.fixture
+def shared_goal(postgres):
+    owner = register_google_account("goal-owner", "synthetic@example.com")
+    with UserSession(bind=postgres, user_id=owner) as session:
+        category = get_categories(session=session)[0]
+        goal = create_goal("Project", 120, category_id=category.id, session=session)
+        return owner, goal.id, category.id
+
+
+def _assert_numbered_goal_sessions(postgres, owner, goal_id):
+    with UserSession(bind=postgres, user_id=owner) as session:
+        quests = session.scalars(select(Quest).where(Quest.goal_id == goal_id).order_by(Quest.goal_session_number)).all()
+        assert [(quest.goal_session_number, quest.title) for quest in quests] == [
+            (1, "Project Session 1"), (2, "Project Session 2"),
+        ]
+        checkins = session.scalars(select(QuestCheckin)).all()
+        assert len(checkins) == 2
+        assert {checkin.quest_id for checkin in checkins} == {quest.id for quest in quests}
+        assert {(checkin.status, checkin.xp_awarded) for checkin in checkins} == {("Planned", 0)}
+
+
+def test_postgresql_concurrent_goal_session_numbering(postgres, shared_goal):
+    owner, goal_id, category_id = shared_goal
+
+    def create_session():
+        with UserSession(bind=postgres, user_id=owner, autoflush=False) as session:
+            quest = create_scheduled_quest(
+                "Session", category_id=category_id, goal_id=goal_id, planned_date=DAY,
+                start_time=time(9), end_time=time(10), session=session,
+            )
+            return quest.goal_session_number
+
+    numbers = _race(postgres, lambda statement: "FROM goals" in statement and "FOR UPDATE" in statement, create_session)
+    assert sorted(numbers) == [1, 2]
+    _assert_numbered_goal_sessions(postgres, owner, goal_id)
+
+
+def test_postgresql_concurrent_bulk_planning_does_not_overallocate(postgres, shared_goal):
+    owner, goal_id, _ = shared_goal
+
+    def plan():
+        with UserSession(bind=postgres, user_id=owner, autoflush=False) as session:
+            return plan_goal_sessions(goal_id, 60, DAY, [DAY.weekday()], time(9), session=session)["created_count"]
+
+    results = _race(postgres, lambda statement: "FROM goals" in statement and "FOR UPDATE" in statement, plan)
+    assert sorted(results) == [0, 2]
+    _assert_numbered_goal_sessions(postgres, owner, goal_id)
+
+
+@pytest.mark.parametrize("bulk", [False, True], ids=["single", "bulk"])
+def test_postgresql_failed_checkin_write_rolls_back_scheduling(postgres, shared_goal, bulk):
+    owner, goal_id, category_id = shared_goal
+    with UserSession(bind=postgres, user_id=owner, autoflush=False) as session:
+        def schedule():
+            if bulk:
+                return plan_goal_sessions(goal_id, 60, DAY, [DAY.weekday()], time(9), session=session)["created_count"]
+            quest = create_scheduled_quest(
+                "Session", category_id=category_id, goal_id=goal_id, planned_date=DAY,
+                start_time=time(9), end_time=time(10), session=session,
+            )
+            return quest.goal_session_number
+
+        expected = 2 if bulk else 1
+        _assert_scheduling_rollback(session, schedule, expected)
+        assert schedule() == expected
+        assert session.scalars(select(Quest.goal_session_number).order_by(Quest.goal_session_number)).all() == list(
+            range(1, expected + 1)
+        )
+        assert session.scalar(select(func.count(QuestCheckin.id))) == expected
+
+
+def _assert_scheduling_rollback(session, schedule, checkins_before_failure):
+    checkin_flushes = 0
+
+    def reject_checkin(current_session, _context, _instances):
+        nonlocal checkin_flushes
+        checkin_flushes += sum(isinstance(row, QuestCheckin) for row in current_session.new)
+        if checkin_flushes >= checkins_before_failure:
+            raise RuntimeError("Synthetic check-in write failure")
+
+    event.listen(session, "before_flush", reject_checkin)
+    try:
+        with pytest.raises(RuntimeError, match="Synthetic check-in write failure"):
+            schedule()
+    finally:
+        event.remove(session, "before_flush", reject_checkin)
+    assert session.scalars(select(Quest.id)).all() == []
+    assert session.scalars(select(QuestCheckin.id)).all() == []

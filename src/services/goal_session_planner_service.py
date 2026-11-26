@@ -5,7 +5,12 @@ from math import ceil
 
 from src.database.db import get_session
 from src.database.models import Goal, Quest, QuestCheckin
-from src.services.goal_session_data import get_linked_goal_quests, get_quest_checkins, get_quest_planned_minutes
+from src.services.goal_session_data import (
+    get_linked_goal_quests,
+    get_quest_checkins,
+    get_quest_planned_minutes,
+    lock_goal_for_session_changes,
+)
 from src.services.quest_service import (
     build_goal_session_title,
     create_scheduled_quest,
@@ -171,10 +176,11 @@ def plan_goal_sessions(
     allow_short_final_session: bool = True,
     session=None,
 ) -> dict:
-    """Create normal one-time goal-linked scheduled quests from a fresh preview."""
+    """Lock the goal and create its scheduled quests from a fresh preview."""
     owns_session = session is None
     session = session or get_session()
     try:
+        goal = lock_goal_for_session_changes(session, goal_id)
         preview = build_goal_session_plan_preview(
             goal_id=goal_id,
             session_duration_minutes=session_duration_minutes,
@@ -188,7 +194,6 @@ def plan_goal_sessions(
         if not preview["date_range_complete"]:
             raise ValueError(preview["blocked_reason"])
 
-        goal = _get_goal_or_raise(session, goal_id)
         created_quests = []
         for row in preview["sessions"]:
             quest = create_scheduled_quest(
@@ -200,6 +205,7 @@ def plan_goal_sessions(
                 end_time=row["end_time"],
                 estimated_minutes=row["duration_minutes"],
                 session=session,
+                commit=False,
             )
             created_quests.append(quest)
 
@@ -208,7 +214,7 @@ def plan_goal_sessions(
             session_duration_minutes=session_duration_minutes,
             session=session,
         )
-        return {
+        result = {
             "goal_id": goal_id,
             "created_count": len(created_quests),
             "created_quest_ids": [quest.id for quest in created_quests],
@@ -218,6 +224,8 @@ def plan_goal_sessions(
             "fully_covers_effort": preview["fully_covers_effort"],
             "planning_summary": refreshed_summary,
         }
+        session.commit()
+        return result
     except Exception:
         session.rollback()
         raise

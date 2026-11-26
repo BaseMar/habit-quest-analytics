@@ -118,8 +118,10 @@ Relationships:
 - Goal-linked one-time sessions receive automatic titles in the format
   `{Goal Title} Session {N}`.
 - Goal-linked one-time sessions require a category.
-- Goal session numbering is scoped per goal and uses `max(existing number) + 1`;
-  deletion leaves surviving session numbers unchanged.
+- Goal session numbering uses `max(existing number) + 1` under a goal lock in
+  the PostgreSQL scheduling service. Deletion leaves surviving session numbers
+  unchanged. Bulk planning recomputes remaining effort under that lock and
+  commits the scheduled quests and planned check-ins together.
 - Goal Session Planner-generated quests follow the same numbering and title
   rules as individually added goal sessions.
 

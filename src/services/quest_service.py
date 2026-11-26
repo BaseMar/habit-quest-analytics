@@ -158,8 +158,10 @@ def create_scheduled_quest(
     estimated_minutes: int | None = None,
     goal_id: int | None = None,
     session=None,
+    *,
+    commit: bool = True,
 ) -> Quest:
-    """Create a quest planned for a specific day and time window."""
+    """Create a scheduled quest with its planned check-in in one transaction."""
     if planned_date is None:
         raise ValueError("Planned date is required.")
     if start_time is None or end_time is None:
@@ -171,6 +173,8 @@ def create_scheduled_quest(
         estimated_minutes = int((planned_end_at - planned_start_at).total_seconds() // 60)
 
     owns_session = session is None
+    if owns_session and not commit:
+        raise ValueError("An existing session is required to defer the commit.")
     session = session or get_session()
     try:
         normalized_goal_id, normalized_title, goal_session_number = _prepare_goal_session_values(
@@ -191,12 +195,15 @@ def create_scheduled_quest(
             planned_start_at=planned_start_at,
             planned_end_at=planned_end_at,
             estimated_minutes=estimated_minutes,
+            checkins=[QuestCheckin(checkin_date=planned_date, status="Planned", xp_awarded=0)],
         )
         session.add(quest)
-        session.commit()
-        session.refresh(quest)
-        ensure_checkin(quest.id, planned_date, session=session)
-        session.refresh(quest)
+        if commit:
+            session.commit()
+            session.refresh(quest)
+        else:
+            # The next session number must include this quest even when autoflush is disabled.
+            session.flush()
         return quest
     except Exception:
         session.rollback()
