@@ -53,7 +53,7 @@ def test_import_preserves_history_and_generates_new_ids(postgres, tmp_path):
             )
             session.add_all([
                 QuestCheckin(id=80, quest=quest, checkin_date=completed_date, status="Completed", xp_awarded=20),
-                PlayerProfile(id=5, character_name="Explorer", avatar_path="data/uploads/avatar.png"),
+                PlayerProfile(id=5, character_name="Explorer", total_xp=20, avatar_path="data/uploads/avatar.png"),
             ])
             session.commit()
         with sqlite.begin() as connection:
@@ -76,12 +76,14 @@ def test_import_preserves_history_and_generates_new_ids(postgres, tmp_path):
         assert quest.goal_session_number == 1
         assert quest.checkins[0].checkin_date == completed_date
         assert get_goal_progress(20, session=session)["earned_xp"] == 20
-        assert session.get(PlayerProfile, 5).avatar_path == "data/uploads/avatar.png"
+        profile = session.get(PlayerProfile, 5)
+        assert profile.avatar_path == "data/uploads/avatar.png"
+        assert profile.total_xp == 20
 
         ensure_default_categories(session=session)
         ensure_default_categories(session=session)
         assert session.get(Category, 10).description == "My own description"
-        assert create_quest("New task", category_id=10, session=session).id > quest.id
+        assert create_quest("New task", category_id=10, session=session).id == quest.id + 1
 
         assert delete_goal(20, session=session) == 1
         assert quest.goal_id is None
@@ -105,10 +107,13 @@ def test_import_rolls_back_if_sqlite_contains_an_orphaned_checkin(postgres, tmp_
     with pytest.raises(IntegrityError):
         import_sqlite(source_path, postgres)
 
-    with postgres.connect() as connection:
+    with postgres.begin() as connection:
         assert connection.execute(select(Category)).first() is None
         assert connection.execute(select(QuestCheckin)).first() is None
         assert "goals" in inspect(connection).get_table_names()
+        # The importer restarted this identity before encountering the orphan.
+        category_id = connection.scalar(insert(Category).values(name="After rollback").returning(Category.id))
+        assert category_id == 1
 
 
 def test_legacy_data_stays_hidden_until_assigned_to_the_selected_google_account(postgres, migration_config):
@@ -142,12 +147,25 @@ def test_legacy_data_stays_hidden_until_assigned_to_the_selected_google_account(
     with Session(postgres) as admin:
         assert admin.get(Quest, quest_id).user_id is None
 
-    other_id = register_google_account("other-google-account", "other@example.com")
+    other_id = register_google_account("other-google-account", "owner@example.com")
     owner_id = register_google_account("owner-google-account", "owner@example.com")
+    with pytest.raises(DBAPIError, match="Cannot downgrade to a shared database while accounts exist"):
+        command.downgrade(migration_config, "0001")
+    with postgres.connect() as connection:
+        assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalar_one() == "0002"
     with UserSession(bind=postgres, user_id=owner_id) as owner:
         assert owner.scalars(select(Quest)).all() == []
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="exactly one account"):
         claim_legacy_data("unknown@example.com")
+    with pytest.raises(ValueError, match="exactly one account"):
+        claim_legacy_data("owner@example.com")
+    with Session(postgres) as admin:
+        quest = admin.get(Quest, quest_id)
+        assert quest.user_id is None
+        assert quest.category.user_id is None
+        assert quest.checkins[0].user_id is None
+        assert quest.checkins[0].xp_awarded == 20
+    assert register_google_account("other-google-account", "other@example.com") == other_id
     assert claim_legacy_data("owner@example.com") == 4
     assert claim_legacy_data("owner@example.com") == 0
 

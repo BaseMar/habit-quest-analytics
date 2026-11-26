@@ -423,8 +423,9 @@ erDiagram
 
 ## SQLite Import Compatibility
 
-The SQLite importer prepares a temporary snapshot of older backups before
-transferring their data into PostgreSQL.
+The SQLite importer opens a single-user legacy backup read-only and prepares a
+temporary snapshot before transferring its data into PostgreSQL. The `quests`
+table must exist. Existing tables need compatible data and relationships.
 
 Snapshot preparation can:
 
@@ -435,9 +436,15 @@ Snapshot preparation can:
 - add missing `estimated_minutes`, `planned_start_at`, and `planned_end_at` columns to `quests`,
 - add missing `goal_id` to `quests`,
 - add missing `goal_session_number` to `quests`,
-- add missing `avatar_path` to `player_profiles`.
+- add missing `planned_start_time` and `planned_end_time` to `recurring_habits`,
+- add missing `avatar_path` to `player_profiles`,
+- add missing nullable `user_id` columns to account-owned tables.
 
-All schema changes during preparation apply to the snapshot.
+Preparation backfills missing numbers for goal-linked one-time quests. Histories
+from missing tables remain empty. All preparation changes apply to the snapshot.
+The PostgreSQL copy skips account rows and sets imported ownership to `NULL`.
+See the [operations guide](database_operations.md#import-a-single-user-sqlite-backup)
+for prerequisites and the legacy claim procedure.
 
 ## PostgreSQL Schema
 
@@ -452,7 +459,8 @@ claim paths in trusted server and maintenance code. The ownership constraints
 apply to assigned rows, and the app hides unassigned legacy rows until claimed.
 Primary keys use identity columns that accept explicit IDs during SQLite
 import. The importer preserves IDs and advances sequences past them. See the
-[PostgreSQL setup and import instructions](../README.md#postgresql).
+[database operations and recovery guide](database_operations.md) for migrations,
+privileges, backup verification, and downgrade limitations.
 
 ## Category To RPG Stat Mapping
 

@@ -55,13 +55,26 @@ test accounts for cross-account checks.
   PostgreSQL writes. CI passed all 388 tests, including the 17 required
   PostgreSQL-backed cases.
   [GitHub Actions run 45828732641](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45828732641)
-- [ ] Extend the existing independent guest session and reset tests to cover
+- [x] Extend the existing independent guest session and reset tests to cover
   interleaved changes, repeated resets, and guest isolation from account data.
-  The lifecycle, avatar boundaries, and PostgreSQL-backed account transitions
-  passed local verification. Remote CI verification is pending publication.
-- [ ] Verify migrations on an empty database and an upgrade from the original
+  Phase 3 passed CI at `fc09e0c` with 392 full-suite tests and 26 integration
+  selection tests. All 18 required PostgreSQL cases passed with zero skips.
+  [GitHub Actions run 45902849430](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45902849430)
+- [x] Verify migrations on an empty database and an upgrade from the original
   schema. Verify SQLite imports, rollback, ID preservation, and legacy ownership
-  assignment on PostgreSQL.
+  assignment on PostgreSQL. Phase 4 locally verified the `0001` → `0002` chain
+  and Alembic drift check, historical relationships and XP, transaction and
+  identity rollback, ambiguous claim rejection, and role-based RLS. An import
+  rehearsal copied only committed SQLite WAL data and serialized concurrent
+  imports, with one success and one nonempty-destination rejection. An
+  out-of-range identity restart rolled back the entire copy. A synthetic
+  PostgreSQL 18.3 dump restored into a separate database with its revision, IDs,
+  relationships, XP, RLS flags, and identity continuity intact. The full suite
+  passed 392 tests with PostgreSQL and 374 with 18 skips without it. The CI
+  selection passed 26 tests locally and its JUnit guard verified all 18 cases.
+  The empty `0002` → `0001` downgrade leaves RLS enabled on existing tables.
+  Use the verified restore or forward repair procedure for recovery. Remote
+  verification of the Phase 4 changes is pending. [Database operations guide](database_operations.md)
 - [ ] Review `analytics_service.py` and other large modules for concrete
   maintainability problems. Refactor only where the review justifies a change.
   Measure query counts and performance before addressing redundant reads.
@@ -76,6 +89,11 @@ test accounts for cross-account checks.
 - [x] Update the ERD with `UserAccount` and ownership relationships.
 - [ ] Capture current app screenshots with synthetic or guest data.
 - [ ] Verify the deployed app, Google sign-in, and guest demo end to end.
+  During Phase 6 hosted verification, confirm the Supabase connection mode,
+  TLS settings, runtime and maintenance role privileges, RLS exposure, and
+  available connection limits under representative sessions. Confirm the
+  project's backup retention and PITR availability or its approved logical
+  backup procedure, with a restore rehearsal in an isolated target.
 - [ ] Prepare release `v1.0.0` with setup instructions, release notes, and
   known limitations.
 

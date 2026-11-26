@@ -487,6 +487,9 @@ On Streamlit Community Cloud, use a top-level app secret. The Alembic, import,
 and legacy claim commands read the shell environment.
 [Streamlit Community Cloud secrets](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)
 
+See the [database operations and recovery guide](docs/database_operations.md)
+for maintenance privileges, migration checks, and a backup and restore rehearsal.
+
 ## Tests
 
 ```bash
