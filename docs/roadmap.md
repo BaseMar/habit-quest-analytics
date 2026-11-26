@@ -46,6 +46,9 @@ test accounts for cross-account checks.
 
 - [ ] Add GitHub Actions to run pytest on pushes and pull requests. Provision a
   PostgreSQL service and set `TEST_POSTGRESQL_URL` for integration tests.
+  Implemented locally, including manual dispatch. Workflow lint and all required
+  integration cases passed locally against disposable PostgreSQL 18. Confirm
+  the first successful GitHub Actions run before closing this task.
 - [ ] Expand account isolation coverage for cross-account reads, writes,
   deletes, and relationship links. Test relevant concurrent provisioning,
   scheduling, and check-in operations on PostgreSQL.

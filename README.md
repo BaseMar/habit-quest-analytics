@@ -7,7 +7,7 @@ operational metrics, trend analysis, and character growth.
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-ff4b4b)
 ![Pandas](https://img.shields.io/badge/Pandas-Data%20Analysis-purple)
-![Tests](https://img.shields.io/badge/tests-pytest-brightgreen)
+[![CI](https://github.com/BaseMar/habit-quest-analytics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BaseMar/habit-quest-analytics/actions/workflows/ci.yml)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-003B57)
 ![Plotly](https://img.shields.io/badge/Plotly-Charts-3F4F75)
 ![Deployment](https://img.shields.io/badge/Deployment-Streamlit%20Cloud-ff4b4b)
@@ -487,21 +487,42 @@ and legacy claim commands read the shell environment.
 ## Tests
 
 ```bash
-python -m pytest
+python -m pytest -ra
 python -m compileall -q app src tests migrations
 ```
 
-Set `TEST_POSTGRESQL_URL` to a disposable PostgreSQL database to run the
-integration tests. The fixture creates and removes an isolated schema. Pytest
-reports these cases as skipped when that environment variable is unset.
+Run PostgreSQL integration tests locally against a disposable database. Set
+`TEST_POSTGRESQL_URL` to its connection URL using a test role that can create
+schemas. The fixture creates an isolated schema, upgrades it to Alembic head,
+checks for schema drift, and drops the schema after the test.
+
+```powershell
+$env:TEST_POSTGRESQL_URL = 'postgresql://test_user:test_password@127.0.0.1:5432/habit_quest_test'
+python -m pytest -ra tests/test_postgresql.py
+```
+
+Without `TEST_POSTGRESQL_URL`, pytest skips the cases that need a running
+PostgreSQL server.
 
 On Windows, if local pycache permissions cause compile issues, run with a
 temporary pycache prefix:
 
 ```powershell
 $env:PYTHONPYCACHEPREFIX="$env:TEMP\habit_quest_pycache"
-python -m compileall -q app src tests
+python -m compileall -q app src tests migrations
 ```
+
+### Continuous integration
+
+The [GitHub Actions CI workflow](.github/workflows/ci.yml) runs on pushes, pull
+requests, and manual dispatch. It installs `requirements.txt` on Ubuntu with
+Python 3.11, runs the full pytest suite and compilation checks, and reruns the
+PostgreSQL module explicitly. CI checks the test report for all required
+database cases and fails if any case in that module skips.
+
+Each job starts a temporary PostgreSQL 18 service with its own test database
+and credentials. The service is independent of Supabase and requires no
+production database or Google authentication secrets.
 
 ## Design Principles
 
@@ -524,8 +545,8 @@ python -m compileall -q app src tests
   and unlock records.
 - The stale planned failure helper is available in the service layer and has
   no automatic trigger. `Quest.status` remains for legacy compatibility.
-- The test suite includes opt-in PostgreSQL integration tests. GitHub Actions
-  and hosted end-to-end verification are release work.
+- Local PostgreSQL integration tests require a disposable database. Hosted
+  end-to-end verification remains release work.
 
 See the [development roadmap](docs/roadmap.md) for planned features, release
 criteria, and deferred ideas.
