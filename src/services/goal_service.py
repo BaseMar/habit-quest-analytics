@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date, timedelta
 from math import ceil
 
@@ -5,6 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from src.database.db import get_session
 from src.database.models import Category, Goal, Quest, QuestCheckin, utc_now
+from src.database.user_session import UserSession
 from src.services.goal_session_data import (
     get_linked_goal_quests,
     get_quest_checkins,
@@ -324,6 +326,41 @@ def _build_goal_progress(session, goal: Goal) -> dict:
     linked_quests = get_linked_goal_quests(session, goal.id)
     linked_quest_ids = [quest.id for quest in linked_quests]
     checkins = get_quest_checkins(session, linked_quest_ids)
+    return _calculate_goal_progress(goal, linked_quests, checkins)
+
+
+def build_goal_progress_batch(session, goals: list[Goal]) -> dict[int, dict]:
+    """Apply the single-project progress calculation to a scoped project selection."""
+    if not goals:
+        return {}
+    if isinstance(session, UserSession) and any(goal.user_id != session.user_id for goal in goals):
+        raise PermissionError("Cannot summarize projects belonging to a different account.")
+
+    goal_ids = [goal.id for goal in goals]
+    quests_by_goal = defaultdict(list)
+    goal_by_quest = {}
+    for quest in session.query(Quest).filter(Quest.goal_id.in_(goal_ids)).order_by(Quest.id):
+        quests_by_goal[quest.goal_id].append(quest)
+        goal_by_quest[quest.id] = quest.goal_id
+
+    checkins_by_goal = defaultdict(list)
+    checkins = (
+        session.query(QuestCheckin)
+        .join(QuestCheckin.quest)
+        .filter(Quest.goal_id.in_(goal_ids))
+        .order_by(QuestCheckin.checkin_date, QuestCheckin.id)
+    )
+    for checkin in checkins:
+        if checkin.quest_id in goal_by_quest:
+            checkins_by_goal[goal_by_quest[checkin.quest_id]].append(checkin)
+
+    return {
+        goal.id: _calculate_goal_progress(goal, quests_by_goal[goal.id], checkins_by_goal[goal.id])
+        for goal in goals
+    }
+
+
+def _calculate_goal_progress(goal: Goal, linked_quests: list[Quest], checkins: list[QuestCheckin]) -> dict:
     quests_by_id = {quest.id: quest for quest in linked_quests}
 
     completed_minutes = 0

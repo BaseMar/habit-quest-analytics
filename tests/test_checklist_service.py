@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Category, Goal, Quest, QuestCheckin
@@ -103,6 +103,30 @@ def test_ensure_checkin_returns_existing_checkin_without_duplicate(session):
 
     assert second.id == first.id
     assert session.query(QuestCheckin).count() == 1
+
+
+def test_month_checklist_loads_existing_checkins_without_per_quest_queries(session):
+    day = date(2026, 7, 1)
+    for index in range(12):
+        quest = _create_quest(session, f"Scheduled task {index}")
+        complete_checkin(quest.id, day, session=session)
+    session.expunge_all()
+    statements = []
+    engine = session.get_bind()
+
+    def count_statement(_connection, _cursor, statement, *_):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        checklist = get_month_checklist(2026, 7, session=session)
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+
+    assert len(checklist["rows"]) == 12
+    assert all(row["cells"][day]["status"] == "Completed" for row in checklist["rows"])
+    assert all(row["cells"][day]["xp_awarded"] == 75 for row in checklist["rows"])
+    assert len(statements) == 2
 
 
 def test_complete_checkin_sets_completed_status_timestamp_and_xp(session):

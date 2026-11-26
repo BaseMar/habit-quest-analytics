@@ -21,7 +21,7 @@ from src.services.command_center_service import (
     get_quest_category_name as _category_name,
     normalize_status as _normalize_status,
 )
-from src.services.goal_service import get_goal_progress
+from src.services.goal_service import build_goal_progress_batch
 from src.services.xp_service import calculate_level, get_character_level_progress, get_stat_level_progress
 
 STATUS_ORDER = QUEST_STATUSES
@@ -500,7 +500,6 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
     owns_session = session is None
     session = session or get_session()
     try:
-        quests = session.query(Quest).options(joinedload(Quest.category)).all()
         checkins = (
             session.query(QuestCheckin)
             .options(joinedload(QuestCheckin.quest).joinedload(Quest.category))
@@ -547,6 +546,7 @@ def get_character_profile_data(today: date | None = None, session=None) -> dict:
                 "activity_stats": activity_stats,
             }
 
+        quests = session.query(Quest).options(joinedload(Quest.category)).all()
         completed_quests = [quest for quest in quests if _is_completed(quest)]
         total_xp = sum(quest.xp_reward or 0 for quest in completed_quests)
         level_progress = get_character_level_progress(total_xp)
@@ -1306,9 +1306,10 @@ def _normalize_goal_status_filter(statuses: list[str] | tuple[str, ...] | str | 
 
 
 def _build_goal_progress_rows(goals: list[Goal], session) -> list[dict]:
+    progress_by_goal_id = build_goal_progress_batch(session, goals)
     rows = []
     for goal in goals:
-        progress = get_goal_progress(goal.id, session=session)
+        progress = progress_by_goal_id[goal.id]
         rows.append(
             {
                 "Goal ID": goal.id,

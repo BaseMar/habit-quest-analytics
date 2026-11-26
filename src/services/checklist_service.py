@@ -57,11 +57,6 @@ def get_month_checklist(year: int, month: int, session=None) -> dict:
             .all()
         )
 
-        for quest in quests:
-            scheduled_date = _get_scheduled_date_in_month(quest, month_start, month_end)
-            if scheduled_date is not None:
-                ensure_checkin(quest.id, scheduled_date, session=session)
-
         quest_ids = [quest.id for quest in quests]
         checkins_by_quest_and_date = _get_month_checkins_by_quest_and_date(
             session,
@@ -69,6 +64,18 @@ def get_month_checklist(year: int, month: int, session=None) -> dict:
             month_start,
             month_end,
         )
+        missing = []
+        for quest in quests:
+            scheduled_date = _get_scheduled_date_in_month(quest, month_start, month_end)
+            if scheduled_date is not None and scheduled_date not in checkins_by_quest_and_date.get(quest.id, {}):
+                missing.append((quest.id, scheduled_date))
+
+        if missing:
+            for quest_id, scheduled_date in missing:
+                ensure_checkin(quest_id, scheduled_date, session=session)
+            checkins_by_quest_and_date = _get_month_checkins_by_quest_and_date(
+                session, quest_ids, month_start, month_end,
+            )
 
         return {
             "year": year,

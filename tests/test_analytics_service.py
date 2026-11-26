@@ -1166,13 +1166,24 @@ def test_get_character_profile_data_does_not_double_count_legacy_completed_quest
     category = _add_category(session, "Learning")
     quest = _add_quest(session, "Legacy completed", status="Completed", xp_reward=300, category=category)
     _add_checkin(session, quest, date(2026, 6, 26), "Completed", xp_awarded=30)
+    session.expunge_all()
+    statements = []
+    engine = session.get_bind()
 
-    profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+    def count_statement(_connection, _cursor, statement, *_):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        profile = get_character_profile_data(today=date(2026, 6, 26), session=session)
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
 
     assert profile["total_xp"] == 30
     assert profile["completed_quest_days"] == 1
     knowledge = profile["rpg_stats"].set_index("Stat").loc["Knowledge"]
     assert int(knowledge["XP"]) == 30
+    assert len(statements) == 2
 
 
 def test_get_character_profile_data_builds_default_stat_profile_without_checkins(session):
@@ -1363,6 +1374,35 @@ def test_get_goal_analytics_summary_filters_category(session):
     summary = get_goal_analytics_summary(category_id=work.id, session=session)
 
     assert [row["Goal ID"] for row in summary["goal_rows"]] == [work_goal.id]
+
+
+def test_goal_analytics_reads_project_progress_in_bounded_queries(session):
+    category = _add_category(session, "Work")
+    for index in range(8):
+        goal = _add_goal(session, f"Project {index}", category=category)
+        quest = _add_quest(session, f"Session {index}", estimated_minutes=30, goal=goal)
+        _add_checkin(session, quest, date(2026, 7, 1), "Completed", xp_awarded=10)
+        _add_checkin(session, quest, date(2026, 7, 2), "Skipped")
+    _add_goal(session, "Project without sessions", category=category)
+    session.expunge_all()
+    statements = []
+    engine = session.get_bind()
+
+    def count_statement(_connection, _cursor, statement, *_):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", count_statement)
+    try:
+        summary = get_goal_analytics_summary(session=session)
+    finally:
+        event.remove(engine, "before_cursor_execute", count_statement)
+
+    assert summary["included_goals_count"] == 9
+    assert summary["linked_sessions_count"] == 8
+    assert summary["completed_sessions_count"] == summary["skipped_sessions_count"] == 8
+    assert summary["completed_effort_minutes"] == 240
+    assert summary["goal_xp_earned"] == 80
+    assert len(statements) == 3
 
 
 def test_goal_analytics_weighted_overall_progress(session):
