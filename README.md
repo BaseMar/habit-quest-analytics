@@ -71,9 +71,12 @@ Live app: https://habit-quest-analytics-sai5h3bl7wjykw4fbruabd.streamlit.app
 
 Choose **Try live demo** to open Planner as Alex Morgan, with sample tasks,
 routine history, a project, and earned XP. You can edit the plan and try other
-features. Each demo session starts fresh, and its data stays in memory for the
-duration of that session. Click **Reset demo** in the sidebar to restore the
-sample data and continue exploring. Demo mode is also available when running locally.
+features. Each guest gets a separate in-memory workspace that survives normal
+app reruns. **Reset demo** restores the sample data, clears temporary avatars
+and drafts, and keeps the selected theme. **Exit demo** discards the workspace.
+Demo mode is also available locally. After an unexpected browser disconnect,
+Streamlit controls when retained session state expires.
+[Streamlit session retention](https://docs.streamlit.io/develop/api-reference/configuration/config.toml)
 
 The account-enabled Streamlit Community Cloud deployment uses PostgreSQL on
 Supabase. See the [Google sign-in setup](#google-sign-in) and
@@ -518,9 +521,9 @@ python -m compileall -q app src tests migrations
 The [GitHub Actions CI workflow](.github/workflows/ci.yml) runs on pushes, pull
 requests, and manual dispatch. It installs `requirements.txt` on Ubuntu with
 Python 3.11, runs the full pytest suite and compilation checks, and reruns the
-PostgreSQL and account scope modules. CI checks the report for the required
-database cases, including ownership, row-level security, and concurrency, and
-fails if cases skip in those modules.
+PostgreSQL and account scope modules alongside the PostgreSQL-backed guest
+isolation test. CI checks the report for required database cases and fails if
+any selected case skips.
 
 Each job starts a temporary PostgreSQL 18 service with its own test database
 and credentials. The service is independent of Supabase and requires no

@@ -57,7 +57,8 @@ jobs:
         run: |
           : "${TEST_POSTGRESQL_URL:?Set TEST_POSTGRESQL_URL to the disposable PostgreSQL service}"
           report="$RUNNER_TEMP/postgresql-results.xml"
-          python -m pytest -ra tests/test_postgresql.py tests/test_account_scope.py --junitxml="$report"
+          python -m pytest -ra tests/test_postgresql.py tests/test_account_scope.py \
+            tests/test_demo_sessions.py::test_postgresql_demo_and_authenticated_workspaces_are_isolated --junitxml="$report"
 
           python - "$report" <<'PY'
           import sys
@@ -81,6 +82,7 @@ jobs:
               "test_postgresql_concurrent_bulk_planning_does_not_overallocate",
               "test_postgresql_failed_checkin_write_rolls_back_scheduling[single]",
               "test_postgresql_failed_checkin_write_rolls_back_scheduling[bulk]",
+              "test_postgresql_demo_and_authenticated_workspaces_are_isolated",
           }
           cases = list(ET.parse(sys.argv[1]).iter("testcase"))
           missing = required - {case.attrib["name"] for case in cases}

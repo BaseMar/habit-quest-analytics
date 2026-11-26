@@ -48,14 +48,17 @@ test accounts for cross-account checks.
   PostgreSQL service and set `TEST_POSTGRESQL_URL` for integration tests. Verified
   on Python 3.11.18 and PostgreSQL 18 with 371 passed and zero skips.
   [GitHub Actions run 45820774139](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45820774139)
-- [ ] Expand account isolation coverage for cross-account reads, writes,
+- [x] Expand account isolation coverage for cross-account reads, writes,
   deletes, and relationship links. Test relevant concurrent provisioning,
   scheduling, and check-in operations on PostgreSQL. The expanded suite covers
   SQLite and PostgreSQL ownership, unprivileged-role RLS, and concurrent
-  PostgreSQL writes. Local verification is complete. The expanded CI run is
-  pending publication.
+  PostgreSQL writes. CI passed all 388 tests, including the 17 required
+  PostgreSQL-backed cases.
+  [GitHub Actions run 45828732641](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45828732641)
 - [ ] Extend the existing independent guest session and reset tests to cover
   interleaved changes, repeated resets, and guest isolation from account data.
+  The lifecycle, avatar boundaries, and PostgreSQL-backed account transitions
+  passed local verification. Remote CI verification is pending publication.
 - [ ] Verify migrations on an empty database and an upgrade from the original
   schema. Verify SQLite imports, rollback, ID preservation, and legacy ownership
   assignment on PostgreSQL.
