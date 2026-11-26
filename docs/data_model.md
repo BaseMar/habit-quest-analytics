@@ -28,7 +28,9 @@ unique subject identifies the account across changes to its email address.
 | `email` | Verified email, refreshed on sign-in. |
 
 Personal tables carry a `user_id` foreign key to `user_accounts.id`. Account
-sessions filter personal ORM reads by owner and validate writes and deletes.
+sessions filter personal ORM reads by owner, including relationship loads, and
+validate per-object writes and deletes. Account sessions reject raw SQL,
+prebuilt `from_statement()` queries, and bulk write APIs.
 Composite foreign keys use `(user_id, related_id)` to enforce same-owner links
 between assigned rows. Categories are unique by owner and name. Each owner
 has at most one player profile. Achievement definitions are shared.

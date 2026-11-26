@@ -1,7 +1,10 @@
-from sqlalchemy import event, inspect
+from sqlalchemy import Select, event, inspect
 from sqlalchemy.orm import Session, with_loader_criteria
 
 from src.database.models import Achievement, UserOwned
+
+
+_SCOPED_OPERATIONS = "Account sessions require ORM reads and writes through mapped objects."
 
 
 class UserSession(Session):
@@ -15,18 +18,26 @@ class UserSession(Session):
     def user_id(self) -> int:
         return self._user_id
 
+    def _reject_legacy_bulk_write(self, *args, **kwargs):
+        # These APIs bypass both ORM execution events and per-object flush validation.
+        raise PermissionError(_SCOPED_OPERATIONS)
+
+    bulk_insert_mappings = _reject_legacy_bulk_write
+    bulk_update_mappings = _reject_legacy_bulk_write
+    bulk_save_objects = _reject_legacy_bulk_write
+
 
 @event.listens_for(UserSession, "do_orm_execute")
 def scope_queries(execution):
-    # Bulk writes and Core SQL bypass the per-object ownership checks below.
-    if not (execution.is_orm_statement and execution.is_select):
-        raise PermissionError("Account sessions require ORM reads and writes through mapped objects.")
+    # A supplied from_statement() query cannot be rewritten with ownership criteria.
+    if not (execution.is_orm_statement and isinstance(execution.statement, Select)):
+        raise PermissionError(_SCOPED_OPERATIONS)
     if any(not issubclass(mapper.class_, (UserOwned, Achievement)) for mapper in execution.all_mappers):
         raise PermissionError("This data is unavailable in an account session.")
     user_id = execution.session.user_id
     execution.statement = execution.statement.options(
         with_loader_criteria(
-            UserOwned, lambda model: model.user_id == user_id, include_aliases=True, propagate_to_loaders=False,
+            UserOwned, lambda model: model.user_id == user_id, include_aliases=True,
         )
     )
 
