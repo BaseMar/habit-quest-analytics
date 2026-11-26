@@ -442,9 +442,14 @@ All schema changes during preparation apply to the snapshot.
 ## PostgreSQL Schema
 
 Alembic revisions `0001` and `0002` establish the baseline tables and add
-ownership constraints and row-level security. RLS protects app tables from
-direct access by public API roles without a matching policy or bypass. The app's
-server-side role uses account-scoped ORM sessions for personal data isolation.
+ownership constraints and row-level security. The migrations enable RLS on
+application tables without granting a policy. A non-owner role without
+`BYPASSRLS` sees no rows even with table grants. Table owners, superusers, and
+roles with `BYPASSRLS` can bypass these policies. The app derives the owner from
+verified sign-in and uses account-scoped ORM sessions for per-account access.
+Keep the PostgreSQL connection, raw SQL, and account provisioning and legacy
+claim paths in trusted server and maintenance code. The ownership constraints
+apply to assigned rows, and the app hides unassigned legacy rows until claimed.
 Primary keys use identity columns that accept explicit IDs during SQLite
 import. The importer preserves IDs and advances sequences past them. See the
 [PostgreSQL setup and import instructions](../README.md#postgresql).

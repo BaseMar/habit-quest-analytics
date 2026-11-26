@@ -27,7 +27,7 @@ audit. The release criteria still apply.
 
 ## Milestone 1 — Version 1.0 · Stabilization and portfolio release
 
-**Status** · Planned
+**Status** · In Progress
 
 **Objective and value.** Establish a reliable baseline and prepare the first
 portfolio release. Users can trust their history and visitors can try the main
@@ -44,14 +44,16 @@ test accounts for cross-account checks.
 
 ### Implementation tasks
 
-- [ ] Add GitHub Actions to run pytest on pushes and pull requests. Provision a
-  PostgreSQL service and set `TEST_POSTGRESQL_URL` for integration tests.
-  Implemented locally, including manual dispatch. Workflow lint and all required
-  integration cases passed locally against disposable PostgreSQL 18. Confirm
-  the first successful GitHub Actions run before closing this task.
+- [x] Add GitHub Actions to run pytest on pushes and pull requests. Provision a
+  PostgreSQL service and set `TEST_POSTGRESQL_URL` for integration tests. Verified
+  on Python 3.11.18 and PostgreSQL 18 with 371 passed and zero skips.
+  [GitHub Actions run 45820774139](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45820774139)
 - [ ] Expand account isolation coverage for cross-account reads, writes,
   deletes, and relationship links. Test relevant concurrent provisioning,
-  scheduling, and check-in operations on PostgreSQL.
+  scheduling, and check-in operations on PostgreSQL. The expanded suite covers
+  SQLite and PostgreSQL ownership, unprivileged-role RLS, and concurrent
+  PostgreSQL writes. Local verification is complete. The expanded CI run is
+  pending publication.
 - [ ] Extend the existing independent guest session and reset tests to cover
   interleaved changes, repeated resets, and guest isolation from account data.
 - [ ] Verify migrations on an empty database and an upgrade from the original

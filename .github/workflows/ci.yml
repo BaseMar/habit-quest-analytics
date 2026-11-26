@@ -57,7 +57,7 @@ jobs:
         run: |
           : "${TEST_POSTGRESQL_URL:?Set TEST_POSTGRESQL_URL to the disposable PostgreSQL service}"
           report="$RUNNER_TEMP/postgresql-results.xml"
-          python -m pytest -ra tests/test_postgresql.py --junitxml="$report"
+          python -m pytest -ra tests/test_postgresql.py tests/test_account_scope.py --junitxml="$report"
 
           python - "$report" <<'PY'
           import sys
@@ -67,6 +67,20 @@ jobs:
               "test_import_preserves_history_and_generates_new_ids",
               "test_import_rolls_back_if_sqlite_contains_an_orphaned_checkin",
               "test_legacy_data_stays_hidden_until_assigned_to_the_selected_google_account",
+              "test_google_account_uses_its_subject_and_provisions_defaults_once[postgresql]",
+              "test_account_reads_relationships_and_aggregates_are_scoped[postgresql]",
+              "test_foreign_service_and_orm_writes_leave_owner_data_unchanged[postgresql]",
+              "test_unsupported_account_session_apis_reject_unscoped_operations[postgresql]",
+              "test_owned_relationship_constraints_roll_back_on_invalid_reference[postgresql]",
+              "test_postgresql_owner_foreign_keys_and_per_account_uniqueness",
+              "test_postgresql_rls_blocks_an_unprivileged_role",
+              "test_postgresql_concurrent_google_registration_provisions_once",
+              "test_postgresql_concurrent_checkin_completion_awards_xp_once",
+              "test_postgresql_concurrent_routine_generation_rolls_back_the_loser",
+              "test_postgresql_concurrent_goal_session_numbering",
+              "test_postgresql_concurrent_bulk_planning_does_not_overallocate",
+              "test_postgresql_failed_checkin_write_rolls_back_scheduling[single]",
+              "test_postgresql_failed_checkin_write_rolls_back_scheduling[bulk]",
           }
           cases = list(ET.parse(sys.argv[1]).iter("testcase"))
           missing = required - {case.attrib["name"] for case in cases}

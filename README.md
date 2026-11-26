@@ -493,12 +493,13 @@ python -m compileall -q app src tests migrations
 
 Run PostgreSQL integration tests locally against a disposable database. Set
 `TEST_POSTGRESQL_URL` to its connection URL using a test role that can create
-schemas. The fixture creates an isolated schema, upgrades it to Alembic head,
-checks for schema drift, and drops the schema after the test.
+schemas, create a disposable unprivileged role, and switch to that role for
+the row-level security test. The fixture upgrades an isolated schema to Alembic
+head, checks for drift, and drops the schema after each test.
 
 ```powershell
 $env:TEST_POSTGRESQL_URL = 'postgresql://test_user:test_password@127.0.0.1:5432/habit_quest_test'
-python -m pytest -ra tests/test_postgresql.py
+python -m pytest -ra tests/test_postgresql.py tests/test_account_scope.py
 ```
 
 Without `TEST_POSTGRESQL_URL`, pytest skips the cases that need a running
@@ -517,8 +518,9 @@ python -m compileall -q app src tests migrations
 The [GitHub Actions CI workflow](.github/workflows/ci.yml) runs on pushes, pull
 requests, and manual dispatch. It installs `requirements.txt` on Ubuntu with
 Python 3.11, runs the full pytest suite and compilation checks, and reruns the
-PostgreSQL module explicitly. CI checks the test report for all required
-database cases and fails if any case in that module skips.
+PostgreSQL and account scope modules. CI checks the report for the required
+database cases, including ownership, row-level security, and concurrency, and
+fails if cases skip in those modules.
 
 Each job starts a temporary PostgreSQL 18 service with its own test database
 and credentials. The service is independent of Supabase and requires no
