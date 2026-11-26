@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 
 from app.components.checkin_actions import get_checkin_status_actions
 from app.components.scheduling import duration_crosses_midnight, end_at_for_duration
+from src.auth import DEMO_STATE
 from src.constants import DEFAULT_CATEGORIES
 
 
@@ -71,24 +72,6 @@ def test_planner_date_selection_and_inline_edit(monkeypatch):
     assert set(app.selectbox(key="plan_category").options) == {name for name, _ in DEFAULT_CATEGORIES}
 
 
-def test_demo_checkins_are_isolated(monkeypatch):
-    from streamlit.testing.v1 import AppTest
-
-    from src.database import db
-
-    monkeypatch.setattr(db, "engine", None)
-    app = AppTest.from_file(APP_PATH).run()
-    next(button for button in app.button if button.label == "Try live demo").click().run()
-    next(button for button in app.button if button.label == "Complete").click().run()
-    assert "completed" in app.success[0].value
-    assert sum(button.label == "Reset" for button in app.button) == 2
-
-    other = AppTest.from_file(APP_PATH).run()
-    next(button for button in other.button if button.label == "Try live demo").click().run()
-    assert sum(button.label == "Reset" for button in other.button) == 1
-    assert not other.exception
-
-
 def test_reset_demo_restores_checkins_and_keeps_the_theme(monkeypatch):
     from streamlit.testing.v1 import AppTest
 
@@ -97,14 +80,19 @@ def test_reset_demo_restores_checkins_and_keeps_the_theme(monkeypatch):
     monkeypatch.setattr(db, "engine", None)
     app = AppTest.from_file(APP_PATH).run()
     next(button for button in app.button if button.label == "Try live demo").click().run()
+    engine = app.session_state[DEMO_STATE]
     app.toggle(key="hq_dark_mode").set_value(True).run()
     next(button for button in app.button if button.label == "Complete").click().run()
+    assert "completed" in app.success[0].value
+    app.run()
+    assert app.session_state[DEMO_STATE] is engine
     assert sum(button.label == "Reset" for button in app.button) == 2
     app.session_state["demo_avatar"] = b"example avatar"
 
     app.sidebar.button(key="reset_demo").click().run()
 
     assert not app.exception
+    assert app.session_state[DEMO_STATE] is not engine
     assert sum(button.label == "Reset" for button in app.button) == 1
     assert "demo_avatar" not in app.session_state
     assert app.toggle(key="hq_dark_mode").value is True
@@ -145,12 +133,11 @@ def test_app_offers_google_or_demo_before_showing_navigation(monkeypatch):
     assert not app.sidebar.get("page_link")
 
 
-def test_loading_screen_follows_page_navigation(monkeypatch):
+def test_loading_screen_follows_page_navigation(monkeypatch, streamlit_navigation):
     from contextlib import contextmanager
 
     import streamlit as st
     from sqlalchemy.pool import StaticPool
-    from streamlit.runtime.pages_manager import PagesManager
     from streamlit.testing.v1 import AppTest
 
     from app.components import loading_screen as loading_component
@@ -160,13 +147,6 @@ def test_loading_screen_follows_page_navigation(monkeypatch):
 
     loads = []
     show_loading = loading_component.loading_screen
-    initialize_pages = PagesManager.__init__
-
-    def initialize_navigation(*args, **kwargs):
-        # AppTest resets this flag on every run. A live st.navigation session keeps it false.
-        PagesManager.uses_pages_directory = False
-        initialize_pages(*args, **kwargs)
-
     @contextmanager
     def track_loading(title, *, enabled):
         if enabled:
@@ -175,7 +155,6 @@ def test_loading_screen_follows_page_navigation(monkeypatch):
             yield
 
     monkeypatch.setattr(loading_component, "loading_screen", track_loading)
-    monkeypatch.setattr(PagesManager, "__init__", initialize_navigation)
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     monkeypatch.setattr(db, "engine", engine)

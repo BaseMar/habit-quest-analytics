@@ -1,10 +1,14 @@
-"""Read the Google identity verified by Streamlit for the current session."""
+"""Manage verified Streamlit identities and per-session guest workspaces."""
+
+import logging
 
 import streamlit as st
+from sqlalchemy.engine import Engine
 
 
 _ACCOUNT_STATE = "_hq_authenticated_account"
 DEMO_STATE = "_hq_demo_database"
+_DEMO_SUBJECT = "_hq_demo_subject"
 _GOOGLE_ISSUERS = {"https://accounts.google.com", "accounts.google.com"}
 _AUTH_KEYS = ("redirect_uri", "cookie_secret", "client_id", "client_secret", "server_metadata_url")
 
@@ -42,30 +46,75 @@ def current_user_id() -> int:
     return account[1]
 
 
-def start_demo() -> None:
+def _subject(identity: tuple[str, str] | None) -> str | None:
+    return identity[0] if identity is not None else None
+
+
+def active_demo_engine() -> Engine | None:
+    engine = st.session_state.get(DEMO_STATE)
+    if engine is not None and st.session_state.get(_DEMO_SUBJECT) == _subject(google_identity()):
+        return engine
+    return None
+
+
+def clear_stale_workspace(identity: tuple[str, str] | None) -> None:
+    subject = _subject(identity)
+    account = st.session_state.get(_ACCOUNT_STATE)
+    if (
+        (DEMO_STATE in st.session_state and st.session_state.get(_DEMO_SUBJECT) != subject)
+        or (account is not None and account[0] != subject)
+    ):
+        end_demo()
+
+
+def _build_demo() -> Engine | None:
     from src.services.demo_service import create_demo_database
 
-    st.session_state[DEMO_STATE] = create_demo_database()
-    st.session_state["_hq_demo_open_planner"] = True
+    try:
+        return create_demo_database()
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to initialize the guest demo.")
+        st.error("Unable to load the demo scenario. Try again.")
+        return None
+
+
+def _replace_workspace(state: dict) -> None:
+    previous_demo = st.session_state.get(DEMO_STATE)
+    st.session_state.clear()
+    st.session_state.update(state)
+    if previous_demo is not None:
+        previous_demo.dispose()
+
+
+def start_demo() -> None:
+    if active_demo_engine() is not None:
+        return
+    if (database := _build_demo()) is not None:
+        # Allow an explicit demo in the sign-in fallback for this identity.
+        _replace_workspace({
+            DEMO_STATE: database,
+            _DEMO_SUBJECT: _subject(google_identity()),
+            "_hq_demo_open_planner": True,
+        })
 
 
 def reset_demo() -> None:
-    from src.services.demo_service import create_demo_database
     from src.ui import THEME_MODE_KEY
 
-    theme_mode = st.session_state[THEME_MODE_KEY]
-    database = create_demo_database()
-    end_demo()
-    st.session_state[DEMO_STATE] = database
-    st.session_state[THEME_MODE_KEY] = theme_mode
+    if active_demo_engine() is None:
+        return
+    if (database := _build_demo()) is not None:
+        _replace_workspace({
+            DEMO_STATE: database,
+            _DEMO_SUBJECT: st.session_state.get(_DEMO_SUBJECT),
+            THEME_MODE_KEY: st.session_state.get(THEME_MODE_KEY, "Light"),
+        })
 
 
 def end_demo() -> None:
-    engine = st.session_state[DEMO_STATE]
-    st.session_state.clear()
-    engine.dispose()
+    _replace_workspace({})
 
 
 def log_out() -> None:
-    st.session_state.clear()
+    end_demo()
     st.logout()

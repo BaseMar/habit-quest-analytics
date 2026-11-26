@@ -35,11 +35,9 @@ def get_engine() -> Engine:
 
 def get_session() -> UserSession:
     """Return an account-scoped session for app services."""
-    import streamlit as st
+    from src.auth import active_demo_engine, current_user_id
 
-    from src.auth import DEMO_STATE, current_user_id
-
-    if demo_engine := st.session_state.get(DEMO_STATE):
+    if demo_engine := active_demo_engine():
         from src.services.demo_service import DEMO_USER_ID
 
         return UserSession(bind=demo_engine, user_id=DEMO_USER_ID, autoflush=False)

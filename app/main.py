@@ -13,7 +13,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.components.loading_screen import loading_screen
 from app.components.sign_in import render_sign_in
-from src.auth import DEMO_STATE, bind_account, current_user_id, end_demo, google_identity, log_out, reset_demo
+from src.auth import (
+    DEMO_STATE, bind_account, clear_stale_workspace, current_user_id, end_demo, google_identity, log_out, reset_demo,
+)
 from src.database import db
 from src.services.account_service import register_google_account
 from src.services.demo_service import DEMO_NAME
@@ -34,6 +36,7 @@ if "on_change" not in signature(st.tabs).parameters:
     st.stop()
 
 identity = google_identity()
+clear_stale_workspace(identity)
 is_demo = DEMO_STATE in st.session_state
 if not is_demo and (identity is None or db.engine is None):
     render_sign_in(database_configured=db.engine is not None)

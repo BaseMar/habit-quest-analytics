@@ -11,6 +11,21 @@ from src.database import db
 
 
 @pytest.fixture
+def streamlit_navigation(monkeypatch):
+    from streamlit.runtime.pages_manager import PagesManager
+
+    initialize = PagesManager.__init__
+
+    def initialize_navigation(*args, **kwargs):
+        # Preserve a live st.navigation session across AppTest reruns.
+        PagesManager.uses_pages_directory = False
+        initialize(*args, **kwargs)
+
+    monkeypatch.setattr(PagesManager, "uses_pages_directory", False)
+    monkeypatch.setattr(PagesManager, "__init__", initialize_navigation)
+
+
+@pytest.fixture
 def migration_config():
     return Config(Path(__file__).resolve().parents[1] / "alembic.ini")
 
