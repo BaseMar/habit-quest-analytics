@@ -290,8 +290,9 @@ def apply_character_profile_styles() -> None:
 
 
 def render_avatar(profile: dict) -> bool:
-    demo_avatar = st.session_state.get("demo_avatar") if DEMO_STATE in st.session_state else None
-    avatar_path = resolve_avatar_path(profile.get("avatar_path"))
+    is_demo = DEMO_STATE in st.session_state
+    demo_avatar = st.session_state.get("demo_avatar") if is_demo else None
+    avatar_path = None if is_demo else resolve_avatar_path(profile.get("avatar_path"))
     if demo_avatar:
         st.image(BytesIO(demo_avatar), width=116)
     elif avatar_path:

@@ -6,6 +6,9 @@ from sqlalchemy.engine import Engine, URL, make_url
 from src.database.user_session import UserSession
 
 
+DEMO_ENGINE_OPTION = "habit_quest_demo"
+
+
 def get_database_url() -> URL | None:
     """Read the configured PostgreSQL URL."""
     configured_url = os.getenv("DATABASE_URL")

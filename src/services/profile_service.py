@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-from src.database.db import get_session
+from src.database.db import DEMO_ENGINE_OPTION, get_session
 from src.database.models import PlayerProfile
 from src.database.user_session import UserSession
 
@@ -45,9 +45,9 @@ def save_avatar(
     owns_session = session is None
     session = session or get_session()
     try:
+        directory = _avatar_directory(upload_dir, session)
         profile = get_or_create_player_profile(session=session, for_update=True)
         previous_path = profile.avatar_path
-        directory = _avatar_directory(upload_dir, session)
         directory.mkdir(parents=True, exist_ok=True)
         avatar_path = directory / f"{uuid4().hex}{extension}"
         stored_path = str(avatar_path)
@@ -73,11 +73,12 @@ def remove_avatar(upload_dir: Path = DEFAULT_UPLOAD_DIR, session=None) -> None:
     owns_session = session is None
     session = session or get_session()
     try:
+        directory = _avatar_directory(upload_dir, session)
         profile = get_or_create_player_profile(session=session, for_update=True)
         previous_path = profile.avatar_path
         profile.avatar_path = None
         session.commit()
-        _remove_managed_avatar(previous_path, _avatar_directory(upload_dir, session))
+        _remove_managed_avatar(previous_path, directory)
     finally:
         if owns_session:
             session.close()
@@ -96,6 +97,8 @@ def resolve_avatar_path(avatar_path: str | None) -> Path | None:
 
 
 def _avatar_directory(upload_dir: Path, session) -> Path:
+    if session.get_bind().get_execution_options().get(DEMO_ENGINE_OPTION):
+        raise ValueError("Guest avatars are stored in the demo session.")
     if isinstance(session, UserSession):
         return (upload_dir / "users" / str(session.user_id)).resolve()
     return upload_dir.resolve()

@@ -5,6 +5,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from src.database.db import DEMO_ENGINE_OPTION
 from src.database.models import Base, PlayerProfile, RecurringHabitInstance, UserAccount
 from src.database.seed import add_missing_default_categories
 from src.database.user_session import UserSession
@@ -21,7 +22,10 @@ DEMO_NAME = "Alex Morgan"
 def create_demo_database(today: date | None = None) -> Engine:
     """Build a fresh sample account in a database owned by one browser session."""
     today = today or date.today()
-    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False},
+        execution_options={DEMO_ENGINE_OPTION: True},
+    )
     try:
         Base.metadata.create_all(engine)
         with Session(engine) as session, session.begin():

@@ -1,20 +1,25 @@
 from datetime import date, time
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 import streamlit as st
+from PIL import Image
 from sqlalchemy import event, select
 from streamlit.testing.v1 import AppTest
 
 from src import auth
 from src.database import db
-from src.database.models import Goal, Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance
+from src.database.models import Base, Goal, Quest, QuestCheckin, RecurringHabit, RecurringHabitInstance
+from src.database.user_session import UserSession
 from src.services import demo_service
+from src.services.account_service import register_google_account
 from src.services.analytics_service import get_character_profile_data, get_goal_analytics_summary, get_habit_analytics_data
 from src.services.checklist_service import complete_checkin, reset_checkin
 from src.services.command_center_service import get_command_center_data
 from src.services.goal_service import create_goal
 from src.services.goal_session_planner_service import plan_goal_sessions
+from src.services.profile_service import get_or_create_player_profile, remove_avatar, save_avatar
 from src.services.quest_service import create_scheduled_quest, get_categories, update_planned_quest
 from src.services.recurring_habit_service import create_recurring_habit, generate_recurring_habit_for_month
 from src.ui import THEME_MODE_KEY
@@ -216,3 +221,157 @@ def test_signed_in_fallback_can_still_enter_demo(monkeypatch, demo_engines):
     _click(app, "Exit demo", sidebar=True)
     assert auth.DEMO_STATE not in app.session_state and disposed == created
     assert "DATABASE_URL" in app.error[0].value
+
+
+def _keep_avatar_dialog_open(app):
+    # AppTest reruns the full page for dialog widgets.
+    next(button for button in app.button if button.label == "Change avatar").click()
+
+
+def _png(color):
+    data = BytesIO()
+    Image.new("RGB", (2, 2), color).save(data, format="PNG")
+    return data.getvalue()
+
+
+def _account_rows(engine):
+    with engine.connect() as connection:
+        return {
+            table.name: connection.execute(table.select().order_by(table.c.id)).all()
+            for table in Base.metadata.sorted_tables
+        }
+
+
+def test_postgresql_demo_and_authenticated_workspaces_are_isolated(
+    postgres, monkeypatch, tmp_path, demo_engines, streamlit_navigation,
+):
+    created, disposed = demo_engines
+    account_disposals = []
+    event.listen(postgres, "engine_disposed", account_disposals.append)
+    first_id = register_google_account("first", "first@example.com")
+    second_id = register_google_account("second", "second@example.com")
+    assert first_id == demo_service.DEMO_USER_ID
+    account_image = _png("red")
+    guest_image = _png("blue")
+    for user_id, subject in ((first_id, "first"), (second_id, "second")):
+        with UserSession(bind=postgres, user_id=user_id) as session:
+            quest = _add_today_task(f"{subject} account task", 15, session=session)
+            complete_checkin(quest.id, DAY, session=session)
+            if user_id == first_id:
+                first_quest_id = quest.id
+                avatar_path = Path(save_avatar("account.png", account_image, upload_dir=tmp_path, session=session))
+    before = _account_rows(postgres)
+
+    user = {"is_logged_in": False}
+
+    def sign_in(subject):
+        user.update({
+            "is_logged_in": True, "iss": "https://accounts.google.com", "email_verified": True,
+            "sub": subject, "email": f"{subject}@example.com",
+        })
+
+    monkeypatch.setattr(st, "user", user)
+    monkeypatch.setattr(st, "login", lambda: sign_in("first"))
+    monkeypatch.setattr(st, "logout", lambda: user.update(is_logged_in=False))
+    app = AppTest.from_file(APP_PATH)
+    app.secrets["auth"] = {
+        "redirect_uri": "http://localhost:8501/oauth2callback",
+        "cookie_secret": "test-only", "client_id": "test-only", "client_secret": "test-only",
+        "server_metadata_url": "https://accounts.google.com/.well-known/openid-configuration",
+    }
+    app.run()
+    _click(app, "Try live demo")
+    first_demo = app.session_state[auth.DEMO_STATE]
+    assert _account_rows(postgres) == before
+    with monkeypatch.context() as patch:
+        patch.setattr(st, "session_state", app.session_state.to_dict())
+        baseline = _guest_snapshot()
+        with db.get_session() as session:
+            assert session.get_bind() is first_demo
+            assert session.user_id == first_id
+            assert session.get(Quest, first_quest_id).title != "first account task"
+            profile = get_or_create_player_profile(session=session)
+            assert profile.avatar_path is None
+            with pytest.raises(ValueError, match="Guest avatars"):
+                save_avatar("guest.png", guest_image, upload_dir=tmp_path, session=session)
+            # Even a stale path in the guest profile cannot touch the account's file.
+            profile.avatar_path = str(avatar_path)
+            session.commit()
+            with pytest.raises(ValueError, match="Guest avatars"):
+                remove_avatar(upload_dir=tmp_path, session=session)
+        task = _add_today_task("Guest-only task", 60)
+        complete_checkin(task.id, DAY)
+        assert _guest_snapshot()["analytics"]["xp_earned"] == baseline["analytics"]["xp_earned"] + 20
+
+    app.switch_page("pages/4_Character_Profile.py").run()
+    assert not app.exception
+    assert any('aria-label="Default avatar"' in item.proto.body for item in app.get("html"))
+    _click(app, "Change avatar")
+    app.file_uploader[0].set_value(("guest.png", guest_image, "image/png"))
+    _keep_avatar_dialog_open(app)
+    app.run()
+    assert not app.exception
+    _keep_avatar_dialog_open(app)
+    _click(app, "Save avatar")
+    assert app.session_state["demo_avatar"] == guest_image
+    _click(app, "Change avatar")
+    _keep_avatar_dialog_open(app)
+    _click(app, "Remove avatar")
+    assert "demo_avatar" not in app.session_state
+    app.run()
+    assert _account_rows(postgres) == before
+    assert avatar_path.read_bytes() == account_image
+    _click(app, "Reset demo", sidebar=True)
+    assert first_demo in disposed
+    reset_demo = app.session_state[auth.DEMO_STATE]
+    with monkeypatch.context() as patch:
+        patch.setattr(st, "session_state", app.session_state.to_dict())
+        assert _guest_snapshot() == baseline
+    assert _account_rows(postgres) == before
+    assert list(tmp_path.rglob("*.png")) == [avatar_path]
+    assert avatar_path.read_bytes() == account_image
+
+    app.session_state["plan_title"] = "Guest draft"
+    _click(app, "Exit demo", sidebar=True)
+    assert reset_demo in disposed
+    assert "plan_title" not in app.session_state and auth.DEMO_STATE not in app.session_state
+    assert [button.label for button in app.button] == ["Try live demo", "Log in with Google"]
+    _click(app, "Log in with Google")
+
+    def assert_account_workspace(user_id, subject):
+        assert auth.DEMO_STATE not in app.session_state
+        with monkeypatch.context() as patch:
+            patch.setattr(st, "session_state", app.session_state.to_dict())
+            with db.get_session() as session:
+                assert session.get_bind() is postgres and session.user_id == user_id
+                assert session.scalars(select(Quest.title)).all() == [f"{subject} account task"]
+                assert get_habit_analytics_data(today=DAY, session=session)["period_summary"]["xp_earned"] == 5
+                assert get_character_profile_data(today=DAY, session=session)["total_xp"] == 5
+
+    assert_account_workspace(first_id, "first")
+    app.session_state["plan_title"] = "First account draft"
+    sign_in("second")
+    app.run()
+    assert not app.exception and "plan_title" not in app.session_state
+    assert_account_workspace(second_id, "second")
+    app.session_state["plan_title"] = "Second account draft"
+    _click(app, "Log out", sidebar=True)
+    assert "plan_title" not in app.session_state
+    _click(app, "Try live demo")
+    stale_demo = app.session_state[auth.DEMO_STATE]
+    assert stale_demo is not reset_demo
+    with monkeypatch.context() as patch:
+        patch.setattr(st, "session_state", app.session_state.to_dict())
+        assert _guest_snapshot() == baseline
+    sign_in("first")
+    with monkeypatch.context() as patch:
+        patch.setattr(st, "session_state", app.session_state.to_dict())
+        with pytest.raises(PermissionError, match="Sign in"):
+            db.get_session()
+    app.run()
+    assert not app.exception
+    assert disposed == created
+    assert_account_workspace(first_id, "first")
+    assert _account_rows(postgres) == before
+    assert avatar_path.read_bytes() == account_image
+    assert account_disposals == []
