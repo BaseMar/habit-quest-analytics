@@ -303,7 +303,7 @@ def render_activity_overview(analytics: dict) -> None:
     if not analytics["has_quests"]:
         render_empty_state(
             "No checklist data yet",
-            "Schedule work in Planner and record check-ins in Command Center.",
+            "Schedule work and record check-ins in Planner.",
         )
         return
 

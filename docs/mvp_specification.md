@@ -7,13 +7,13 @@ The MVP proves the core loop: plan quests, track daily completion, earn XP, leve
 The current usable version includes:
 
 - calendar-based scheduled quest creation,
-- daily quest completion through Command Center check-ins,
+- daily quest completion through Planner check-ins,
 - recurring habit templates with creation-month and future-month planned-day generation,
 - categories for organizing work,
 - time-based XP for new scheduled quests and recurring habit templates,
 - XP rewards stored per completed check-in,
 - player profile with XP, nonlinear level, avatar, and RPG stat levels,
-- Command Center operational actions and KPIs,
+- Summary actions and KPIs,
 - Habit Analytics trends and consistency metrics,
 - PostgreSQL persistence and import of SQLite backups,
 - pytest coverage for business rules.
@@ -30,9 +30,9 @@ The current usable version includes:
 
 ## App Sections
 
-- `Command Center` - default daily workspace for today's and overdue check-in status actions.
-- `Planner` - calendar, unified planning form, selected-day editing/removal of
-  unresolved work, and read-only Monthly Review.
+- `Planner` - default workspace with a clickable calendar, unified planning form,
+  inline editing, daily check-in actions, and a read-only Monthly checklist.
+- `Summary` - today's progress, overdue work, and past check-ins.
 - `Projects & Routines` - project creation, editing, lifecycle, comparison,
   bulk project-session planning, routine templates, and future-month routine
   generation.
@@ -102,8 +102,7 @@ Status: implemented v1.
 - Create planned check-ins for scheduled quests.
 - Build monthly checklist data with rows as quests and columns as days.
 - Render a compact read-only matrix preview in Planner.
-- Keep status transitions in Command Center, where only existing today's and
-  overdue scheduled check-ins can be resolved.
+- Provide status transitions for today's and past check-ins in Planner and Summary.
 - Keep XP idempotent with `QuestCheckin.xp_awarded`.
 
 Not implemented:
@@ -111,7 +110,7 @@ Not implemented:
 - fully editable 31-column widget grid,
 - automatic app-level stale planned failure.
 
-### Phase 4: Command Center
+### Phase 4: Summary
 
 Status: implemented with check-ins.
 
@@ -120,8 +119,7 @@ Status: implemented with check-ins.
 - Overdue counts planned check-ins before today.
 - Failed counts failed check-ins through today.
 - Today's Focus reads parent quest metadata and `QuestCheckin.status`.
-- Command Center is the single operational surface for today's and overdue
-  check-in status actions.
+- Summary provides status actions for daily work and overdue check-ins.
 
 ### Phase 5: Habit Analytics
 
@@ -172,6 +170,6 @@ Legacy quest-based fallback remains only for databases with no check-ins.
 - A user can safely remove unresolved planned records without deleting
   completed, skipped, failed, or XP-awarded history.
 - Completed check-ins award XP once.
-- Command Center, Habit Analytics, and Character Profile use check-ins when available.
+- Summary, Habit Analytics, and Character Profile use check-ins when available.
 - Quest records and check-ins persist in PostgreSQL.
 - Core formulas and service behavior remain covered by tests.

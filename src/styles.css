@@ -3,6 +3,7 @@
     --hq-radius-small: 6px;
     --hq-radius: 10px;
     --hq-radius-large: 14px;
+    --hq-heading-font: Georgia, 'Times New Roman', serif;
     --hq-ease: cubic-bezier(0.4, 0, 0.2, 1);
     --primary-color: var(--hq-accent);
     --background-color: var(--hq-background);
@@ -26,20 +27,20 @@
 
 .block-container {
     container: hq-main / inline-size;
-    max-width: 1600px;
+    max-width: 1480px;
     width: 100%;
-    /* Streamlit reserves space above the content for its toolbar. */
+    padding-top: 4.5rem;
     padding-inline: clamp(1rem, 3vw, 3rem);
     padding-bottom: 3rem;
 }
 
 @container hq-main (max-width: 54rem) {
-    :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_planner_toolbar, .st-key-hq_analytics_charts,
+    :is(.st-key-hq_command, .st-key-hq_analytics_charts,
         .st-key-hq_character_stats) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {
         flex-direction: column;
     }
 
-    :is(.st-key-hq_command, .st-key-hq_calendar, .st-key-hq_planner_toolbar, .st-key-hq_analytics_charts,
+    :is(.st-key-hq_command, .st-key-hq_analytics_charts,
         .st-key-hq_character_stats) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         flex: none;
         width: 100%;
@@ -106,7 +107,7 @@ hr {
 }
 
 section[data-testid="stSidebar"] {
-    background: var(--hq-surface) !important;
+    background: var(--hq-background-alt) !important;
     border-right: 1px solid var(--hq-border);
 }
 
@@ -115,20 +116,30 @@ section[data-testid="stSidebar"] > div {
 }
 
 .hq-sidebar-brand {
-    background: transparent;
-    border: 0;
+    align-items: center;
     border-bottom: 1px solid var(--hq-border);
-    border-radius: 0;
-    box-shadow: none;
-    margin: 0.15rem 0 0.8rem;
-    padding: 0.35rem 0.15rem 0.75rem;
+    display: flex;
+    gap: 0.85rem;
+    margin: 0.2rem 0 0.65rem;
+    padding: 0.4rem 0.15rem 1.15rem;
+}
+
+.hq-sidebar-mark {
+    align-items: center;
+    aspect-ratio: 1;
+    background: var(--hq-accent);
+    border-radius: 9px 9px 9px 2px;
+    color: var(--hq-accent-foreground);
+    display: grid;
+    flex: none;
+    font: bold 1rem var(--hq-heading-font);
+    justify-items: center;
+    width: 2.65rem;
 }
 
 .hq-sidebar-brand-title {
     color: var(--hq-text-primary);
-    font-size: 1.08rem;
-    font-weight: 820;
-    line-height: 1.12;
+    font: bold 1.12rem/1.1 var(--hq-heading-font);
 }
 
 .hq-sidebar-section-title {
@@ -140,17 +151,44 @@ section[data-testid="stSidebar"] > div {
     text-transform: uppercase;
 }
 
-.hq-sidebar-brand-caption {
-    color: var(--hq-text-secondary);
-    font-size: 0.78rem;
-    line-height: 1.35;
-    margin-top: 0.42rem;
+.hq-sidebar-account {
+    align-items: center;
+    border-top: 1px solid var(--hq-border);
+    color: var(--hq-text-primary);
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.65rem;
+    padding-top: 1rem;
+}
+
+.hq-account-initials {
+    align-items: center;
+    aspect-ratio: 1;
+    background: var(--hq-accent-soft);
+    border-radius: 50%;
+    color: var(--hq-accent-text);
+    display: grid;
+    flex: none;
+    font-size: 0.75rem;
+    font-weight: 750;
+    justify-items: center;
+    width: 2.1rem;
+}
+
+.hq-account-label {
+    display: grid;
+    font-size: 0.86rem;
+    overflow-wrap: anywhere;
+}
+
+.hq-account-label small {
+    font-size: 0.74rem !important;
 }
 
 [data-testid="stSidebar"] [data-testid="stPageLink"] a {
     align-items: center;
     background: transparent;
-    border: 1px solid var(--hq-border);
+    border: 1px solid transparent;
     border-radius: var(--hq-radius-small);
     color: var(--hq-text-primary);
     min-height: 40px;
@@ -177,7 +215,6 @@ section[data-testid="stSidebar"] > div {
 [data-testid="stSidebar"] [data-testid="stPageLink"] a:is(:hover, :focus-visible) {
     background: var(--hq-accent-soft);
     border-color: var(--hq-accent-border);
-    box-shadow: 0 4px 14px var(--hq-accent-glow);
     color: var(--hq-accent-text);
 }
 
@@ -201,37 +238,38 @@ section[data-testid="stSidebar"] > div {
     cursor: pointer;
 }
 
-.st-key-hq_dark_mode [data-testid="stCheckbox"] label > div:first-child {
+[data-testid="stCheckbox"] label:has(input[role="switch"]) > div:not([data-testid]) {
     background: var(--hq-border-strong) !important;
 }
 
-.st-key-hq_dark_mode [data-testid="stCheckbox"] label:has(input:checked) > div:first-child {
+[data-testid="stCheckbox"] label:has(input[role="switch"]:checked) > div:not([data-testid]) {
     background: var(--hq-accent) !important;
 }
 
-.st-key-hq_dark_mode [data-testid="stCheckbox"] label > div:first-child > div {
+[data-testid="stCheckbox"] label:has(input[role="switch"]) > div:not([data-testid]) > div {
     background: white;
 }
 
-.st-key-hq_dark_mode [data-testid="stCheckbox"] label:has(input:checked) > div:first-child > div {
+[data-testid="stCheckbox"] label:has(input[role="switch"]:checked) > div:not([data-testid]) > div {
     background: var(--hq-accent-foreground);
 }
 
-.st-key-hq_dark_mode label:has(input:focus-visible) > div:first-child {
+[data-testid="stCheckbox"] label:has(input[role="switch"]:focus-visible) > div:not([data-testid]) {
     outline: 2px solid var(--hq-accent-border);
     outline-offset: 3px;
 }
 
 .hq-page-header {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
 }
 
 .hq-page-title {
     color: var(--hq-text-primary);
-    font-size: clamp(1.55rem, 1.3rem + 1vw, 2rem);
-    font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
+    font-family: var(--hq-heading-font);
+    font-size: clamp(2.55rem, 2rem + 2.2vw, 4rem);
+    font-weight: 400;
+    letter-spacing: -0.075em;
+    line-height: 1;
     margin: 0 0 0.35rem;
     padding: 0;
 }
@@ -283,7 +321,7 @@ section[data-testid="stSidebar"] > div {
     overflow: hidden;
     padding: 1.15rem 1rem;
     position: relative;
-    text-align: center;
+    text-align: left;
     transition: border-color 220ms var(--hq-ease), box-shadow 220ms var(--hq-ease),
                 transform 220ms var(--hq-ease);
 }
@@ -312,7 +350,7 @@ section[data-testid="stSidebar"] > div {
 }
 
 [data-testid="stMetricLabel"] {
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 [data-testid="stMetricLabel"] p,
@@ -590,40 +628,48 @@ input[type="radio"] {
     border-color: var(--hq-accent-border);
 }
 
-:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+:is([data-testid="stButton"] button[kind], [data-testid="stFormSubmitButton"] button[kind],
+    [data-testid="stPopover"] button[data-testid="stPopoverButton"], [data-testid="stDownloadButton"] > button,
     [data-testid="stFileUploaderDropzone"] button) {
-    background: linear-gradient(145deg, var(--hq-surface-elevated), var(--hq-surface));
+    background: var(--hq-surface);
     border: 1px solid var(--hq-border);
     border-radius: var(--hq-radius);
-    box-shadow: var(--hq-shadow);
+    box-shadow: none;
     color: var(--hq-text-primary);
     font-weight: 600;
     min-height: 44px;
     padding: 0.55rem 0.9rem;
-    transition: border-color 180ms var(--hq-ease), box-shadow 180ms var(--hq-ease),
-                color 180ms var(--hq-ease), transform 180ms var(--hq-ease);
+    transition: background-color 180ms var(--hq-ease), border-color 180ms var(--hq-ease), color 180ms var(--hq-ease);
 }
 
 :is([data-testid="stButton"], [data-testid="stFormSubmitButton"]) > button:is([kind="primary"], [kind="primaryFormSubmit"], [data-testid$="-primary"], [data-testid$="-primaryFormSubmit"]) {
-    background: linear-gradient(135deg, var(--hq-accent-bright), var(--hq-accent));
-    border-color: var(--hq-accent-border);
+    background: var(--hq-accent);
+    border-color: var(--hq-accent);
     color: var(--hq-accent-foreground);
 }
 
-:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+:is([data-testid="stButton"] button[kind], [data-testid="stFormSubmitButton"] button[kind],
+    [data-testid="stPopover"] button[data-testid="stPopoverButton"], [data-testid="stDownloadButton"] > button,
     [data-testid="stFileUploaderDropzone"] button):not(:disabled):hover {
+    background: var(--hq-accent-soft);
     border-color: var(--hq-accent-border);
-    box-shadow: 0 5px 16px var(--hq-accent-glow);
-    transform: translateY(-1px);
 }
 
-:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+:is([data-testid="stButton"], [data-testid="stFormSubmitButton"]) > button:is([kind="primary"], [kind="primaryFormSubmit"], [data-testid$="-primary"], [data-testid$="-primaryFormSubmit"]):enabled:hover {
+    background: var(--hq-accent-bright);
+    border-color: var(--hq-accent-bright);
+    color: var(--hq-accent-foreground);
+}
+
+:is([data-testid="stButton"] button[kind], [data-testid="stFormSubmitButton"] button[kind],
+    [data-testid="stPopover"] button[data-testid="stPopoverButton"], [data-testid="stDownloadButton"] > button,
     [data-testid="stFileUploaderDropzone"] button):focus-visible {
     outline: 2px solid var(--hq-accent-border);
     outline-offset: 2px;
 }
 
-:is([data-testid="stButton"] > button, [data-testid="stFormSubmitButton"] > button,
+:is([data-testid="stButton"] button[kind], [data-testid="stFormSubmitButton"] button[kind],
+    [data-testid="stPopover"] button[data-testid="stPopoverButton"], [data-testid="stDownloadButton"] > button,
     [data-testid="stFileUploaderDropzone"] button):disabled {
     background: var(--hq-muted-surface);
     border-color: var(--hq-border);
@@ -634,6 +680,19 @@ input[type="radio"] {
 
 button :is(p, span) {
     color: inherit;
+}
+
+:is([data-testid="stText"], [data-testid="stText"] pre, [data-testid="stTooltipContent"]) {
+    color: var(--hq-text-primary);
+}
+
+[data-testid="stPopoverBody"], [data-testid="stTooltipContent"] {
+    background: var(--hq-surface);
+    border-color: var(--hq-border);
+}
+
+:is([data-testid="stDateInputField"], [data-testid="stTimeInputTimeDisplay"]) span[data-type] {
+    color: var(--hq-text-primary);
 }
 
 :is([data-testid="stSelectbox"], [data-testid="stMultiSelect"], [data-testid="stDateInput"],

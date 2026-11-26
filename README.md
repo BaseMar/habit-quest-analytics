@@ -55,7 +55,7 @@ I designed and implemented the current MVP, including:
 - Quest planning workflow with calendar scheduling.
 - Monthly Checklist tracking system backed by daily `QuestCheckin` records.
 - Checklist status service with idempotent XP rules.
-- Command Center, Habit Analytics, and Character Profile data services.
+- Summary, Habit Analytics, and Character Profile data services.
 - Long-term goal/project planning services, including bulk goal session preview
   and generation.
 - RPG XP, level, and stat progression logic.
@@ -66,8 +66,14 @@ I designed and implemented the current MVP, including:
 
 Live app: https://habit-quest-analytics-sai5h3bl7wjykw4fbruabd.streamlit.app
 
-The Streamlit Community Cloud deployment uses PostgreSQL on Supabase. See
-[Google Sign-In](#google-sign-in) for configuring the account-enabled version.
+Choose **Try live demo** to open Planner as Alex Morgan, with sample tasks,
+routine history, a project, and earned XP. You can edit the plan and try other
+features. Each demo session starts fresh, and its data stays in memory for the
+duration of that session. Click **Reset demo** in the sidebar to restore the
+sample data and continue exploring. Demo mode is also available when running locally.
+
+The account-enabled Streamlit Community Cloud deployment uses PostgreSQL on
+Supabase. See [Google Sign-In](#google-sign-in) for configuration.
 Uploaded avatars use local storage and may reset when the Streamlit instance changes.
 
 ## Project Status
@@ -80,10 +86,11 @@ the product name and progression system, not a requirement for using the planner
 
 Implemented:
 
-- Command Center as the default operational workspace.
+- Planner as the default workspace for scheduling and daily check-ins.
 - Custom Streamlit navigation/sidebar with explicit page labels.
 - Full-screen loading indicator when opening the workspace or switching pages.
-- Calendar-based Planner.
+- Interactive monthly calendar with the selected day's plan and inline editing.
+- Built-in categories for tasks, routines, and projects.
 - Monthly Checklist UI for daily quest/checkin tracking.
 - Recurring Habit templates with automatic generation for the creation month and
   explicit future-month generation from Projects & Routines.
@@ -115,7 +122,7 @@ Implemented:
   while preserving separate underlying `Quest` and `QuestCheckin` records.
 - Time-based quest XP for new scheduled quests and recurring habit templates.
 - Nonlinear character leveling and RPG stat leveling.
-- Command Center operational actions and metrics powered by check-ins.
+- Summary with daily metrics and a review of overdue work and past check-ins.
 - Character Profile XP, level, and RPG stats powered by check-in XP.
 - Habit Analytics date filters, plan-versus-completion trends, category and
   routine performance, and insight data powered by check-ins.
@@ -146,7 +153,6 @@ the current UI.
 - SQLAlchemy
 - Pandas
 - Plotly
-- streamlit-calendar
 - pytest
 - Streamlit Community Cloud
 
@@ -159,7 +165,7 @@ Habit Quest Analytics turns productivity tracking into a compact RPG loop:
 - Track daily completion in a Monthly Checklist.
 - Complete quest days to earn XP.
 - Grow RPG stats through quest categories.
-- Review today's operational status in Command Center.
+- Review today's status and overdue work in Summary.
 - Analyze consistency, plan versus completion, category and routine activity,
   and planned workload in Habit Analytics.
 - View level, XP progress, avatar, stat-level bars, radar chart, and RPG stats
@@ -187,9 +193,11 @@ The app is designed to answer questions such as:
   and notes are available only when needed.
 - XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
-- Calendar and selected day schedule views that display check-in status.
-- Command Center is the only screen for completing, skipping, failing, or
-  resetting today's and overdue planned work.
+- Select a calendar date to see its tasks, routines, and project sessions.
+- Edit an unresolved item in the selected-day list. A routine-day edit applies
+  to that occurrence, while its dates are managed by the routine's schedule.
+- Complete, skip, fail, or reset check-ins for today and past dates in Planner or
+  Summary.
 - Recurring Habit templates for Every day, Weekdays, and custom selected
   weekdays.
 - Creating a routine generates its days for the selected creation month.
@@ -219,20 +227,19 @@ The app is designed to answer questions such as:
 
 ### Monthly Checklist
 
-- Month and year selection.
+- Month navigation shared with the calendar.
 - Month-level review and status history for scheduled quest days.
 - Matrix preview with quests as rows and days as columns.
 - Recurring habits appear as one logical row with generated dates populated.
 - Status legend for empty, planned, completed, skipped, and failed days.
-- Read-only monthly status history; daily status actions belong to Command
-  Center.
+- Read-only monthly status history. Use Planner or Summary for daily status actions.
 - Selected-day planning controls handle editing or removing unresolved work.
 - `QuestCheckin.xp_awarded` prevents duplicate XP from repeated completion
   actions.
 
-### Command Center
+### Summary
 
-- Default operational workspace for today's and overdue quest check-ins.
+- Overview of today's progress and overdue quest check-ins.
 - Planned Today, Completed Today, Failed, and Overdue metrics from
   `QuestCheckin`.
 - Status actions for today's and overdue planned work.
@@ -278,9 +285,9 @@ The app is designed to answer questions such as:
 
 ## App Sections
 
-- `Command Center` - Today and Review tabs for daily work, overdue check-ins, and past dates.
-- `Planner` - Calendar and Monthly checklist tabs. Use Add item to plan work and
-  the selected-day list to edit or remove unresolved items.
+- `Planner` - start page with Calendar and Monthly checklist tabs. Use the
+  selected-day list to edit tasks and record check-ins.
+- `Summary` - Today and Review tabs for daily work, overdue check-ins, and past dates.
 - `Projects & Routines` - Projects, Routines, and Portfolio tabs, with dialogs for
   editing, lifecycle actions, and generating scheduled work.
 - `Habit Analytics` - Overview, Categories, and Routines tabs with shared filters.
@@ -303,9 +310,9 @@ The app is designed to answer questions such as:
   `max(planned_total_minutes - completed_minutes - currently_planned_minutes, 0)`.
 - Failed and skipped goal sessions do not reduce remaining scheduling effort,
   so replacement work can be planned.
-- Monthly Checklist is a read-only monthly history. Status transitions occur in
-  Command Center; unresolved planning changes occur from Planner's selected-day
-  panel.
+- Monthly Checklist is a read-only monthly history. Planner's selected-day panel
+  supports edits to unresolved items and status transitions. Summary also
+  supports status transitions.
 - Deletion workflows are conservative: completed, skipped, failed, and
   XP-awarded records are preserved.
 - Business logic lives in service layers instead of Streamlit page code.
@@ -320,8 +327,8 @@ The app is designed to answer questions such as:
 ```text
 Scheduled Quest
   -> Planned QuestCheckin
-  -> Command Center status action
-  -> Command Center operational metrics
+  -> Planner or Summary status action
+  -> Summary metrics
   -> Character Profile XP/progression
   -> Habit Analytics trends and consistency
 ```
@@ -344,7 +351,7 @@ should remain stable as the UI evolves.
 habit-quest-analytics/
   app/
     main.py                  # Streamlit entrypoint and explicit navigation
-    pages/                   # Command Center, Planner, Projects & Routines, Analytics, Profile
+    pages/                   # Planner, Summary, Projects & Routines, Analytics, Profile
   src/
     analysis/                # Pure metric helpers
     database/                # SQLAlchemy models, database setup, SQLite import, seed data
@@ -511,9 +518,8 @@ See [docs/data_model.md](docs/data_model.md) for deeper model notes.
   - Alembic and Psycopg for PostgreSQL
   - pandas
   - Plotly
-  - streamlit-calendar
   - pytest
-- A PostgreSQL database configured through `DATABASE_URL`.
+- A PostgreSQL database configured through `DATABASE_URL` for Google accounts.
 
 ## Installation
 

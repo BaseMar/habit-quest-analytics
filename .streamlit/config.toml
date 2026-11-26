@@ -1,9 +1,9 @@
 [theme]
 base = "light"
-primaryColor = "#00777D"
-backgroundColor = "#F2F5F6"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#222831"
+primaryColor = "#593777"
+backgroundColor = "#F6F1EB"
+secondaryBackgroundColor = "#FFFCF8"
+textColor = "#30243A"
 font = "sans serif"
 
 [logger]

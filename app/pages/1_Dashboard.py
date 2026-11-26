@@ -75,6 +75,7 @@ def render_work_items(items: list[dict], empty_title: str, empty_message: str, k
                         item["quest_id"],
                         item["checkin_date"],
                         next_status,
+                        expected_status=item["status"],
                     )
                 except ValueError as error:
                     st.error(str(error))
@@ -211,7 +212,7 @@ def render_status_kpis(command_center: dict, compact: bool = False) -> None:
     )
 
 
-render_page_header("Command Center", "Manage today's work and review past check-ins.")
+render_page_header("Summary", "See today’s progress and review past check-ins.")
 
 command_center = get_command_center_data()
 

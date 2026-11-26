@@ -4,6 +4,7 @@ import streamlit as st
 
 
 _ACCOUNT_STATE = "_hq_authenticated_account"
+DEMO_STATE = "_hq_demo_database"
 _GOOGLE_ISSUERS = {"https://accounts.google.com", "accounts.google.com"}
 _AUTH_KEYS = ("redirect_uri", "cookie_secret", "client_id", "client_secret", "server_metadata_url")
 
@@ -39,6 +40,30 @@ def current_user_id() -> int:
     if identity is None or account is None or identity[0] != account[0]:
         raise PermissionError("Sign in to use this account.")
     return account[1]
+
+
+def start_demo() -> None:
+    from src.services.demo_service import create_demo_database
+
+    st.session_state[DEMO_STATE] = create_demo_database()
+    st.session_state["_hq_demo_open_planner"] = True
+
+
+def reset_demo() -> None:
+    from src.services.demo_service import create_demo_database
+    from src.ui import THEME_MODE_KEY
+
+    theme_mode = st.session_state[THEME_MODE_KEY]
+    database = create_demo_database()
+    end_demo()
+    st.session_state[DEMO_STATE] = database
+    st.session_state[THEME_MODE_KEY] = theme_mode
+
+
+def end_demo() -> None:
+    engine = st.session_state[DEMO_STATE]
+    st.session_state.clear()
+    engine.dispose()
 
 
 def log_out() -> None:

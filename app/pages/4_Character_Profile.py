@@ -1,14 +1,17 @@
 import sys
 from html import escape
+from io import BytesIO
 from pathlib import Path
 
 import plotly.graph_objects as go
 import streamlit as st
+from PIL import Image, UnidentifiedImageError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.auth import DEMO_STATE
 from src.services.analytics_service import get_character_profile_data
 from src.services.profile_service import remove_avatar, resolve_avatar_path, save_avatar
 from src.ui import get_theme_tokens, render_page_header, render_section_title
@@ -21,31 +24,34 @@ def apply_character_profile_styles() -> None:
         .hq-hero-avatar-placeholder {
             align-items: center;
             aspect-ratio: 1;
-            background: var(--hq-surface-elevated);
-            border: 1px dashed var(--hq-accent-border);
-            border-radius: 8px;
-            color: var(--hq-text-secondary);
-            display: flex;
-            flex-direction: column;
-            font-size: 0.8rem;
-            justify-content: center;
-            line-height: 1.3;
-            min-height: 104px;
-            max-width: 116px;
-            padding: 0.65rem;
-            text-align: center;
-        }
-
-        .hq-hero-avatar-icon {
+            background: var(--hq-accent-soft);
+            border: 1px solid var(--hq-border);
+            border-radius: 18px 18px 18px 4px;
             color: var(--hq-accent-text);
-            font-size: 1.8rem;
-            line-height: 1;
-            margin-bottom: 0.32rem;
+            display: flex;
+            font: 400 2.25rem var(--hq-heading-font);
+            justify-content: center;
+            width: min(100%, 116px);
         }
 
-        .hq-hero-avatar-title {
-            color: var(--hq-text-primary);
-            font-weight: 760;
+        .st-key-hq_avatar_controls [data-testid="stImage"] img {
+            aspect-ratio: 1;
+            border: 1px solid var(--hq-border);
+            border-radius: 18px 18px 18px 4px;
+            object-fit: cover;
+        }
+
+        .st-key-hq_avatar_controls [data-testid="stButton"] {
+            margin-top: 0.3rem;
+        }
+
+        .st-key-hq_avatar_controls [data-testid="stButton"] button {
+            min-height: 36px;
+            padding-inline: 0.5rem;
+        }
+
+        .st-key-hq_avatar_controls [data-testid="stButton"] p {
+            font-size: 0.76rem;
         }
 
         .hq-hero-identity {
@@ -283,28 +289,36 @@ def apply_character_profile_styles() -> None:
     )
 
 
-def render_avatar(profile: dict) -> None:
+def render_avatar(profile: dict) -> bool:
+    demo_avatar = st.session_state.get("demo_avatar") if DEMO_STATE in st.session_state else None
     avatar_path = resolve_avatar_path(profile.get("avatar_path"))
-    if avatar_path:
+    if demo_avatar:
+        st.image(BytesIO(demo_avatar), width=116)
+    elif avatar_path:
         st.image(str(avatar_path), width=116)
     else:
-        st.markdown(
-            """
-            <div class="hq-hero-avatar-placeholder">
-                <div class="hq-hero-avatar-icon">[+]</div>
-                <div class="hq-hero-avatar-title">No avatar</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        initials = "".join(part[0] for part in profile["character_name"].split()[:2]).upper()
+        st.html(
+            f'<div class="hq-hero-avatar-placeholder" role="img" aria-label="Default avatar">{escape(initials)}</div>'
         )
+    return bool(demo_avatar or avatar_path)
 
 
 @st.dialog("Change avatar", on_dismiss="rerun")
 def _change_avatar_dialog(has_avatar: bool) -> None:
-    uploaded_avatar = st.file_uploader("Avatar image", type=["png", "jpg", "jpeg"])
+    is_demo = DEMO_STATE in st.session_state
+    uploaded_avatar = st.file_uploader("Avatar image", type=["png", "jpg", "jpeg"], max_upload_size=5 if is_demo else None)
     if st.button("Save avatar", type="primary", width="stretch", disabled=uploaded_avatar is None):
+        content = uploaded_avatar.getvalue()
         try:
-            save_avatar(uploaded_avatar.name, uploaded_avatar.getvalue())
+            with Image.open(BytesIO(content)) as image:
+                image.verify()
+            if is_demo:
+                st.session_state["demo_avatar"] = content
+            else:
+                save_avatar(uploaded_avatar.name, content)
+        except (UnidentifiedImageError, OSError, SyntaxError, Image.DecompressionBombError):
+            st.error("Choose a valid PNG or JPEG image.")
         except ValueError as error:
             st.error(str(error))
         else:
@@ -312,7 +326,10 @@ def _change_avatar_dialog(has_avatar: bool) -> None:
             st.rerun()
 
     if has_avatar and st.button("Remove avatar", width="stretch"):
-        remove_avatar()
+        if is_demo:
+            st.session_state.pop("demo_avatar", None)
+        else:
+            remove_avatar()
         st.session_state["avatar_status_message"] = "Avatar removed."
         st.rerun()
 
@@ -322,10 +339,10 @@ def render_character_hero(profile: dict) -> None:
 
     with st.container(key="hq_character_hero"):
         avatar_col, identity_col, xp_col = st.columns([0.16, 0.51, 0.33], gap="medium")
-        with avatar_col:
-            render_avatar(profile)
-            if st.button("Change avatar", width="stretch"):
-                _change_avatar_dialog(bool(profile.get("avatar_path")))
+        with avatar_col.container(key="hq_avatar_controls", gap="xsmall"):
+            has_avatar = render_avatar(profile)
+            if st.button("Change avatar"):
+                _change_avatar_dialog(has_avatar)
 
         with identity_col:
             st.markdown(
@@ -368,7 +385,7 @@ def render_character_hero(profile: dict) -> None:
             """
             <div class="hq-empty-compact">
                 <strong>No completed quest days yet.</strong>
-                Complete planned work in Command Center to earn XP and grow RPG stats.
+                Complete planned work in Planner to earn XP and grow RPG stats.
             </div>
             """,
             unsafe_allow_html=True,

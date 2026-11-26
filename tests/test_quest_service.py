@@ -26,9 +26,11 @@ from src.services.quest_service import (
     preview_next_goal_session_title,
     quest_to_calendar_event,
     update_one_time_quest_if_unresolved,
+    update_planned_quest,
     update_quest_status,
     validate_schedule_times,
 )
+from src.services.recurring_habit_service import create_recurring_habit, generate_recurring_habit_for_month
 
 
 @pytest.fixture()
@@ -63,6 +65,30 @@ def test_create_quest_persists_xp_reward_and_details(session):
     assert quest.xp_reward == 15
     assert quest.due_date == date(2026, 6, 26)
     assert quest.estimated_minutes == 45
+
+
+def test_editing_one_routine_day_preserves_the_template_and_other_occurrences(session):
+    day = date(2026, 7, 1)
+    next_day = date(2026, 7, 2)
+    category_id = session.query(Category).one().id
+    habit = create_recurring_habit(
+        "Morning walk", category_id, 30, "selected_weekdays", [day.weekday(), next_day.weekday()],
+        day, end_date=next_day, session=session,
+    )
+    generate_recurring_habit_for_month(habit.id, day.year, day.month, session=session)
+    occurrence = get_quests_for_day(day, session=session)[0]
+
+    with pytest.raises(ValueError, match="schedule"):
+        update_planned_quest(occurrence.id, "Park walk", "", category_id, next_day, None, None, 30, session=session)
+    updated = update_planned_quest(
+        occurrence.id, "Park walk", "New route", category_id, day, None, None, 30, session=session,
+    )
+
+    assert updated.title == "Park walk"
+    assert updated.planned_start_at is None
+    assert updated.checkins[0].checkin_date == day
+    assert habit.title == "Morning walk"
+    assert get_quests_for_day(next_day, session=session)[0].title == "Morning walk"
 
 
 def test_create_scheduled_quest_sets_planned_datetimes_and_duration(session):

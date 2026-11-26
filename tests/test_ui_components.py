@@ -1,11 +1,14 @@
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
-import pytest
 from sqlalchemy import create_engine
 
 from app.components.checkin_actions import get_checkin_status_actions
 from app.components.scheduling import duration_crosses_midnight, end_at_for_duration
+from src.constants import DEFAULT_CATEGORIES
+
+
+APP_PATH = Path(__file__).resolve().parents[1] / "app" / "main.py"
 
 
 def test_planned_checkin_actions_offer_resolve_choices():
@@ -37,80 +40,97 @@ def test_scheduling_helpers_detect_midnight_crossing():
     assert duration_crosses_midnight(date(2026, 7, 1), time(23, 30), 60) is True
 
 
-def test_planner_add_item_uses_manually_selected_day_after_calendar_click(tmp_path, monkeypatch):
-    pytest.importorskip("streamlit", minversion="1.66.1")
-    from streamlit.testing.v1 import AppTest
-    import streamlit as st
-    import streamlit_calendar
-
-    from src.database import db
-    from src.database.models import Base
-
-    db_path = tmp_path / "planner.db"
-    db_url = f"sqlite:///{db_path.as_posix()}"
-    engine = create_engine(db_url, connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine)
-    monkeypatch.setattr(db, "engine", engine)
-    monkeypatch.setattr(st, "user", {
-        "is_logged_in": True,
-        "iss": "https://accounts.google.com",
-        "sub": "planner-test",
-        "email": "planner@example.com",
-        "email_verified": True,
-    })
-
-    clicked_date = date.today() - timedelta(days=1)
-    manual_date = date.today() + timedelta(days=1)
-    original_calendar_key = None
-
-    def calendar_with_previous_click(*, key, **_):
-        nonlocal original_calendar_key
-        original_calendar_key = original_calendar_key or key
-        if key == original_calendar_key:
-            return {"dateClick": {"dateStr": clicked_date.isoformat()}}
-        return {}
-
-    monkeypatch.setattr(streamlit_calendar, "calendar", calendar_with_previous_click)
-    try:
-        main = Path(__file__).resolve().parents[1] / "app" / "main.py"
-        app = AppTest.from_file(str(main)).run().switch_page("pages/2_Quest_Log.py").run()
-        assert app.date_input(key="planner_manage_date").value == clicked_date
-
-        app.date_input(key="planner_manage_date").set_value(manual_date).run()
-        next(button for button in app.button if button.label == "Add item").click().run()
-
-        assert not app.exception
-        assert app.date_input(key="planner_manage_date").value == manual_date
-        assert app.date_input(key="plan_date").value == manual_date
-    finally:
-        engine.dispose()
-
-
-def test_app_explains_how_to_configure_postgresql_when_url_is_missing(monkeypatch):
-    pytest.importorskip("streamlit", minversion="1.66.1")
+def test_planner_date_selection_and_inline_edit(monkeypatch):
     from streamlit.testing.v1 import AppTest
 
     from src.database import db
 
-    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setattr(db, "engine", None)
-    main = Path(__file__).resolve().parents[1] / "app" / "main.py"
+    today = date.today()
+    clicked_date = today + timedelta(days=1)
+    app = AppTest.from_file(APP_PATH).run()
+    next(button for button in app.button if button.label == "Try live demo").click().run()
+    clicked_day_key = f"planner_day_{clicked_date.isoformat()}"
+    if clicked_day_key not in {button.key for button in app.button}:
+        app.button(key="planner_next_month").click().run()
+    app.button(key=clicked_day_key).click().run()
+    assert app.date_input(key="planner_manage_date").value == clicked_date
+    assert any("Pick up groceries" in item.proto.body for item in app.get("html"))
 
-    app = AppTest.from_file(str(main)).run()
+    edit = next(button for button in app.button if button.label == "Edit" and button.key.startswith("agenda_"))
+    edit.click().run()
+    next(widget for widget in app.text_input if widget.label == "Title").set_value("Buy produce")
+    next(button for button in app.button if button.label == "Save changes").click().run()
+    assert any("<h3>Buy produce</h3>" in item.proto.body for item in app.get("html"))
+
+    app.date_input(key="planner_manage_date").set_value(today).run()
+    next(button for button in app.button if button.label == "Add item").click().run()
+    assert not app.exception
+    assert app.date_input(key="planner_manage_date").value == today
+    assert app.date_input(key="plan_date").value == today
+    assert set(app.selectbox(key="plan_category").options) == {name for name, _ in DEFAULT_CATEGORIES}
+
+
+def test_demo_checkins_are_isolated(monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    from src.database import db
+
+    monkeypatch.setattr(db, "engine", None)
+    app = AppTest.from_file(APP_PATH).run()
+    next(button for button in app.button if button.label == "Try live demo").click().run()
+    next(button for button in app.button if button.label == "Complete").click().run()
+    assert "completed" in app.success[0].value
+    assert sum(button.label == "Reset" for button in app.button) == 2
+
+    other = AppTest.from_file(APP_PATH).run()
+    next(button for button in other.button if button.label == "Try live demo").click().run()
+    assert sum(button.label == "Reset" for button in other.button) == 1
+    assert not other.exception
+
+
+def test_reset_demo_restores_checkins_and_keeps_the_theme(monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    from src.database import db
+
+    monkeypatch.setattr(db, "engine", None)
+    app = AppTest.from_file(APP_PATH).run()
+    next(button for button in app.button if button.label == "Try live demo").click().run()
+    app.toggle(key="hq_dark_mode").set_value(True).run()
+    next(button for button in app.button if button.label == "Complete").click().run()
+    assert sum(button.label == "Reset" for button in app.button) == 2
+    app.session_state["demo_avatar"] = b"example avatar"
+
+    app.sidebar.button(key="reset_demo").click().run()
 
     assert not app.exception
-    assert "DATABASE_URL" in app.error[0].value
+    assert sum(button.label == "Reset" for button in app.button) == 1
+    assert "demo_avatar" not in app.session_state
+    assert app.toggle(key="hq_dark_mode").value is True
 
 
-def test_app_requires_login_before_showing_navigation(monkeypatch):
+def test_app_offers_demo_when_postgresql_is_missing(monkeypatch):
+    from streamlit.testing.v1 import AppTest
+
+    from src.database import db
+
+    monkeypatch.setattr(db, "engine", None)
+    app = AppTest.from_file(APP_PATH).run()
+
+    assert not app.exception
+    assert [button.label for button in app.button] == ["Try live demo"]
+    assert not app.sidebar.get("page_link")
+
+
+def test_app_offers_google_or_demo_before_showing_navigation(monkeypatch):
     import streamlit as st
     from streamlit.testing.v1 import AppTest
     from src.database import db
 
     monkeypatch.setattr(db, "engine", object())
     monkeypatch.setattr(st, "user", {"is_logged_in": False})
-    main = Path(__file__).resolve().parents[1] / "app" / "main.py"
-    app = AppTest.from_file(str(main))
+    app = AppTest.from_file(APP_PATH)
     app.secrets["auth"] = {
         "redirect_uri": "http://localhost:8501/oauth2callback",
         "cookie_secret": "test-only",
@@ -121,7 +141,7 @@ def test_app_requires_login_before_showing_navigation(monkeypatch):
     app.run()
 
     assert not app.exception
-    assert [button.label for button in app.button] == ["Log in with Google"]
+    assert [button.label for button in app.button] == ["Try live demo", "Log in with Google"]
     assert not app.sidebar.get("page_link")
 
 
@@ -167,16 +187,16 @@ def test_loading_screen_follows_page_navigation(monkeypatch):
         "email_verified": True,
     })
 
-    main = Path(__file__).resolve().parents[1] / "app" / "main.py"
     try:
-        app = AppTest.from_file(str(main)).run()
+        app = AppTest.from_file(APP_PATH).run()
         app.toggle(key="hq_dark_mode").set_value(True).run()
         assert not app.exception
-        assert loads == ["Loading Command Center"]
+        assert all(button.label != "Reset demo" for button in app.sidebar.button)
+        assert loads == ["Loading Planner"]
 
-        app.switch_page("pages/2_Quest_Log.py").run()
+        app.switch_page("pages/1_Dashboard.py").run()
         assert not app.exception
-        assert loads == ["Loading Command Center", "Loading Planner"]
+        assert loads == ["Loading Planner", "Loading Summary"]
         assert all('class="hq-loading-screen"' not in item.proto.body for item in app.get("html"))
 
         with monkeypatch.context() as patch:
@@ -187,6 +207,6 @@ def test_loading_screen_follows_page_navigation(monkeypatch):
 
         app.switch_page("pages/2_Quest_Log.py").run()
         assert not app.exception
-        assert loads == ["Loading Command Center", "Loading Planner", "Loading Projects & Routines", "Loading Planner"]
+        assert loads == ["Loading Planner", "Loading Summary", "Loading Projects & Routines", "Loading Planner"]
     finally:
         engine.dispose()

@@ -118,6 +118,8 @@ def update_checkin_status(
     checkin_date: date,
     status: str,
     session=None,
+    *,
+    expected_status: str | None = None,
 ) -> QuestCheckin:
     """Update a daily check-in status and apply timestamp/XP rules."""
     normalized_status = _normalize_checkin_status(status)
@@ -125,8 +127,17 @@ def update_checkin_status(
     owns_session = session is None
     session = session or get_session()
     try:
-        quest = _get_quest_or_raise(session, quest_id)
+        quest = _get_quest_or_raise(session, quest_id, lock=True)
         checkin = _get_checkin(session, quest.id, checkin_date)
+        if expected_status is not None:
+            scheduled = quest.due_date == checkin_date or (
+                quest.planned_start_at is not None and quest.planned_start_at.date() == checkin_date
+            )
+            current_status = checkin.status if checkin else quest.status.strip().capitalize()
+            if current_status == "Active":
+                current_status = "Planned"
+            if (checkin is None and not scheduled) or current_status != expected_status:
+                raise ValueError("This item changed. Refresh the day before updating its status.")
         if checkin is None:
             checkin = QuestCheckin(
                 quest_id=quest.id,
@@ -245,8 +256,8 @@ def mark_stale_planned_checkins_failed(today: date, grace_days: int = 3, session
             session.close()
 
 
-def _get_quest_or_raise(session, quest_id: int) -> Quest:
-    quest = session.get(Quest, quest_id)
+def _get_quest_or_raise(session, quest_id: int, *, lock: bool = False) -> Quest:
+    quest = session.get(Quest, quest_id, with_for_update=lock)
     if quest is None:
         raise ValueError(f"Quest with id {quest_id} was not found.")
     return quest

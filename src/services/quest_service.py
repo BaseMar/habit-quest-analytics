@@ -1,6 +1,6 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.database.db import get_session
@@ -240,10 +240,18 @@ def get_quests_by_planned_date(planned_date: date, session=None) -> list[Quest]:
 
 def get_quests_for_day(planned_date: date, session=None) -> list[Quest]:
     """Return quests for a day, ordered by scheduled start time then creation time."""
+    quests = get_planner_schedule(planned_date, planned_date, session=session).get(planned_date, [])
+    for quest in quests:
+        quest.display_status = get_quest_status_for_date(quest, planned_date)
+    return quests
+
+
+def get_planner_schedule(first_day: date, last_day: date, session=None) -> dict[date, list[Quest]]:
+    """Group the visible schedule and legacy check-ins by date in a bounded range."""
     owns_session = session is None
     session = session or get_session()
-    day_start = datetime.combine(planned_date, time.min)
-    day_end = day_start + timedelta(days=1)
+    start_at = datetime.combine(first_day, time.min)
+    end_at = datetime.combine(last_day, time.max)
     try:
         quests = (
             session.query(Quest)
@@ -254,22 +262,31 @@ def get_quests_for_day(planned_date: date, session=None) -> list[Quest]:
             )
             .filter(
                 or_(
-                    Quest.due_date == planned_date,
-                    and_(Quest.planned_start_at >= day_start, Quest.planned_start_at < day_end),
-                    Quest.checkins.any(QuestCheckin.checkin_date == planned_date),
+                    Quest.due_date.between(first_day, last_day),
+                    Quest.planned_start_at.between(start_at, end_at),
+                    Quest.checkins.any(QuestCheckin.checkin_date.between(first_day, last_day)),
                 )
             )
             .all()
         )
-        for quest in quests:
-            quest.display_status = get_quest_status_for_date(quest, planned_date)
-        return sorted(
+        schedule = {}
+        for quest in sorted(
             quests,
             key=lambda quest: (
                 quest.planned_start_at is None,
                 quest.planned_start_at or quest.created_at or datetime.min,
+                quest.id,
             ),
-        )
+        ):
+            days = {checkin.checkin_date for checkin in quest.checkins}
+            if quest.due_date is not None:
+                days.add(quest.due_date)
+            if quest.planned_start_at is not None:
+                days.add(quest.planned_start_at.date())
+            for day in days:
+                if first_day <= day <= last_day:
+                    schedule.setdefault(day, []).append(quest)
+        return schedule
     finally:
         if owns_session:
             session.close()
@@ -345,23 +362,52 @@ def update_one_time_quest_if_unresolved(
         raise ValueError("Planned date is required.")
     if start_time is None or end_time is None:
         raise ValueError("Start and end time are required.")
+    return update_planned_quest(
+        quest_id, title, description, category_id, planned_date, start_time, end_time, estimated_minutes,
+        allow_routine_occurrence=False, session=session,
+    )
 
-    planned_start_at, planned_end_at = validate_schedule_times(planned_date, start_time, end_time)
+
+def update_planned_quest(
+    quest_id: int,
+    title: str,
+    description: str,
+    category_id: int | None,
+    planned_date: date,
+    start_time: time | None,
+    end_time: time | None,
+    estimated_minutes: int | None = None,
+    *,
+    allow_routine_occurrence: bool = True,
+    session=None,
+) -> Quest:
+    """Edit a planned item or override one routine day without changing its template."""
+    if (start_time is None) != (end_time is None):
+        raise ValueError("Set both start and end time, or leave the item all day.")
+
+    planned_start_at = planned_end_at = None
     normalized_minutes = _normalize_estimated_minutes(estimated_minutes)
-    if normalized_minutes is None:
-        normalized_minutes = int((planned_end_at - planned_start_at).total_seconds() // 60)
+    if start_time is not None and end_time is not None:
+        planned_start_at, planned_end_at = validate_schedule_times(planned_date, start_time, end_time)
+        if normalized_minutes is None:
+            normalized_minutes = int((planned_end_at - planned_start_at).total_seconds() // 60)
 
     owns_session = session is None
     session = session or get_session()
     try:
-        quest = session.get(Quest, quest_id)
+        quest = session.get(Quest, quest_id, with_for_update=True)
         if quest is None:
             raise ValueError(f"Quest with id {quest_id} was not found.")
-        if _get_recurring_instance_for_quest(session, quest.id) is not None:
+        instance = _get_recurring_instance_for_quest(session, quest.id)
+        if instance is not None and not allow_routine_occurrence:
             raise ValueError("Generated routine days must be edited through the routine workflow.")
+        if instance is not None and planned_date != instance.scheduled_date:
+            raise ValueError("Edit the routine's schedule in Projects & Routines to change its dates.")
 
         checkins = _get_quest_checkins(session, quest.id)
-        if any(not _is_unresolved_planned_checkin(checkin) for checkin in checkins):
+        if any(not _is_unresolved_planned_checkin(checkin) for checkin in checkins) or (
+            not checkins and quest.status.lower() in {"completed", "failed", "skipped"}
+        ):
             raise ValueError("Resolved quests or quests with awarded XP cannot be edited.")
         if len(checkins) > 1:
             raise ValueError("Quests with multiple check-ins cannot be edited as one-time planned items.")
@@ -379,7 +425,8 @@ def update_one_time_quest_if_unresolved(
         quest.planned_start_at = planned_start_at
         quest.planned_end_at = planned_end_at
         quest.estimated_minutes = normalized_minutes
-        quest.xp_reward = calculate_time_based_xp(normalized_minutes)
+        if normalized_minutes is not None:
+            quest.xp_reward = calculate_time_based_xp(normalized_minutes)
 
         if checkins:
             checkins[0].checkin_date = planned_date
@@ -504,7 +551,7 @@ def get_quest_status_for_date(quest: Quest, target_date: date) -> str:
     for checkin in getattr(quest, "checkins", []) or []:
         if checkin.checkin_date == target_date:
             return _normalize_status(checkin.status)
-    return _normalize_status(quest.status)
+    return "Planned" if quest.status.strip().lower() == "active" else _normalize_status(quest.status)
 
 
 def _build_one_time_quest_deletion_summary(session, quest: Quest) -> dict:

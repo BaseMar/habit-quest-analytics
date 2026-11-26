@@ -82,10 +82,10 @@ completed_quest_days = count(check-ins where status = Completed)
 
 This replaces the older "completed quests" interpretation in profile-style views when check-ins exist. A repeated habit can eventually produce many completed quest days from one parent quest.
 
-## Command Center Metrics
+## Summary Metrics
 
-Command Center uses check-ins for operational status and is the single UI
-surface for resolving today's and overdue planned work.
+Summary calculates daily progress and overdue work from check-ins. Daily status
+actions are available in Planner and Summary.
 
 ```text
 planned_today = count(check-ins where status = Planned and checkin_date = today)

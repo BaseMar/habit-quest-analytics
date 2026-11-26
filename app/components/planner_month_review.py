@@ -1,4 +1,3 @@
-from calendar import month_name
 from datetime import date
 from html import escape
 
@@ -15,38 +14,6 @@ _STATUS_MARKERS = {
     "Skipped": "S",
     "Failed": "F",
 }
-
-
-def render_month_review_controls(selected_date: date) -> tuple[int, int]:
-    """Render the persisted month selector and return its year and month."""
-    if "checklist_month" not in st.session_state:
-        st.session_state["checklist_month"] = selected_date.month
-    if "checklist_year" not in st.session_state:
-        st.session_state["checklist_year"] = selected_date.year
-
-    month_col, year_col = st.columns([0.64, 0.36], vertical_alignment="bottom")
-    with month_col:
-        selected_month_name = st.selectbox(
-            "Month",
-            list(month_name)[1:],
-            index=st.session_state["checklist_month"] - 1,
-            key="checklist_month_name",
-        )
-        selected_month = list(month_name).index(selected_month_name)
-        st.session_state["checklist_month"] = selected_month
-    with year_col:
-        selected_year = int(
-            st.number_input(
-                "Year",
-                min_value=2000,
-                max_value=2100,
-                value=int(st.session_state["checklist_year"]),
-                step=1,
-                key="checklist_year_input",
-            )
-        )
-        st.session_state["checklist_year"] = selected_year
-    return selected_year, selected_month
 
 
 def render_month_checklist(year: int, month: int) -> None:

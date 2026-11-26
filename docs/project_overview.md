@@ -27,10 +27,10 @@ The MVP is deployed on Streamlit Community Cloud with PostgreSQL on Supabase.
 
 Implemented:
 
-- Custom Streamlit navigation with Command Center as the default page.
-- Command Center for today's and overdue `QuestCheckin` status actions.
-- Planner with calendar scheduling, selected-day editing, unified task/routine/
-  project-session form, and read-only Monthly Review.
+- Planner as the default page, with a clickable calendar, inline editing and
+  status actions for the selected day, a unified planning form, and a read-only
+  Monthly checklist.
+- Summary for daily metrics, overdue work, and past check-in review.
 - Projects & Routines workspace for project creation, editing, lifecycle,
   comparison, bulk session planning, routine templates, future-month generation,
   and safe cleanup.
@@ -52,7 +52,8 @@ Implemented:
 - PostgreSQL through SQLAlchemy, with Alembic schema
   upgrades and a SQLite importer for PostgreSQL.
 - Google sign-in with personal records and progression for each account.
-- Default category seeding.
+- Default category seeding for each account.
+- Interactive demo with isolated sample data and a reset action in the sidebar.
 - Pytest coverage for model, service, metric, profile, and analytics behavior.
 
 Compatibility:
