@@ -27,6 +27,7 @@ operational metrics, trend analysis, and character growth.
 - [Key Technical Decisions](#key-technical-decisions)
 - [Data Flow](#data-flow)
 - [Architecture](#architecture)
+- [Performance and architecture review](docs/performance_review.md)
 - [Data Model](#data-model)
 - [Requirements](#requirements)
 - [Installation](#installation)

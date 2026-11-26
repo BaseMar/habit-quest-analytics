@@ -73,11 +73,26 @@ test accounts for cross-account checks.
   passed 392 tests with PostgreSQL and 374 with 18 skips without it. The CI
   selection passed 26 tests locally and its JUnit guard verified all 18 cases.
   The empty `0002` → `0001` downgrade leaves RLS enabled on existing tables.
-  Use the verified restore or forward repair procedure for recovery. Remote
-  verification of the Phase 4 changes is pending. [Database operations guide](database_operations.md)
-- [ ] Review `analytics_service.py` and other large modules for concrete
-  maintainability problems. Refactor only where the review justifies a change.
-  Measure query counts and performance before addressing redundant reads.
+  Use the verified restore or forward repair procedure for recovery. Phase 4
+  passed CI at `10bfc4f` with 392 full-suite tests and 26 integration selection
+  tests. All 18 required PostgreSQL cases passed with zero skips.
+  [GitHub Actions run 45904880351](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45904880351) · [Database operations guide](database_operations.md)
+- [x] Review `analytics_service.py` and other large modules for concrete
+  maintainability problems. Phase 5 benchmarked 1,000, 10,000, and 50,000
+  synthetic check-ins per account and varied project count at fixed volume.
+  The large-profile Checklist, portfolio, and Character Profile paths went
+  from 790, 79, and 3 SQL statements to 2, 3, and 2. All 40 benchmark result
+  fingerprints matched the baseline. The local full suite passed 394 tests
+  with PostgreSQL and 376 with 18 skips without it. The CI selection passed
+  26 tests and its guard verified all 18 required PostgreSQL cases. Phase 5
+  remote verification is pending. Defer broad analytics refactoring and index
+  proposals. [Performance review](performance_review.md)
+- [ ] Fix the concurrent legacy check-in backfill before releasing `v1.0.0`.
+  Two simultaneous Summary reads of the same missing check-in reproduced
+  PostgreSQL unique-constraint error `23505` in one reader. Add a focused
+  PostgreSQL regression that overlaps separate sessions. Both Summary and
+  Monthly Checklist reads must succeed and leave exactly one account-scoped
+  planned check-in with zero XP. Preserve existing check-in statuses and XP.
 - [ ] Run end-to-end functional checks across planning, routine lifecycle,
   project sessions, check-ins, analytics, progression, and account switching.
   Review status labels, form errors, empty states, and chart readability in
@@ -94,6 +109,11 @@ test accounts for cross-account checks.
   available connection limits under representative sessions. Confirm the
   project's backup retention and PITR availability or its approved logical
   backup procedure, with a restore rehearsal in an isolated target.
+- [ ] During Phase 6, verify hosted process memory and concurrent-session
+  behavior with authorized synthetic accounts and guest sessions. Record the
+  available process RSS or platform memory metric, response behavior, and
+  connection usage during representative analytics and portfolio operations.
+  Check for session failures and confirm account and guest isolation.
 - [ ] Prepare release `v1.0.0` with setup instructions, release notes, and
   known limitations.
 
@@ -102,6 +122,8 @@ CI runs for both pushes and pull requests, and PostgreSQL integration tests
 execute without skips in the database job. Account isolation has no known
 critical issues. Documentation and screenshots match the release, and a
 visitor can launch, use, and reset the demo without signing in.
+The concurrent legacy check-in backfill fix and its PostgreSQL regression
+must pass before publishing `v1.0.0`.
 
 **Testing requirements.** Run the suite against a disposable PostgreSQL
 database and check schema upgrades, constraints, imports, ownership assignment,
