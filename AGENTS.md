@@ -1,41 +1,44 @@
 # Agent Notes
 
-Habit Quest Analytics is an MVP scaffold for a Streamlit application. Keep future work small, testable, and aligned with the current architecture.
+Habit Quest Analytics is a deployed Streamlit planner and analytics app with
+PostgreSQL for signed-in accounts and an isolated in-memory SQLite guest demo.
 
-## Project Rules
+## Planning and scope
 
-- Keep the code simple and readable.
-- Prefer small commits with one clear purpose.
-- Do not over-engineer abstractions before the MVP needs them.
-- Do not add authentication unless explicitly requested.
-- Do not add machine learning unless explicitly requested.
-- Do not add external APIs unless explicitly requested.
-- Do not introduce cloud services while the app is still local-first.
-- Do not modify application logic when the task is documentation-only.
+- Read [the roadmap](docs/roadmap.md) before implementing new features, then
+  inspect the relevant implementation and tests. Treat implemented code as the
+  source of truth for current behavior.
+- Work on one explicitly approved feature or milestone task at a time, following
+  its dependencies and acceptance criteria. Get explicit approval before
+  implementing future milestones or adding external APIs, cloud services, or ML.
+- Keep code simple and readable. Avoid speculative abstractions and unrelated
+  refactoring. Keep application behavior unchanged during documentation-only work.
+- Keep commits focused. Commit or push only when explicitly requested.
 
-## Architecture Guidance
+## Architecture and invariants
 
-- Keep Streamlit pages focused on presentation.
-- Keep business logic in `src/services/`.
-- Keep metric formulas in `src/analysis/`.
-- Keep database connection and SQLAlchemy models in `src/database/`.
-- Keep persistence concerns separate from calculation logic.
-- Use SQLite as the default local database until a different storage target is requested.
+- Keep Streamlit pages and components focused on presentation. Put business
+  rules in `src/services/`, reusable metric formulas in `src/analysis/`, and
+  SQLAlchemy models and connection logic in `src/database/`. Keep persistence
+  separate from calculations.
+- Derive identity from the authenticated application context and keep personal
+  data scoped to the account. Preserve ownership constraints and guest isolation.
+- Preserve historical check-ins and awarded XP. Use `QuestCheckin` for daily
+  status and XP when check-ins exist. Preserve unique quest/date check-ins,
+  idempotent completion, and the existing reset and safe-deletion rules.
 
-## Testing Guidance
+## Testing and documentation
 
-- Add or update pytest coverage when business rules change.
-- Keep tests focused on behavior rather than implementation details.
-- Run these checks before handing off code changes:
+- Update behavioral pytest coverage and relevant documentation with implemented
+  changes. Record PostgreSQL skips accurately and use a disposable database
+  with `TEST_POSTGRESQL_URL` for database integration checks.
+- Run these checks before handing off code changes.
 
 ```bash
 python -m pytest
-python -m compileall -q app src tests
+python -m compileall -q app src tests migrations
 ```
 
-## Documentation Guidance
-
-- Keep README and docs honest about implementation status.
-- Mark unfinished features as planned or in progress.
-- Update docs when data model fields, metrics, commands, or app sections change.
-- Avoid claiming CRUD, charts, achievements, ML, or deployment are implemented before they exist.
+- Keep documentation aligned with actual behavior, including data ownership,
+  metrics, app sections, and commands. Keep planned work in the roadmap and
+  update each task's status after implementation and verification.

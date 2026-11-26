@@ -1,7 +1,9 @@
 # Data Model
 
-Habit Quest Analytics uses SQLAlchemy with PostgreSQL.
-`QuestCheckin` tracks daily status.
+SQLAlchemy maps the PostgreSQL schema used by signed-in accounts. A guest
+session creates its own in-memory SQLite schema from the same models.
+`QuestCheckin` tracks daily status. The [repository baseline](project_overview.md)
+and [PostgreSQL setup](../README.md#postgresql) describe current usage.
 
 ## Source Of Truth
 
@@ -9,20 +11,32 @@ Habit Quest Analytics uses SQLAlchemy with PostgreSQL.
 
 - `Quest.status` still exists for legacy compatibility and fallback.
 - New scheduled quests create a planned check-in for the scheduled date.
-- Command Center, Habit Analytics, and Character Profile should prefer check-in data when available.
+- Summary, Habit Analytics, and Character Profile use check-in data when available.
 - Avoid double-counting legacy quest status and check-in status for the same workflow.
 
 ## Tables
 
 ### user_accounts
 
-Stores the verified Google subject and email. The subject is unique and
-identifies the account across changes to its email address.
+The `UserAccount` model stores the verified Google subject and email. The
+unique subject identifies the account across changes to its email address.
 
-Personal tables carry a `user_id` foreign key to `user_accounts.id`. Related
-personal rows share an owner. Account sessions filter every personal query by
-that owner. Rows from the single-user schema have a null owner until explicitly
-assigned by the [legacy claim command](../README.md#google-sign-in).
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key. |
+| `google_subject` | Unique, verified Google identity key. |
+| `email` | Verified email, refreshed on sign-in. |
+
+Personal tables carry a `user_id` foreign key to `user_accounts.id`. Account
+sessions filter personal ORM reads by owner and validate writes and deletes.
+Composite foreign keys use `(user_id, related_id)` to enforce same-owner links
+between assigned rows. Categories are unique by owner and name. Each owner
+has at most one player profile. Achievement definitions are shared.
+
+Existing single-user rows can have a null owner. Account sessions hide them
+until explicitly assigned by the [legacy claim command](../README.md#google-sign-in).
+See the [account session](../src/database/user_session.py) and
+[account migration](../migrations/versions/0002_accounts.py) for enforcement.
 
 ### categories
 
@@ -103,7 +117,7 @@ Relationships:
   `{Goal Title} Session {N}`.
 - Goal-linked one-time sessions require a category.
 - Goal session numbering is scoped per goal and uses `max(existing number) + 1`;
-  deleted sessions are not renumbered.
+  deletion leaves surviving session numbers unchanged.
 - Goal Session Planner-generated quests follow the same numbering and title
   rules as individually added goal sessions.
 
@@ -146,9 +160,9 @@ Constraints and relationships:
 
 ### recurring_habits
 
-Stores recurring habit templates. These templates are not completed directly;
-explicit month generation creates normal planned quest days and planned
-check-ins.
+Stores recurring habit templates. Creation in Planner generates the start
+month. Projects & Routines generates later months on demand. Each occurrence
+is a normal quest with a planned check-in.
 
 | Field | Purpose |
 | --- | --- |
@@ -158,8 +172,8 @@ check-ins.
 | `category_id` | Optional foreign key to `categories.id`, matching current quest category behavior. |
 | `xp_reward` | Time-based XP value copied to generated quests. |
 | `estimated_minutes` | Planned duration copied to generated quests. |
-| `recurrence_type` | Recurrence type. v1 is designed around `selected_weekdays`. |
-| `weekdays` | Serialized JSON weekday list for SQLite v1. `0` is Monday and `6` is Sunday. |
+| `recurrence_type` | Recurrence type. The supported value is `selected_weekdays`. |
+| `weekdays` | JSON weekday list stored as text. `0` is Monday and `6` is Sunday. |
 | `start_date` | First date the habit can generate. |
 | `end_date` | Optional final date the habit can generate. |
 | `planned_start_time` | Optional template start time for generated recurring quest days. |
@@ -215,7 +229,8 @@ Safe cleanup behavior:
 
 ### player_profiles
 
-Stores the local RPG-style character profile.
+Stores an account's RPG-style character profile. Avatar files are stored on
+local disk for signed-in users and in session state for guests.
 
 | Field | Purpose |
 | --- | --- |
@@ -232,7 +247,8 @@ Relationships:
 
 ### achievements
 
-Stores achievement definitions.
+Stores shared achievement definitions. The schema supports unlock records,
+with unlock processing tracked in the [roadmap](roadmap.md).
 
 | Field | Purpose |
 | --- | --- |
@@ -264,26 +280,45 @@ Relationships:
 
 ## Mermaid ERD
 
+Optional account ownership represents legacy rows awaiting a claim. The
+same-owner composite constraints are described in [User accounts](#user_accounts).
+
 ```mermaid
 erDiagram
-    categories ||--o{ quests : groups
-    categories ||--o{ recurring_habits : groups
-    categories ||--o{ goals : groups
-    goals ||--o{ quests : links
+    user_accounts |o..o{ categories : owns
+    user_accounts |o..o{ goals : owns
+    user_accounts |o..o{ quests : owns
+    user_accounts |o..o{ quest_checkins : owns
+    user_accounts |o..o{ recurring_habits : owns
+    user_accounts |o..o{ recurring_habit_instances : owns
+    user_accounts |o..o| player_profiles : owns
+    user_accounts |o..o{ unlocked_achievements : owns
+    categories |o--o{ quests : groups
+    categories |o--o{ recurring_habits : groups
+    categories |o--o{ goals : groups
+    goals |o--o{ quests : links
     quests ||--o{ quest_checkins : tracks
     recurring_habits ||--o{ recurring_habit_instances : generates
     quests ||--o| recurring_habit_instances : generated_as
     player_profiles ||--o{ unlocked_achievements : earns
     achievements ||--o{ unlocked_achievements : unlocked_as
 
+    user_accounts {
+        int id PK
+        string google_subject UK
+        string email
+    }
+
     categories {
         int id PK
+        int user_id FK
         string name
         text description
     }
 
     quests {
         int id PK
+        int user_id FK
         string title
         text description
         string status
@@ -302,6 +337,7 @@ erDiagram
 
     goals {
         int id PK
+        int user_id FK
         string title
         text description
         int planned_total_minutes
@@ -315,6 +351,7 @@ erDiagram
 
     quest_checkins {
         int id PK
+        int user_id FK
         int quest_id FK
         date checkin_date
         string status
@@ -328,6 +365,7 @@ erDiagram
 
     recurring_habits {
         int id PK
+        int user_id FK
         string title
         text description
         int xp_reward
@@ -346,6 +384,7 @@ erDiagram
 
     recurring_habit_instances {
         int id PK
+        int user_id FK
         int recurring_habit_id FK
         date scheduled_date
         int quest_id FK
@@ -354,6 +393,7 @@ erDiagram
 
     player_profiles {
         int id PK
+        int user_id FK
         string character_name
         int total_xp
         string avatar_path
@@ -370,6 +410,7 @@ erDiagram
 
     unlocked_achievements {
         int id PK
+        int user_id FK
         int player_profile_id FK
         int achievement_id FK
         datetime unlocked_at
@@ -396,10 +437,13 @@ All schema changes during preparation apply to the snapshot.
 
 ## PostgreSQL Schema
 
-Alembic version-controls the PostgreSQL schema. Primary keys use identity
-columns that accept explicit IDs during SQLite import. The importer preserves
-the IDs and resets the identity sequences to start above the imported IDs.
-See the [PostgreSQL setup and import instructions](../README.md#postgresql).
+Alembic revisions `0001` and `0002` establish the baseline tables and add
+ownership constraints and row-level security. RLS protects app tables from
+direct access by public API roles without a matching policy or bypass. The app's
+server-side role uses account-scoped ORM sessions for personal data isolation.
+Primary keys use identity columns that accept explicit IDs during SQLite
+import. The importer preserves IDs and advances sequences past them. See the
+[PostgreSQL setup and import instructions](../README.md#postgresql).
 
 ## Category To RPG Stat Mapping
 
@@ -416,9 +460,9 @@ quest category.
 
 The radar chart displays calculated stat levels, not raw XP.
 
-## Notes For Future Development
+## Storage and compatibility notes
 
 - `estimated_minutes` stores planned workload for scheduled tasks and routines.
-- Achievement rules may need fields beyond `xp_required` once non-XP achievements are added.
-- Local avatar uploads are stored under `data/uploads/` and are intentionally ignored by git.
-- On Streamlit Community Cloud, avatar uploads may reset when the instance changes.
+- Local avatar uploads are stored under `data/uploads/` and ignored by Git.
+  On Streamlit Community Cloud, they may disappear when the instance changes.
+- Planned schema changes are tracked in the [roadmap](roadmap.md).

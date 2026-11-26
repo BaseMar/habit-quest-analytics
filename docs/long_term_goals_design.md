@@ -1,7 +1,8 @@
 # Long-term Goals / Projects Design
 
-This document designs the Long-term Goals / Projects feature for Habit Quest
-Analytics.
+This design record explains the project and session decisions currently used
+by Habit Quest Analytics. See the [metrics reference](metrics.md#goal-analytics)
+for current formulas and the [roadmap](roadmap.md) for future work.
 
 Current implementation status:
 
@@ -12,7 +13,7 @@ Current implementation status:
 - Goal progress is derived from linked quest sessions and their check-ins.
 - Projects & Routines owns project creation, editing, progress, lifecycle, and
   comparison.
-- Quest Planner can link one-time sessions to an existing project.
+- Planner can link one-time sessions to an existing active project.
 - The selected-project workspace includes a Goal Session Planner for previewing
   and bulk creating multiple planned one-time sessions.
 - Goal session titles are generated automatically as
@@ -20,7 +21,8 @@ Current implementation status:
 - The same project workspace includes lifecycle actions to archive, complete,
   reopen, and delete goals.
 - Recurring habits are not linked to goals.
-- A deeper standalone project dashboard is not implemented yet.
+- The Portfolio tab compares active and completed projects. The Projects tab
+  includes a deterministic completion forecast for the selected project.
 
 ## Problem
 
@@ -32,7 +34,7 @@ Example:
 A Portfolio Project planned for 20 hours can be split into 10 sessions of 2
 hours.
 
-The app should eventually understand:
+Project reporting tracks the following measures.
 
 - total planned effort,
 - completed effort,
@@ -43,9 +45,8 @@ The app should eventually understand:
 
 ## Core Concept
 
-The backend foundation adds an entity named `Goal`.
-
-Suggested fields:
+The project entity is `Goal`. Its core fields are listed below. The
+[data model](data_model.md#goals) documents account ownership and constraints.
 
 - `id`
 - `title`
@@ -83,9 +84,7 @@ Rules:
   planned start/due date, creation time, then id.
 - Deleting a session does not renumber remaining sessions.
 - User-supplied titles do not override goal session titles.
-- Recurring habits can remain separate for v1.
-- Generated recurring habit quests do not need goal linking in v1 unless that is
-  explicitly added later.
+- Routines and their generated occurrences remain separate from projects.
 - A goal can have many quest sessions.
 - Each linked quest session has its own `QuestCheckin`.
 - `QuestCheckin.xp_awarded` remains the XP source of truth.
@@ -116,11 +115,8 @@ Rules:
 
 - Linked quest sessions award XP normally using time-based XP.
 - Goal earned XP is the sum of `QuestCheckin.xp_awarded` for linked sessions.
-- Goal planned XP can be the sum of planned XP for linked/planned sessions or a
-  value calculated from `planned_total_minutes`.
-- Completing the goal itself should not automatically award extra XP in v1.
-- Optional completion bonus XP can be future work, but it is out of scope for
-  v1.
+- Expected project XP applies the time-based formula to positive target effort.
+- Project completion itself awards no additional XP.
 
 Current XP formula remains unchanged:
 
@@ -130,7 +126,7 @@ XP = max(5, round(planned_minutes / 60 * 20))
 
 ## Progress Calculation
 
-Planned metrics for each goal:
+The goal service returns the following progress metrics.
 
 - `planned_total_minutes`
 - `completed_minutes` from completed linked quest check-ins
@@ -159,17 +155,14 @@ Rules:
 
 ### Planner And Projects Workspace
 
-Current backend/minimal UI behavior:
-
-- Projects can be created inline in Planner with title, optional planned total time,
-  optional notes, required category, start date, and target date.
+- Create projects from Projects & Routines with a title, required category,
+  and optional effort target, dates, and notes.
 - A one-time scheduled quest can optionally be linked to an active goal/project
   at creation time.
 - Users select one project workspace in Projects & Routines; it shows
   completed/planned effort, progress percentage,
   earned/expected XP, session counts, category, status, and target date.
-- The unified Add to plan form can select an active project or create one
-  inline from its optional project section. A selected project creates a normal
+- The Add to plan form can select an existing active project. It creates a normal
   one-time scheduled quest session with a planned `QuestCheckin` and awards no
   XP until completed.
 - Project-linked sessions use generated session titles instead of asking the
@@ -178,7 +171,7 @@ Current backend/minimal UI behavior:
 - Project lifecycle actions appear in the selected project workspace alongside
   progress and session-planning controls.
 - Project deletion requires confirmation and leaves linked sessions in Planner
-  as one-time tasks.
+  as one-time tasks, with check-ins and XP preserved.
 - Recurring habit template creation does not show or set a goal link.
 - Linked quest sessions continue to create normal planned `QuestCheckin` rows.
 - Bulk-planned sessions also create separate normal `Quest` and
@@ -220,10 +213,10 @@ Rules:
 Example flow:
 
 1. Create Goal: Portfolio Project, 20h total.
-2. Open the project, then select Plan Multiple Sessions.
+2. Open the project and select **Plan sessions**.
 3. Preview 2h sessions on Monday, Wednesday, and Friday.
 4. Confirm generation of 10 separate planned quest sessions.
-5. Complete sessions in Command Center.
+5. Complete sessions in Planner or Summary.
 6. Goal progress updates automatically.
 
 ### Projects & Routines
@@ -232,35 +225,19 @@ The implemented Projects & Routines page provides project creation, editing,
 the selected-project workspace, lifecycle actions, compact comparison, and bulk
 session planning.
 
-### Character Profile
-
-Potential future addition:
-
-- Show major active goals or completed goals.
-- Avoid overcomplicating the current Character Profile.
-
 ### Project Analytics
 
-Current implementation:
-
-- Projects & Routines provides a compact comparison of active and completed
-  projects.
-- Goal KPIs include active goals, completed goals, planned effort, completed
-  effort, weighted overall progress, and earned goal XP.
-- The comparison uses completed and remaining effort from linked one-time quest
-  sessions.
-- A project with target effort, target date, and completed session history shows
-  a completion forecast based on its completed planned effort per day.
-
-Future analytics ideas:
-
-- most progressed goal,
-- stalled goals,
-- deeper goal-level drilldowns in a standalone dashboard.
+- Portfolio displays active-project count, completed and remaining effort, and
+  weighted progress when at least two active or completed projects qualify.
+- Projects shows progress for a selected project and a forecast based on
+  completed planned effort per day when the target and history support it.
+- The [metrics reference](metrics.md#goal-completion-forecast) describes when a
+  forecast is available, including the effort-target-reached case.
 
 ## Data Model Design
 
-Possible model additions:
+The following fields are implemented. See the [ERD](data_model.md#mermaid-erd)
+for same-owner relationships.
 
 ### goals
 
@@ -284,8 +261,7 @@ Possible model additions:
 | `goal_id` | Nullable foreign key to `goals.id`. Implemented for one-time scheduled quests. |
 | `goal_session_number` | Nullable stable session number scoped to a goal. |
 
-No new XP table is added in v1. `QuestCheckin.xp_awarded` remains the XP source
-of truth.
+`QuestCheckin.xp_awarded` records XP earned by linked sessions.
 
 ## Safe Deletion / Archive Rules
 
@@ -294,7 +270,7 @@ of truth.
   schedules, check-in history, and awarded XP are preserved. They appear as
   one-time tasks in Planner and Analytics.
 
-## Implementation Phases
+## Historical Implementation Phases
 
 1. `docs: add long-term goals design` - implemented.
 2. `feat: add goal/project model and service layer` - implemented.
@@ -309,7 +285,9 @@ of truth.
 
 ## Test Plan
 
-Future tests should cover:
+The [goal service](../tests/test_goal_service.py),
+[bulk planner](../tests/test_goal_session_planner_service.py), and
+[analytics](../tests/test_analytics_service.py) suites cover these cases.
 
 - create goal,
 - update goal,
@@ -324,13 +302,9 @@ Future tests should cover:
 - deleting or archiving goals preserves completed history,
 - existing quest/check-in/XP tests still pass.
 
-## Out Of Scope For V1
+## Scope decisions
 
-- Automatic AI goal planning.
-- Automatic session generation without explicit preview and confirmation.
-- Completion bonus XP.
-- Dependencies between goals.
-- Subtasks beyond linked quest sessions.
-- Team/shared goals.
-- Google Calendar sync.
-- PostgreSQL migration.
+Bulk generation requires preview and confirmation. Linked sessions provide
+the work breakdown for personal projects. See the [roadmap](roadmap.md) for
+future assistant and calendar work, and the deferred backlog for project
+dependencies, subtasks, sharing, and bonus rewards.

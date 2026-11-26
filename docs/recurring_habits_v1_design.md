@@ -1,16 +1,17 @@
 # Recurring Habits v1 Design
 
-This document defines the Recurring Habits v1 feature and its intended boundaries.
+This design record describes selected-weekday routine templates and their
+history safeguards. See the [current baseline](project_overview.md) and the
+[development roadmap](roadmap.md).
 
-The app has completed its migration to `QuestCheckin`-based daily tracking. Quest Planner,
-Command Center, Character Profile, and Habit Analytics now use `QuestCheckin` records as the
+The app has completed its migration to `QuestCheckin`-based daily tracking. Planner,
+Summary, Character Profile, and Habit Analytics now use `QuestCheckin` records as the
 main source of truth for daily status, XP, and progression.
 
 ## Status
 
-Recurring Habits v1 is implemented for selected-weekday templates and explicit
-creation-month generation from Planner and future-month generation from
-Projects & Routines.
+Planner creates selected-weekday templates and generates their start month.
+Projects & Routines generates later months on demand.
 
 Template management is also implemented:
 
@@ -22,13 +23,12 @@ Template management is also implemented:
 - future unresolved planned generated days can be removed safely while
   preserving completed, skipped, failed, and XP-awarded history,
 - a single unresolved generated recurring occurrence can be deleted safely,
-- templates can be edited without mutating existing generated days.
+- template edits affect later generation. Planner can edit an unresolved
+  generated occurrence without changing its date or template.
 
-Still not implemented:
-
-- true `N times per week` auto-scheduling,
-- automatic background generation,
-- generation from analytics, profile, Command Center, or app startup.
+Routines generate for selected weekdays and explicit months. Flexible weekly
+frequency and background generation are in the roadmap's
+[deferred backlog](roadmap.md#deferred-backlog).
 
 ## Product Rule
 
@@ -44,15 +44,15 @@ The implemented flow is:
 RecurringHabit template
   -> generated Quest
   -> planned QuestCheckin
-  -> completion through Command Center
+  -> completion through Summary
 ```
 
 Generated habit days should appear naturally in the existing check-in workflow:
 
-- Quest Planner calendar
+- Planner calendar
 - Selected Day Board
 - Monthly Checklist
-- Command Center
+- Summary
 - Character Profile after completion
 - Habit Analytics
 
@@ -127,7 +127,7 @@ Fields:
 | `xp_reward` | Time-based XP value copied to generated quests. |
 | `estimated_minutes` | Planned minutes copied to generated quests. |
 | `recurrence_type` | Recurrence type, initially `selected_weekdays`. |
-| `weekdays` | Serialized weekday list for SQLite v1, preferably a JSON string. |
+| `weekdays` | JSON weekday list stored as text. |
 | `start_date` | First date the habit can generate. |
 | `end_date` | Optional final date the habit can generate. |
 | `planned_start_time` | Optional start time copied into generated quest datetime windows. |
@@ -136,7 +136,7 @@ Fields:
 | `created_at` | Timestamp set when the template is created. |
 | `updated_at` | Timestamp updated when the template changes. |
 
-For SQLite v1, `weekdays` should be stored as a serialized weekday list, preferably a JSON string
+The database stores `weekdays` as a JSON list
 such as `[0, 2, 4]`.
 
 ### RecurringHabitInstance
@@ -203,7 +203,7 @@ the same month should not create duplicate quests or check-ins.
 
 Do not auto-generate recurring records from:
 
-- Command Center,
+- Summary,
 - Habit Analytics,
 - Character Profile,
 - app startup.
@@ -266,16 +266,16 @@ Monthly Checklist should not calculate recurrence itself.
 
 It displays persisted generated `QuestCheckin` records exactly like other planned quest
 days, grouped into one logical row per recurring habit template. Empty days should remain blank.
-Generated recurring habit days use the same Command Center status actions as
+Generated recurring habit days use the same Summary status actions as
 other planned work.
 
 Monthly Checklist should preserve existing completed, skipped, failed, and planned check-ins.
 It should not create a new check-in when the selected recurring habit is not scheduled for the
 selected date.
 
-## Command Center Impact
+## Summary Impact
 
-Command Center should not generate recurring habits.
+Summary should not generate recurring habits.
 
 It should only display already-generated check-ins:
 
@@ -324,7 +324,7 @@ grace_days = 3
 ```
 
 Recurring Habits v1 should not automatically enable stale planned failure from app startup or
-page load. A future activation workflow should be designed before automatic failure is enabled.
+page load. The [roadmap](roadmap.md) tracks evaluation of optional activation.
 
 ## Implementation Phases
 
@@ -353,7 +353,7 @@ Covered by focused pytest coverage for:
 - generated quest fields,
 - generated check-in starts as `Planned`,
 - generated rows appear in Monthly Checklist,
-- generated today rows appear in Command Center after generation,
+- generated today rows appear in Summary after generation,
 - completed generated check-ins award XP once,
 - Character Profile includes generated check-in XP,
 - Habit Analytics includes generated check-ins.
@@ -385,12 +385,7 @@ Decisions for v1:
 - Keep one-time quests and recurring habits compatible but conceptually separate.
 - Defer true `times_per_week` auto-scheduling.
 
-## Non-Goals For V1
+## Scope decision
 
-- No automatic background generation.
-- No generation from analytics, profile, Command Center, or app startup.
-- No true `N times per week` auto-scheduling.
-- No external calendar sync.
-- No authentication or multi-user scheduling.
-- No machine learning or AI planning.
-- No production database migration framework.
+Routine generation remains month-based. Summary, analytics, profile, and app
+startup do not generate occurrences.

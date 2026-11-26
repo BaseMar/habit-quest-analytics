@@ -1,15 +1,17 @@
 # XP System v2 Design
 
-This document defines XP System v2 for Habit Quest Analytics.
+This design record explains time-based XP and nonlinear progression. See the
+[metrics reference](metrics.md) for current formulas and the
+[development roadmap](roadmap.md) for planned reward changes.
 
 Current app context:
 
 - Daily tracking uses `QuestCheckin`.
-- Command Center resolves planned quest days; Monthly Checklist shows their
-  month-level history.
+- Planner and Summary resolve planned quest days. Monthly Checklist shows
+  their month-level history.
 - Recurring Habits v1 generates normal `Quest` and planned `QuestCheckin`
   records.
-- Command Center, Character Profile, and Habit Analytics use check-in records as
+- Summary, Character Profile, and Habit Analytics use check-in records as
   the main source of truth.
 - Character Profile reads progression from `QuestCheckin.xp_awarded`.
 
@@ -32,9 +34,9 @@ Implemented:
 - RPG stat levels are derived from completed check-in XP by category.
 - Character Profile stat panel and radar use stat levels.
 
-Still planned:
-
-- Long-term goals/projects.
+Projects now aggregate the time and XP of their completed linked sessions.
+The [project design record](long_term_goals_design.md#xp-behavior) explains
+that relationship.
 
 ## Product Goal
 
@@ -191,7 +193,7 @@ Radar chart behavior:
 
 ## App Impact
 
-### Quest Planner
+### Planner
 
 - One-time scheduled quests receive XP based on planned duration.
 - XP reward should not be manually editable.
@@ -204,9 +206,9 @@ Radar chart behavior:
 - Generated quests inherit `xp_reward` from the recurring habit template.
 - Completed generated check-ins award that stored XP once.
 
-### Monthly Checklist
+### Daily check-ins
 
-- Completion awards the stored quest/check-in XP.
+- Completion in Planner or Summary awards the stored quest XP.
 - `QuestCheckin.xp_awarded` remains the durable record of awarded XP.
 - Reset clears awarded XP as currently implemented.
 - Skipped, failed, and planned check-ins award no XP.
@@ -222,32 +224,17 @@ Radar chart behavior:
 ### Habit Analytics
 
 - Weekly XP uses `QuestCheckin.xp_awarded`.
-- XP Trend uses `QuestCheckin.xp_awarded` grouped by check-in date.
+- The analytics service can aggregate `QuestCheckin.xp_awarded` by check-in date.
 - Planned time becomes more meaningful for analytics because XP is aligned with
   planned effort.
 
-## Future Goals And Projects
+## Project XP
 
-Longer-term, the app can add a Goal or Project concept.
+A 20-hour project can be planned as ten two-hour sessions. Each completed
+session awards XP from its planned time. The project aggregates completed
+session effort and earned XP and has no independent completion reward.
 
-Planned fields:
-
-- title
-- category
-- planned_total_minutes
-- completed_minutes
-- progress_percent
-- status
-
-Example:
-
-A Portfolio Project planned for 20 hours can be split into 10 sessions of 2
-hours. Each 2-hour session gives XP from planned time. The project aggregates
-completed session minutes and XP.
-
-This is not part of XP System v2. Keep it as future work.
-
-## Implementation Phases
+## Historical Implementation Phases
 
 Phase status:
 
@@ -275,11 +262,7 @@ Covered by focused tests for:
 - radar chart uses stat levels,
 - no retroactive recalculation unless explicitly requested.
 
-## Non-Goals For XP System v2
+## Scope decision
 
-- No retroactive historical XP recalculation by default.
-- No project/goal aggregate model.
-- No achievements overhaul.
-- No machine learning.
-- No external APIs.
-- No production migration framework.
+Existing XP remains as recorded. The roadmap covers achievement processing and
+streak rewards with explicit rules for historical eligibility.

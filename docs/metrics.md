@@ -1,6 +1,9 @@
 # Metrics
 
-This document defines the current core metrics for Habit Quest Analytics. After the QuestCheckin migration, daily completion metrics should use `QuestCheckin` records when they exist.
+This document defines metrics used by the current application and computed by
+its analytics services. Daily completion and progression use `QuestCheckin`
+records where available. `Quest.status` remains a legacy fallback. Planned
+analytics changes belong in the [roadmap](roadmap.md).
 
 ## XP Rewards
 
@@ -123,7 +126,8 @@ Rules:
 xp_by_day = sum(xp_awarded grouped by checkin_date)
 ```
 
-The Habit Analytics trend chart uses check-in dates and a line chart with markers.
+The Habit Analytics service prepares daily XP from check-in dates. The current
+Overview displays weekly workload execution and weekday completion charts.
 
 ## Check-ins By Status
 
@@ -160,6 +164,21 @@ Rules:
 - Exclude planned items.
 - Return `0.0` for weekdays without resolved check-ins.
 
+## Period comparison and workload
+
+Habit Analytics applies date, category, and work-type filters. It compares the
+selected inclusive range with the immediately preceding range of equal length
+using the same filters. The Overview shows the change in completion rate in
+percentage points and the change in completed check-in count. Period, category,
+and routine completion rates use completed / (completed + failed), returning
+zero for an empty denominator.
+
+Weekly workload groups check-ins by the Monday of their scheduled week.
+Scheduled effort sums the parent quests' estimated minutes. Completed planned
+effort uses those same estimates for completed check-ins only. Missing estimates
+contribute zero. These figures measure planned effort and follow-through.
+Measured actual duration is not collected.
+
 ## Period Review Highlights
 
 Habit Analytics derives compact review signals from the selected date range.
@@ -175,9 +194,13 @@ active_day_rate = days_with_at_least_one_completed_checkin / scheduled_checkin_d
 
 The review displays at most one focus item, selected in this order:
 
-1. An active routine with overdue planned or failed check-ins.
-2. The category with the largest remaining planned workload in the selected period.
-3. The category with the lowest completion rate among categories with resolved check-ins.
+1. An active routine with overdue planned or failed check-ins. Rank by overdue
+   planned count, then failed count. For this review, overdue means scheduled
+   before the selected period's end date.
+2. The category with the most unresolved planned check-ins in the selected
+   period, using total planned minutes as a tiebreaker.
+3. The category with the lowest completion rate among categories with resolved
+   check-ins, using total planned minutes as a tiebreaker.
 
 ## Planned Minutes By Category
 
@@ -207,12 +230,13 @@ directly, and expected goal XP is not counted as earned XP.
 ### Goal Completed Effort
 
 ```text
-goal_completed_minutes = sum(Quest.estimated_minutes for completed linked check-ins)
+goal_completed_minutes = sum(planned_minutes_for_quest for completed linked check-ins)
 ```
 
 Rules:
 
-- Completed linked sessions contribute estimated minutes.
+- Completed linked sessions contribute their positive estimate, or the scheduled
+  time window if an estimate is missing, or zero if neither is available.
 - Planned linked sessions do not contribute completed effort.
 - Skipped and failed linked sessions do not contribute completed effort.
 - Reset check-ins return to planned state with `xp_awarded = 0`, so they do not
@@ -222,16 +246,20 @@ Rules:
 
 ### Goal Completion Forecast
 
-For projects with a target effort, target date, and at least one completed
-session, the forecast uses the average completed planned effort per calendar day
-since the first completed session.
+For a project with a positive effort target and a target date, the Projects tab
+can forecast completion from completed planned effort per calendar day. With
+work remaining, the estimate needs a completed check-in dated through today
+and positive completed planned effort. The observation window includes the
+first such check-in date and today.
 
 ```text
 projected_completion_date = today + ceil(remaining_minutes / daily_completed_minutes) - 1 day
 ```
 
-The forecast compares the projected completion date with the target date. It is
-not available when any required planning or completion-history input is missing.
+The forecast compares the projected date with the target date. When the effort
+is already reached, the service returns today as the projected date with zero
+required daily minutes. That special case reports an effort target reached,
+without recovering the historical finishing date.
 
 ### Goal Scheduling Effort
 
@@ -263,8 +291,9 @@ overall_goal_progress =
     * 100
 ```
 
-Overall goal progress is weighted by planned effort. It is not a simple average
-of individual goal percentages. The displayed value is capped between 0 and 100.
+The Portfolio tab compares active and completed projects when at least two
+qualify. It caps the weighted progress value between 0 and 100 and reports zero
+when there is no total target effort.
 
 ## RPG Stat XP
 

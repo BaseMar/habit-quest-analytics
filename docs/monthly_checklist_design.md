@@ -1,6 +1,8 @@
 # Monthly Habit Checklist v1 Design
 
-This document records the approved design and current implementation status for the checklist-based daily completion workflow in Quest Planner.
+This design record explains the daily completion workflow and the decision to
+keep the Monthly Checklist read-only. See the [current baseline](project_overview.md)
+and the [development roadmap](roadmap.md).
 
 ## Status
 
@@ -13,10 +15,11 @@ Implemented:
 - Checklist status service.
 - Scheduled quest -> planned check-in integration.
 - Monthly checklist data builder.
-- Quest Planner Monthly Checklist UI.
-- Monthly Checklist blocks status updates for not-scheduled cells.
-- Quest Planner calendar and selected day schedule using check-in status.
-- Command Center metrics using check-ins.
+- Planner Monthly Checklist UI.
+- Monthly Checklist is a read-only history. Daily actions operate on specific
+  scheduled items in Planner or Summary.
+- Planner calendar and selected day schedule using check-in status.
+- Summary metrics using check-ins.
 - Character Profile XP/progression using check-in XP.
 - Habit Analytics using check-ins.
 - Generated recurring habit days grouped into one logical checklist row per
@@ -24,27 +27,20 @@ Implemented:
 - Goal-linked one-time sessions grouped into one logical checklist row per
   goal/project.
 
-Not implemented:
-
-- automatic app/page-level stale planned failure,
-- production database,
-- authentication,
-- Google Calendar sync,
-- AI planning assistant,
-- voice input.
+The optional stale planned failure helper has no app-level trigger.
 
 ## Goal
 
-Monthly Checklist v1 replaces the old temporary Quest Planner status workflow with a daily completion system.
+Monthly Checklist v1 replaces the old temporary Planner status workflow with a daily completion system.
 
 Target flow:
 
-- Plan quests in Quest Planner.
+- Plan quests in Planner.
 - Scheduled quests create planned check-ins for their scheduled date.
 - Review a selected month.
-- Resolve today's or overdue planned work in Command Center.
+- Resolve eligible current or past work in Planner or Summary.
 - Award XP once for completed daily check-ins.
-- Feed check-in data into Command Center, Habit Analytics, and Character Profile.
+- Feed check-in data into Summary, Habit Analytics, and Character Profile.
 
 ## Product Behavior
 
@@ -59,8 +55,8 @@ Core behavior:
 - Goal cells can represent one or more linked session check-ins for that goal on
   that date.
 - The monthly matrix is a read-only history and does not expose status actions.
-- Command Center marks an eligible check-in `Completed`, `Skipped`, `Failed`, or
-  resets it to `Planned`.
+- Daily views can mark an eligible check-in `Completed`, `Skipped`, `Failed`,
+  or reset it to `Planned`.
 - Unresolved planned cells remain `Planned`.
 - Empty days remain neutral/blank and are locked.
 - Completed check-ins award XP once.
@@ -68,11 +64,10 @@ Core behavior:
 
 Status safeguards:
 
-- Status actions never create check-ins for unscheduled dates.
-- The service rejects updates for a quest/date pair without a scheduled
-  check-in.
-- Command Center exposes status actions only for eligible today's and overdue
-  check-ins.
+- Planner and Summary pass the displayed status to the update service, which
+  rejects stale state and dates with neither a check-in nor a scheduled item.
+- The Monthly Checklist builder can backfill missing scheduled check-ins for
+  legacy work while assembling the matrix.
 
 ## Status Semantics
 
@@ -111,7 +106,7 @@ Why this table is needed:
 
 - `Quest.status` can only represent one global state.
 - A checklist needs one status per quest per day.
-- Future recurring habits need one check-in per generated habit date.
+- Each generated routine occurrence has a planned check-in on its scheduled date.
 - Long-term goal sessions remain separate `Quest` and `QuestCheckin` records
   even when Monthly Checklist groups them into one visual goal row.
 - Analytics and XP calculations need stable daily completion records.
@@ -156,25 +151,20 @@ Behavior:
 Important:
 
 - This helper is not called automatically from app startup or page load yet.
-- A future activation workflow should be designed before enabling it automatically.
+- Any activation design belongs in the [roadmap](roadmap.md).
 
 ## UI Direction
 
-Monthly Checklist lives in Quest Planner.
+Monthly Checklist lives in Planner.
 
-Current structure:
-
-- Section title: `Monthly Review`.
-- Subtitle: `View the planned and completed work for the selected month.`
-- Month selector.
-- Year selector.
+The `Monthly checklist` tab shares the selected month with Planner's Calendar.
 - Status legend.
 - Matrix preview:
   - rows are quests, recurring habits, or goals/projects,
   - columns are days of the month,
   - cells show simple status symbols.
-- The matrix is read-only. Daily status actions belong to Command Center and
-  future-month routine generation belongs to Projects & Routines.
+- The matrix is read-only. Planner and Summary handle check-ins, and
+  Projects & Routines handles later-month routine generation.
 
 Goal row display:
 
@@ -186,16 +176,16 @@ Goal row display:
 The matrix intentionally avoids a fragile fully editable 31-column widget grid.
 It is a compact monthly history and planning view.
 
-## Quest Planner Impact
+## Planner Impact
 
 Planner is the calendar and planning surface.
 
 Current behavior:
 
-- Calendar planning and the New Quest form remain.
+- Calendar planning uses the **Add to plan** form.
 - Creating a scheduled quest creates a planned check-in for the scheduled date.
 - Selected Day Schedule edits or removes unresolved planned work only.
-- Monthly Review remains a read-only month-level history and planning matrix.
+- Monthly Checklist displays a month-level history.
 - The old Maintenance, Quest Ledger, and Legacy Status Controls UI were removed.
 - Calendar events display check-in status for the event date when available.
 - Selected Day Schedule displays the check-in status for the selected date.
@@ -203,9 +193,9 @@ Current behavior:
 - Safe deletion is available from the selected-day plan for unresolved work.
 - `Quest.status` is not synchronized from check-in status.
 
-## Command Center Impact
+## Summary Impact
 
-Command Center uses check-ins for operational metrics.
+Summary uses check-ins for operational metrics.
 
 Current behavior:
 
@@ -215,8 +205,8 @@ Current behavior:
 - `Failed` counts failed check-ins through today.
 - `Overdue` means unresolved planned check-ins before today.
 - Skipped remains separate from failed.
-- Command Center exposes Complete, Skip, Fail, and Reset for today's and
-  overdue planned check-ins.
+- Summary exposes eligible actions for today's items, overdue planned work,
+  and a selected past date in Review.
 
 ## Habit Analytics Impact
 
@@ -234,7 +224,7 @@ Current behavior:
 - Weekday completion rate uses check-in dates.
 - Planned minutes by category uses parent quest `estimated_minutes`.
 
-Legacy quest-based fallback remains only for databases with no check-ins.
+Legacy fallback in this view applies when no check-ins are visible to the account.
 
 ## Character Profile Impact
 
@@ -249,29 +239,18 @@ Current behavior:
 - RPG stat levels and radar chart are derived from stat XP.
 - Resetting a completed check-in to planned removes its XP contribution because `xp_awarded` becomes `0`.
 
-Legacy quest-based fallback remains only for databases with no check-ins.
+Legacy fallback in this view applies when no check-ins are visible to the account.
 
-## Implementation Phases
-
-Current phase status:
+## Historical Implementation Phases
 
 1. Data model - implemented.
 2. Checklist service - implemented.
 3. Quest creation integration - implemented.
-4. Quest Planner UI - implemented.
-5. Command Center metrics - implemented.
+4. Planner UI - implemented.
+5. Summary metrics - implemented.
 6. Habit Analytics metrics - implemented.
 7. Character Profile XP/stat calculations - implemented.
 8. Docs cleanup - current documentation refresh.
-
-Future phases:
-
-1. Optional auto-fail activation workflow.
-2. Production persistence and migration strategy.
-3. Authentication and user-specific data.
-4. External calendar sync.
-5. AI and voice planning extensions.
-6. Legacy `Quest.status` cleanup.
 
 ## Test Plan
 
@@ -287,8 +266,8 @@ Covered by current tests:
 - Stale planned failure helper.
 - Scheduled quest creation creates planned check-ins.
 - Monthly checklist data builder.
-- Command Center metrics from check-ins.
-- Quest Planner calendar/day status helpers.
+- Summary metrics from check-ins.
+- Planner calendar/day status helpers.
 - Monthly Checklist unscheduled-date blocking in the service layer.
 - Character Profile XP/stat calculations from check-ins.
 - Habit Analytics metrics from check-ins.
@@ -300,15 +279,12 @@ Manual verification focus:
 
 - Create scheduled quest.
 - Confirm planned check-in appears in Monthly Checklist.
-- Confirm unscheduled dates cannot create check-ins through the service.
-- Mark Complete, Skip, Fail, and Reset in Command Center.
-- Confirm matrix, calendar, selected day schedule, Command Center, Habit Analytics, and Character Profile reflect the expected check-in data.
+- Confirm the daily views cannot submit check-ins for blank, unscheduled
+  dates, and service calls carrying displayed status reject such dates.
+- Mark Complete, Skip, Fail, and Reset in Summary.
+- Confirm matrix, calendar, selected day schedule, Summary, Habit Analytics, and Character Profile reflect the expected check-in data.
 
-## Non-Goals For V1
+## Scope decision
 
-- No PostgreSQL migration.
-- No authentication.
-- No Google Calendar sync.
-- No AI planning assistant.
-- No voice input.
-- No fragile 31-column editable widget grid.
+The matrix stays compact by presenting history. Editing and check-in actions
+live in the daily views.

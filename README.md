@@ -32,23 +32,25 @@ operational metrics, trend analysis, and character growth.
 - [Installation](#installation)
 - [Running The App](#running-the-app)
 - [Google Sign-In](#google-sign-in)
+- [PostgreSQL](#postgresql)
 - [Tests](#tests)
 - [Design Principles](#design-principles)
-- [Limitations & Future Work](#limitations--future-work)
+- [Current Limitations](#current-limitations)
+- [Development Roadmap](docs/roadmap.md)
 
 ## Project Goal
 
 Habit apps often track whether tasks were done, but they do not always connect
 planning, completion, XP, progression, and analytics in one workflow.
 
-Habit Quest Analytics explores that loop as a portfolio MVP. It lets a user
+Habit Quest Analytics brings that loop into one planner and analytics app. It lets a user
 schedule daily quests, mark each quest day as planned, completed, skipped, or
 failed, earn XP from completed check-ins, grow RPG-style stats, and review
 behavior through dashboards and charts.
 
 ## My Role
 
-I designed and implemented the current MVP, including:
+I designed and implemented the application, including the following work.
 
 - SQLAlchemy persistence with PostgreSQL and an importer for SQLite backups.
 - Streamlit app shell, custom navigation, and dark RPG dashboard UI.
@@ -56,6 +58,7 @@ I designed and implemented the current MVP, including:
 - Monthly Checklist tracking system backed by daily `QuestCheckin` records.
 - Checklist status service with idempotent XP rules.
 - Summary, Habit Analytics, and Character Profile data services.
+- Google sign-in, per-account data ownership, and a resettable guest demo.
 - Long-term goal/project planning services, including bulk goal session preview
   and generation.
 - RPG XP, level, and stat progression logic.
@@ -73,12 +76,17 @@ duration of that session. Click **Reset demo** in the sidebar to restore the
 sample data and continue exploring. Demo mode is also available when running locally.
 
 The account-enabled Streamlit Community Cloud deployment uses PostgreSQL on
-Supabase. See [Google Sign-In](#google-sign-in) for configuration.
-Uploaded avatars use local storage and may reset when the Streamlit instance changes.
+Supabase. See the [Google sign-in setup](#google-sign-in) and
+[PostgreSQL setup](#postgresql) for configuration.
+Uploaded account avatars use local storage and may reset when the Streamlit
+instance changes.
 
 ## Project Status
 
-The MVP is functional and deployed.
+The planner, account workspaces, guest demo, and analytics are implemented.
+The documented deployment uses Streamlit Community Cloud and Supabase
+PostgreSQL. See the [repository baseline](docs/project_overview.md) for audit
+evidence and verification limits.
 
 In the interface, everyday work is called a **task**, repeated work a
 **routine**, and a larger outcome a **project**. RPG terminology remains part of
@@ -89,17 +97,18 @@ Implemented:
 - Planner as the default workspace for scheduling and daily check-ins.
 - Custom Streamlit navigation/sidebar with explicit page labels.
 - Full-screen loading indicator when opening the workspace or switching pages.
-- Interactive monthly calendar with the selected day's plan and inline editing.
+- Interactive monthly calendar and selected-day agenda with check-in actions
+  and editing for unresolved items.
 - Built-in categories for tasks, routines, and projects.
-- Monthly Checklist UI for daily quest/checkin tracking.
+- Read-only Monthly Checklist grouped by routine or project where applicable.
 - Recurring Habit templates with automatic generation for the creation month and
   explicit future-month generation from Projects & Routines.
 - Recurring habit template editing, a unified stop/resume lifecycle, unused-template
   deletion, single generated-day deletion, and safe future planned-day cleanup.
 - `QuestCheckin` model for per-day completion status.
 - Checklist service for `Planned`, `Completed`, `Skipped`, `Failed`, reset
-  behavior, XP idempotency, unscheduled-date blocking, and a stale planned
-  failure helper.
+  behavior and XP idempotency. Planner and Summary validate status actions
+  against the displayed check-in. A stale planned failure helper exists.
 - Scheduled quest creation that creates a planned check-in for the scheduled
   date.
 - Safe deletion for unresolved one-time planned quests.
@@ -109,12 +118,13 @@ Implemented:
 - Goal/project planned total time can be left unset when the total effort is not
   known yet.
 - The unified Add to plan form can link a one-time work session to an existing
-  project, with automatic per-goal session numbering and generated session
-  titles.
+  active project, with automatic per-goal session numbering and generated
+  session titles.
 - The project workspace combines creation, editing, progress, lifecycle
-  actions, project comparison, and a Goal Session Planner that previews and
-  bulk creates multiple scheduled one-time sessions from remaining unscheduled
-  goal effort.
+  actions, and a Goal Session Planner that previews and bulk creates scheduled
+  one-time sessions from remaining unscheduled effort. The Portfolio tab
+  compares project progress, and the Projects tab includes a rule-based
+  completion forecast.
 - Goal lifecycle controls in Projects & Routines include archiving, completing,
   reopening, and deleting projects. When a project is deleted, its sessions
   become one-time tasks in Planner and keep their check-ins and earned XP.
@@ -124,33 +134,29 @@ Implemented:
 - Nonlinear character leveling and RPG stat leveling.
 - Summary with daily metrics and a review of overdue work and past check-ins.
 - Character Profile XP, level, and RPG stats powered by check-in XP.
-- Habit Analytics date filters, plan-versus-completion trends, category and
-  routine performance, and insight data powered by check-ins.
+- Habit Analytics with date, category, and work-type filters, period-over-period
+  comparisons, planned versus completed planned effort, category and routine
+  performance, and current and best routine streaks.
 - PostgreSQL persistence with Alembic migrations and a SQLite importer.
 - Google sign-in and per-account data, including categories, check-ins, and XP.
+- Per-session in-memory SQLite guest demo, with sample data and a reset action.
+- Light and Dark themes and shared Streamlit presentation components.
 - Legacy `Quest.status` compatibility/fallback while the migration remains
   stable.
 
-Still evolving:
-
-- External calendar sync.
-- AI and voice planning assistants.
-- Bonus XP for streaks.
-- Optional automatic stale planned failure workflow.
-- Eventual cleanup of legacy `Quest.status` once the check-in migration is fully
-  stable.
+Planned work and release criteria are tracked in the [development roadmap](docs/roadmap.md).
 
 ## Preview
 
-No screenshot files are currently committed. Use the live demo above to review
-the current UI.
+Use the [live demo](#live-demo) to explore the interface. Screenshot capture is
+tracked in the [roadmap](docs/roadmap.md).
 
 ## Tech Stack
 
 - Python
 - Streamlit
-- PostgreSQL
-- SQLAlchemy
+- PostgreSQL on Supabase
+- SQLAlchemy, Alembic, and Psycopg
 - Pandas
 - Plotly
 - pytest
@@ -189,8 +195,8 @@ The app is designed to answer questions such as:
 - Calendar-based scheduled quest creation.
 - One `Add to plan` form for one-time tasks, repeating routines, and sessions
   linked to an existing goal/project.
-- One-time tasks default to the selected day; schedule timing, project linking,
-  and notes are available only when needed.
+- The creation form defaults to the selected day and provides a start and end
+  time. One-time tasks can link to an existing active project. Notes are optional.
 - XP reward calculation from planned time.
 - Estimated duration calculation from the scheduled time window.
 - Select a calendar date to see its tasks, routines, and project sessions.
@@ -246,18 +252,15 @@ The app is designed to answer questions such as:
 
 ### Habit Analytics
 
-- Weekly XP from check-in XP.
-- Completed and failed quest days for the current week.
-- Weekly completion rate using completed / (completed + failed).
-- XP trend by check-in date.
-- Check-ins by status and category.
-- Completion rate by weekday.
-- Planned minutes by category.
-- Date-range period review with prior-period comparison, active-day consistency,
-  workload execution, weekday patterns, category performance, and one clear focus item.
-- Current and best streaks for routines, calculated from their scheduled history through today.
-- Project completion forecasts based on completed planned effort and target dates.
-- Insight summaries based on completed and failed check-ins.
+- Date, category, and work-type filters with 7-, 30-, and 90-day presets and a
+  custom range.
+- Completion rate and completed check-in count compared with the preceding
+  period of the same length, plus active-day consistency and a review focus.
+- Weekly scheduled and completed planned minutes, with completion rate by weekday.
+- Category and routine performance, including current and best routine streaks
+  from scheduled history through today.
+- Completion forecasts appear in Projects & Routines. See the
+  [metrics reference](docs/metrics.md) for calculations and units.
 
 ### Character Profile
 
@@ -275,6 +278,8 @@ The app is designed to answer questions such as:
 - Tabs for related views and dialogs for editing, generation, and confirmations.
 - Tile-like sidebar navigation styling.
 - Card-based sections and compact helper text.
+- Dedicated sign-in screen and a themed loading screen on initial page load and
+  route changes.
 
 ### Testing
 
@@ -288,8 +293,9 @@ The app is designed to answer questions such as:
 - `Planner` - start page with Calendar and Monthly checklist tabs. Use the
   selected-day list to edit tasks and record check-ins.
 - `Summary` - Today and Review tabs for daily work, overdue check-ins, and past dates.
-- `Projects & Routines` - Projects, Routines, and Portfolio tabs, with dialogs for
-  editing, lifecycle actions, and generating scheduled work.
+- `Projects & Routines` - Projects for creation, editing, lifecycle, session
+  planning, and forecasting. Routines for template management and generation.
+  Portfolio compares active and completed projects when at least two qualify.
 - `Habit Analytics` - Overview, Categories, and Routines tabs with shared filters.
 - `Character Profile` - avatar, XP, level, RPG stats, and radar chart. Use Change
   avatar to upload or remove the profile image.
@@ -319,8 +325,8 @@ The app is designed to answer questions such as:
 - Metrics are covered by pytest before the UI consumes them.
 - Auto-fail service logic exists with `grace_days = 3`, but it is not
   automatically enabled from app startup or page load.
-- The app remains local-first until production persistence is explicitly
-  designed.
+- Signed-in work uses PostgreSQL and an account-scoped SQLAlchemy session.
+  Guest work uses a separate in-memory SQLite database for each session.
 
 ## Data Flow
 
@@ -352,162 +358,28 @@ habit-quest-analytics/
   app/
     main.py                  # Streamlit entrypoint and explicit navigation
     pages/                   # Planner, Summary, Projects & Routines, Analytics, Profile
+    components/              # Planning forms, checklist, sign-in, and loading UI
   src/
+    auth.py                  # Google identity and guest session management
     analysis/                # Pure metric helpers
-    database/                # SQLAlchemy models, database setup, SQLite import, seed data
+    database/                # Models, scoped sessions, SQLite import, and seed data
     services/                # Quest, checklist, analytics, profile, and XP business logic
     constants.py             # Statuses, categories, RPG stat mapping
     ui.py                    # Shared Streamlit UI/style helpers
-  docs/                      # Project, model, metrics, and design documentation
+  migrations/                # Alembic PostgreSQL schema revisions
+  docs/                      # Baseline, data model, metrics, and roadmap
   tests/                     # Pytest coverage
   data/                      # Local uploads and optional SQLite backups
 ```
 
 ## Data Model
 
-Core entities:
-
-- `Category` - groups quests into areas such as Health, Work, Learning, Home,
-  and Social.
-- `Quest` - scheduled task or habit plan with XP reward, due date, optional
-  time window, optional goal link, stable goal session number, and legacy status.
-- `Goal` - long-term project container with planned effort, lifecycle status,
-  target dates, and linked one-time quest sessions.
-- `QuestCheckin` - daily status record for one quest on one date.
-- `RecurringHabit` - reusable selected-weekday habit template.
-- `RecurringHabitInstance` - link from one generated habit date to one generated
-  quest.
-- `PlayerProfile` - local character profile name, avatar path, and legacy total
-  XP field.
-- `Achievement` - planned milestone definition.
-- `UnlockedAchievement` - join table connecting profiles to unlocked
-  achievements.
-
-Important relationship:
-
-- One `Quest` can have many `QuestCheckin` records.
-- One `Goal` can have many one-time `Quest` sessions.
-- Goal-linked quests use `Quest.goal_id` and `Quest.goal_session_number`.
-- A `QuestCheckin` tracks the status for a specific `quest_id` and
-  `checkin_date`.
-- `QuestCheckin.xp_awarded` is used for XP, progression, RPG stats, and
-  analytics when check-ins exist.
-- One `RecurringHabit` can have many generated `RecurringHabitInstance` rows.
-- One `RecurringHabitInstance` points to one generated `Quest`.
-
-```mermaid
-erDiagram
-    categories ||--o{ quests : groups
-    categories ||--o{ recurring_habits : groups
-    categories ||--o{ goals : groups
-    goals ||--o{ quests : links
-    quests ||--o{ quest_checkins : has
-    recurring_habits ||--o{ recurring_habit_instances : generates
-    quests ||--o| recurring_habit_instances : generated_as
-    player_profiles ||--o{ unlocked_achievements : earns
-    achievements ||--o{ unlocked_achievements : unlocks
-
-    categories {
-        int id PK
-        string name
-        text description
-    }
-
-    quests {
-        int id PK
-        string title
-        text description
-        string status
-        boolean is_habit
-        int xp_reward
-        date due_date
-        datetime planned_start_at
-        datetime planned_end_at
-        int estimated_minutes
-        datetime completed_at
-        datetime created_at
-        int category_id FK
-        int goal_id FK
-        int goal_session_number
-    }
-
-    goals {
-        int id PK
-        string title
-        text description
-        int planned_total_minutes
-        date start_date
-        date target_end_date
-        string status
-        datetime created_at
-        datetime updated_at
-        int category_id FK
-    }
-
-    quest_checkins {
-        int id PK
-        int quest_id FK
-        date checkin_date
-        string status
-        int xp_awarded
-        datetime completed_at
-        datetime skipped_at
-        datetime failed_at
-        datetime created_at
-        datetime updated_at
-    }
-
-    recurring_habits {
-        int id PK
-        string title
-        text description
-        int xp_reward
-        int estimated_minutes
-        string recurrence_type
-        text weekdays
-        date start_date
-        date end_date
-        time planned_start_time
-        time planned_end_time
-        boolean is_active
-        datetime created_at
-        datetime updated_at
-        int category_id FK
-    }
-
-    recurring_habit_instances {
-        int id PK
-        int recurring_habit_id FK
-        date scheduled_date
-        int quest_id FK
-        datetime created_at
-    }
-
-    player_profiles {
-        int id PK
-        string character_name
-        int total_xp
-        string avatar_path
-        datetime created_at
-        datetime updated_at
-    }
-
-    achievements {
-        int id PK
-        string name
-        text description
-        int xp_required
-    }
-
-    unlocked_achievements {
-        int id PK
-        int player_profile_id FK
-        int achievement_id FK
-        datetime unlocked_at
-    }
-```
-
-See [docs/data_model.md](docs/data_model.md) for deeper model notes.
+The [data model and ERD](docs/data_model.md) show the `UserAccount` ownership
+relationships, the planning tables, and `QuestCheckin` as the daily status and
+XP record. An account owns its categories, tasks, projects, routine templates
+and instances, check-ins, profile, and achievement unlock records. Achievement
+definitions are shared. Achievement unlock processing is tracked in the
+[development roadmap](docs/roadmap.md).
 
 ## Requirements
 
@@ -566,9 +438,9 @@ testing while any single-user deployment is still running. During rollout,
 stop the single-user app on every instance that shares the database, apply the
 latest PostgreSQL migration, then start the account-enabled versions.
 
-Use a server-side database role for the connection. The migration enables
-row-level security on app tables so direct queries from public API roles are
-denied. The app scopes its server-side sessions to the signed-in account.
+Use a server-side database role for the connection. The account migration
+adds same-owner foreign keys and enables row-level security on app tables.
+Public API roles without a policy or bypass cannot directly access those rows. The app scopes its server-side sessions to the signed-in account.
 
 New accounts receive their own default categories and profile. For an existing
 database or an imported SQLite backup, sign in once as the intended owner. Before
@@ -619,8 +491,9 @@ python -m pytest
 python -m compileall -q app src tests migrations
 ```
 
-Set `TEST_POSTGRESQL_URL` to run the PostgreSQL integration tests. They create
-and remove an isolated schema in that database.
+Set `TEST_POSTGRESQL_URL` to a disposable PostgreSQL database to run the
+integration tests. The fixture creates and removes an isolated schema. Pytest
+reports these cases as skipped when that environment variable is unset.
 
 On Windows, if local pycache permissions cause compile issues, run with a
 temporary pycache prefix:
@@ -641,31 +514,18 @@ python -m compileall -q app src tests
   records.
 - The app reads and writes PostgreSQL. SQLite is used for imports and tests.
 
-## Limitations & Future Work
+## Current Limitations
 
-Current limitations:
+- Workload and project forecasts use planned duration. The app does not record
+  measured actual duration.
+- Uploaded account avatars use local server storage. Guest changes last for
+  the current session.
+- Routine streaks are reporting metrics. Achievement tables support definitions
+  and unlock records.
+- The stale planned failure helper is available in the service layer and has
+  no automatic trigger. `Quest.status` remains for legacy compatibility.
+- The test suite includes opt-in PostgreSQL integration tests. GitHub Actions
+  and hosted end-to-end verification are release work.
 
-- Recurring Habits supports selected weekdays, template editing, and explicit
-  month generation.
-- Projects & Routines provides a selected-project workspace. A broader portfolio
-  dashboard with deeper drilldowns remains future work; the design is documented
-  in [docs/long_term_goals_design.md](docs/long_term_goals_design.md).
-- Database records can persist in PostgreSQL. Uploaded avatar files use local
-  storage.
-- Google Calendar sync is not implemented.
-- AI planning assistant and voice quest capture are not implemented.
-- Streaks currently provide analytics. Bonus XP for streaks is planned.
-- Achievement unlock rules are not implemented.
-- Auto-fail exists as service logic but is not automatically enabled.
-- `Quest.status` still exists for compatibility/fallback and should be cleaned
-  up only after the check-in migration is stable.
-
-Suggested future order:
-
-1. Google Calendar sync
-2. AI planning assistant
-3. Voice quest capture / microphone input
-4. Bonus XP for streaks
-5. Achievement system
-6. Optional auto-fail activation workflow
-7. Legacy `Quest.status` cleanup
+See the [development roadmap](docs/roadmap.md) for planned features, release
+criteria, and deferred ideas.

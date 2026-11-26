@@ -1,10 +1,15 @@
 # MVP Specification
 
-The MVP proves the core loop: plan quests, track daily completion, earn XP, level up, and review productivity patterns.
+The original MVP established the loop for planning quests, tracking daily
+completion, earning XP, leveling up, and reviewing productivity patterns.
+This specification preserves the original scope and the decisions it produced.
+See the [repository baseline](project_overview.md) for current behavior and the
+[development roadmap](roadmap.md) for planned work.
 
 ## MVP Scope
 
-The current usable version includes:
+The core loop included the following capabilities by the end of its initial
+implementation.
 
 - calendar-based scheduled quest creation,
 - daily quest completion through Planner check-ins,
@@ -15,7 +20,6 @@ The current usable version includes:
 - player profile with XP, nonlinear level, avatar, and RPG stat levels,
 - Summary actions and KPIs,
 - Habit Analytics trends and consistency metrics,
-- PostgreSQL persistence and import of SQLite backups,
 - pytest coverage for business rules.
 
 ## User Stories
@@ -28,7 +32,7 @@ The current usable version includes:
 - As a user, I want to see my level and RPG stats grow from completed activity.
 - As a user, I want analytics that show trends, categories, consistency, and planned workload.
 
-## App Sections
+## Current App Sections
 
 - `Planner` - default workspace with a clickable calendar, unified planning form,
   inline editing, daily check-in actions, and a read-only Monthly checklist.
@@ -36,8 +40,8 @@ The current usable version includes:
 - `Projects & Routines` - project creation, editing, lifecycle, comparison,
   bulk project-session planning, routine templates, and future-month routine
   generation.
-- `Habit Analytics` - weekly pulse, XP trend, check-in breakdowns, consistency,
-  planned minutes, and insights.
+- `Habit Analytics` - period comparisons, consistency, workload execution,
+  and category and routine performance.
 - `Character Profile` - avatar, XP, level, RPG stats, and radar chart.
 
 ## User-Facing Language
@@ -52,16 +56,15 @@ The planner uses simple terms in its interface:
 or part of the RPG presentation. They should not be needed to complete daily
 planning work.
 
-## Implementation Phases
+## Historical Implementation Phases
 
 ### Phase 1: Scaffold
 
-Status: implemented.
+Implemented in the initial scaffold or subsequent setup work.
 
 - Create project structure.
 - Add Streamlit pages.
 - Add SQLAlchemy models.
-- Add database migrations and SQLite import.
 - Add default category seeding.
 - Add XP and level formulas.
 - Add initial tests.
@@ -70,7 +73,7 @@ Status: implemented.
 
 Status: implemented for scheduled one-time quests and recurring habit templates.
 
-- Create scheduled quests from Quest Planner using the selected day as the
+- Create scheduled quests from Planner using the selected day as the
   default schedule.
 - Store title, notes, category, planned date, planned start/end times, estimated minutes, and XP reward.
 - Validate that end time is after start time.
@@ -89,10 +92,8 @@ Status: implemented for scheduled one-time quests and recurring habit templates.
 - Remove future unresolved planned generated days while preserving completed,
   skipped, failed, and XP-awarded history.
 
-Still planned:
-
-- one-time quest archive/soft-delete workflow for historical records,
-- broader historical quest editing beyond unresolved planned records.
+The design limited editing and deletion to unresolved work. The roadmap's
+[deferred backlog](roadmap.md#deferred-backlog) covers historical edits and soft hide.
 
 ### Phase 3: Monthly Checklist
 
@@ -100,15 +101,14 @@ Status: implemented v1.
 
 - Add `QuestCheckin` model with unique `quest_id + checkin_date`.
 - Create planned check-ins for scheduled quests.
-- Build monthly checklist data with rows as quests and columns as days.
+- Build monthly checklist data with rows for tasks, routines, and projects, and
+  columns for days.
 - Render a compact read-only matrix preview in Planner.
 - Provide status transitions for today's and past check-ins in Planner and Summary.
 - Keep XP idempotent with `QuestCheckin.xp_awarded`.
 
-Not implemented:
-
-- fully editable 31-column widget grid,
-- automatic app-level stale planned failure.
+The monthly grid is read-only. Planner and Summary provide date-specific
+status actions. The stale planned failure helper has no automatic trigger.
 
 ### Phase 4: Summary
 
@@ -135,7 +135,7 @@ Status: implemented with check-ins when available.
 - Planned minutes by category.
 - Insight summaries from check-in data.
 
-Legacy quest-based fallback remains only for databases with no check-ins.
+Legacy fallback in this view applies when no check-ins are visible to the account.
 
 ### Phase 6: Character Profile
 
@@ -148,28 +148,24 @@ Status: implemented with check-ins when available.
 - RPG stat levels and radar chart from stat levels.
 - Local avatar upload path stored on the player profile.
 
-Legacy quest-based fallback remains only for databases with no check-ins.
+Legacy fallback in this view applies when no check-ins are visible to the account.
 
-## Future Features Outside MVP
+## Changes Beyond The Original MVP
 
-- Authentication and user-specific data isolation.
-- Google Calendar sync.
-- AI planning assistant.
-- Voice quest capture.
-- Streak system / bonus XP.
-- Achievement unlock rules.
-- Date filters and richer analytics comparisons.
-- Data export/import.
+Subsequent work added PostgreSQL persistence and Alembic migrations, a SQLite
+backup importer, Google authentication and account ownership, a resettable
+guest demo, and project planning and forecasting. Date filters, period
+comparison, and routine streaks also now ship. See the
+[repository baseline](project_overview.md) for evidence.
 
 ## MVP Success Criteria
 
-- A user can schedule quests locally.
+- A user can schedule work in Planner.
 - Scheduled quests create planned check-ins.
-- A user can resolve daily check-ins as completed, skipped, failed, or planned.
-- A user cannot resolve a quest on an unscheduled Monthly Checklist date.
+- Users can complete, skip, fail, or reset eligible check-ins in Planner and
+  Summary. The Monthly Checklist provides a read-only record.
 - A user can safely remove unresolved planned records without deleting
   completed, skipped, failed, or XP-awarded history.
 - Completed check-ins award XP once.
 - Summary, Habit Analytics, and Character Profile use check-ins when available.
-- Quest records and check-ins persist in PostgreSQL.
 - Core formulas and service behavior remain covered by tests.
