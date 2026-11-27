@@ -106,24 +106,31 @@ test accounts for cross-account checks.
   implementation. Recheck them against the release candidate.
 - [x] Update the ERD with `UserAccount` and ownership relationships.
 - [ ] Capture current app screenshots with synthetic or guest data.
-- [ ] Phase 6B. Verify hosted PostgreSQL connections with `sslmode=verify-full`.
-  Manual checks confirmed Supabase Free, the Session Pooler on port `5432`,
-  and SSL Enforcement enabled. The Streamlit Cloud reboot, Google sign-in,
-  and Guest Demo smoke tests passed with the current `sslmode=require`
-  configuration. The public CA and relative path are prepared locally.
-  Certificate deployment, the hosted Secrets update, and authenticated
-  verification after reboot are pending. [TLS deployment steps](database_operations.md#streamlit-community-cloud-tls)
+- [x] Phase 6B. Verify hosted PostgreSQL connections with `sslmode=verify-full`.
+  The operator confirmed Supabase Free on PostgreSQL 17.12, the Session
+  Pooler on port `5432`, SSL Enforcement, and the deployed public CA.
+  Google sign-in, database reads and writes, and Guest Demo passed manual
+  checks. The Data API is disabled. [Hosted TLS and database access](database_operations.md#streamlit-community-cloud-tls)
+- [x] Phase 6B. Verify the production backup and isolated restore. The original
+  archive matched its SHA-256 and restored on PostgreSQL 18.7 with exit code 0.
+  The earlier 18.3 attempt rolled back atomically on `pg_attver`. Read-only
+  revalidation after restart confirmed all 11 tables at Alembic head `0002`
+  with no schema drift, matching rows and identity sequences, validated
+  constraints, and no orphaned or cross-owner references. The effective
+  PostgreSQL RLS and application account-scoping checks passed separately.
+  [Backup and recovery guide](database_operations.md#back-up-and-verify-a-restore)
+- [ ] Review and reduce excessive API-role grants. Separate the privileged
+  `postgres` runtime connection from maintenance privileges and verify RLS
+  and the intended grants before release.
 - [ ] Verify the deployed app, Google sign-in, and guest demo end to end.
-  During Phase 6 hosted verification, confirm runtime and maintenance role
-  privileges, RLS exposure, and available connection limits under
-  representative sessions. Confirm the project's backup retention and PITR
-  availability or its approved logical backup procedure, with a restore
-  rehearsal in an isolated target.
+  The Phase 6B smoke tests established basic connectivity. Final QA remains
+  open for the full hosted workflows.
 - [ ] During Phase 6, verify hosted process memory and concurrent-session
   behavior with authorized synthetic accounts and guest sessions. Record the
   available process RSS or platform memory metric, response behavior, and
   connection usage during representative analytics and portfolio operations.
   Check for session failures and confirm account and guest isolation.
+- [ ] Verify CI in an actual pull-request run before release.
 - [ ] Prepare release `v1.0.0` with setup instructions, release notes, and
   known limitations.
 

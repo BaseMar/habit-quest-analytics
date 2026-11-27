@@ -57,11 +57,12 @@ and grants separately. See the [data model](data_model.md) for ownership rules.
 
 ### Streamlit Community Cloud TLS
 
-The production Supabase Free project uses the Session Pooler on port `5432`
-with SSL Enforcement enabled. The manual post-reboot Guest Demo and Google
-sign-in checks used `sslmode=require`. The intended configuration verifies
-the server certificate chain and the Session Pooler hostname using the
-[public Supabase CA](../certs/prod-ca-2021.crt).
+The production Supabase Free project runs PostgreSQL 17.12 and uses the
+Session Pooler on port `5432` with SSL Enforcement enabled. The deployed
+configuration verifies the certificate chain and Session Pooler hostname
+using the [public Supabase CA](../certs/prod-ca-2021.crt). The operator
+confirmed Google sign-in, database-backed reads and writes, and Guest Demo
+after deployment.
 
 ```text
 sslmode=verify-full&sslrootcert=certs/prod-ca-2021.crt
@@ -93,42 +94,142 @@ Deploy the replacement and repeat the authenticated smoke test with
 `verify-full` enabled. If the path changes, update `sslrootcert` in Secrets
 with the deployment. [Supabase SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement)
 
+### Hosted database access
+
+The Data API is disabled, and the application connects directly through
+the Session Pooler as `postgres`. All ten application tables have RLS
+enabled without policies or FORCE RLS. The privileged runtime role relies
+on `UserSession` for account scoping and on database ownership constraints
+for relationship integrity. Existing API-role grants and separation of
+runtime and maintenance roles remain release follow-ups. Disabling the
+Data API leaves the grants in place.
+
 ## Back up and verify a restore
 
-For a standalone PostgreSQL rehearsal, point the PostgreSQL client environment
-(`PGHOST`, `PGPORT`, `PGUSER`, TLS settings, and credentials from a safe source)
-to a disposable server. Create `habit_quest_restore` as a fresh, empty database.
-Use a `pg_dump` client that supports the source server's major version and
-rehearse on the intended restore version. Run the commands with synthetic data.
+### Production logical backup
 
-```bash
-pg_dump --format=custom --no-owner --no-privileges \
-  --file=habit_quest.dump --dbname=habit_quest_source
-pg_restore --exit-on-error --single-transaction --no-owner --no-privileges \
-  --dbname=habit_quest_restore habit_quest.dump
+From the repository root, use the Session Pooler endpoint from the official
+dashboard and an approved backup role that can read all selected rows and
+sequences. Set the placeholders below with the approved host, role, database,
+and destination. Use an interactive password prompt. The table selection
+covers the ten application tables and `alembic_version` and leaves provider
+schemas outside the archive. Refresh the allowlist when migrations add tables.
+
+```powershell
+$poolerHost = '<session-pooler-host>'
+$backupRole = '<approved-backup-role>'
+$database = '<database-name>'
+$archive = '<protected-backup-location>'
+$tables = @(
+    'public.achievements', 'public.alembic_version', 'public.categories',
+    'public.goals', 'public.player_profiles', 'public.quest_checkins',
+    'public.quests', 'public.recurring_habit_instances', 'public.recurring_habits',
+    'public.unlocked_achievements', 'public.user_accounts'
+)
+$tableArgs = @($tables | ForEach-Object { "--table=$_" })
+$env:PGSSLMODE = 'verify-full'
+$env:PGSSLROOTCERT = (Resolve-Path -LiteralPath 'certs/prod-ca-2021.crt').Path
+pg_dump --host=$poolerHost --port=5432 --username=$backupRole --dbname=$database `
+    --password --format=custom --no-privileges --quote-all-identifiers --strict-names `
+    @tableArgs --file=$archive
+if ($LASTEXITCODE -ne 0) { throw 'Logical backup failed.' }
+Get-FileHash -LiteralPath $archive -Algorithm SHA256
 ```
 
-The archive includes schema, rows, sequence state, and `alembic_version`. Restore
-into an empty database before running Alembic. The restore assigns object
-ownership to the restore role and skips source grants. Review target role
-memberships, object ownership, RLS, and grants before exposure. Store authorized
-backup files encrypted with restricted access. Back up `data/uploads/` separately
-if the deployment relies on local avatar files. [PostgreSQL `pg_dump`](https://www.postgresql.org/docs/18/app-pgdump.html) · [PostgreSQL `pg_restore`](https://www.postgresql.org/docs/18/app-pgrestore.html)
+Record the SHA-256, size, timestamp, versions, and table inventory in a
+restricted backup manifest. Verify the hash after copying and immediately
+before restoration. Encrypt the archive and any restored data at rest, restrict
+access to authorized operators, and keep an encrypted off-site copy. Keep
+archives, plaintext exports, connection secrets, and raw diagnostics outside
+Git. [PostgreSQL `pg_dump`](https://www.postgresql.org/docs/18/app-pgdump.html)
 
-Point `DATABASE_URL` to the disposable restore. Check `alembic current` against
-the source revision and run `alembic check` from the matching checkout. Compare
-row counts, sample IDs and foreign keys, assigned and unassigned ownership,
-check-in statuses and XP, and profile data. Verify that a new insert gets an ID
-above restored IDs, and that RLS and account isolation work with the intended
-roles. Verify any separate avatar restore. Upgrade a restored copy first when
-rehearsing a migration.
+Supabase Free has no managed daily backups or point-in-time recovery. For
+this project, take a logical backup daily while production data is changing
+and immediately before migrations or bulk changes. Start with seven daily
+and four weekly copies, and adjust the schedule to the agreed recovery point
+and retention requirements. Rehearse restoration periodically and after
+changing the backup tool, database version, or table selection. [Supabase Free backups](https://supabase.com/kb/faqs/platform/free-plan-backups)
 
-For Supabase, determine which daily backups, retention, restore targets, and
-optional point-in-time recovery the actual project has. If managed recovery is
-unavailable, establish an authorized logical backup procedure for the project.
-Follow the provider's instructions for managed schemas and roles. A database
-restore can require downtime and does not restore avatar files, secrets, or
-Storage API object contents. [Supabase database backups](https://supabase.com/docs/guides/platform/backups) · [Supabase CLI backup and restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
+### Restore to an isolated server
+
+Use a supported PostgreSQL release and current minor patches for both client
+and server. The `pg_dump` major version must support the source. For a new
+export from PostgreSQL 17.12, use a patched 17.12 or 18.7 client and rehearse
+with a patched 18.7 destination. Use the current minor release for the
+chosen supported major version as new fixes are released.
+[PostgreSQL versioning policy](https://www.postgresql.org/support/versioning/) · [PostgreSQL `pg_dump`](https://www.postgresql.org/docs/18/app-pgdump.html)
+
+Create a fresh `habit_quest_restore` database on a separate loopback-only
+server with a distinct port, a disposable restore role, and SCRAM
+authentication. Verify the binary version and the archive hash from the
+manifest, check the archive inventory with `pg_restore --list`, and confirm
+the destination has no user tables. Set `$restorePort` and `$restoreRole`
+for this isolated instance. Use the matching patched `pg_restore` client.
+
+```powershell
+pg_restore --host=127.0.0.1 --port=$restorePort --username=$restoreRole `
+    --dbname=habit_quest_restore --password --single-transaction --exit-on-error `
+    --no-owner --no-privileges $archive
+if ($LASTEXITCODE -ne 0) { throw 'Restore failed. Verify the target before retrying.' }
+```
+
+Run the restore in a private terminal and keep raw output out of shared logs.
+The destination role owns the restored objects because of `--no-owner`.
+`--no-privileges` skips grants, and this table-scoped archive omits source
+roles, provider configuration, avatar files, and secrets. Back up avatar
+files separately if needed. Review privileges separately before any restored
+database is exposed. [PostgreSQL `pg_restore`](https://www.postgresql.org/docs/18/app-pgrestore.html)
+
+On November 27, 2026, the original custom-format archive from Supabase
+PostgreSQL 17.12, exported by `pg_dump` 18.3, failed to restore on 18.3.
+The older client emitted the newer internal `pg_attver` attribute option.
+The older server rejected it and the single transaction rolled back. A
+catalog check confirmed the failed destination was empty. The original
+archive kept its SHA-256 and restored successfully on PostgreSQL 18.7 with
+exit code 0. [PostgreSQL 17.12 release notes](https://www.postgresql.org/docs/release/17.12/) · [PostgreSQL 18.7 release notes](https://www.postgresql.org/docs/18/release-18-7.html) · [PostgreSQL source change](https://www.postgresql.org/message-id/E1xQQFr-000000003OT-3txh%40gemulon.postgresql.org)
+
+### Verify the restored copy
+
+1. Confirm the exact local server and authenticate in a private terminal.
+   Use a read-only transaction. Verify the 11 expected tables, local owners,
+   validated primary, unique, check, and foreign-key constraints, and valid
+   indexes. Run `alembic heads`, inspect the current revision, and run
+   `alembic check` with an explicit restore-only connection.
+2. Compare aggregate row counts, full-row fingerprints and primary keys,
+   ownership including unassigned legacy rows, check-in statuses and XP, and
+   profile and project, routine, and achievement relationships against the
+   archive or a trusted export manifest. Derive the archive comparison in
+   memory and keep individual rows and identifiers out of reports. Archive
+   agreement verifies the backup snapshot. Live production counts require
+   independent source-side evidence.
+3. Compare each archived sequence state with restored `last_value` and
+   `is_called`. Derive the next ID from that state and the increment, then
+   compare it with the highest existing key. Actual inserts for identity
+   testing belong in a separate authorized copy because a rollback can
+   leave a sequence advanced. [PostgreSQL sequence functions](https://www.postgresql.org/docs/18/functions-sequence.html)
+4. Verify RLS flags and policies as catalog metadata. In the read-only
+   transaction, test the existing PostgreSQL `pg_read_all_data` role with
+   `SET LOCAL ROLE`. Verify that the restore owner can read through its
+   privileges and the non-bypass role is subject to RLS. Check application
+   isolation separately through account-scoped `UserSession` reads. Keep
+   role changes and grant experiments for a separate synthetic environment.
+   [PostgreSQL predefined roles](https://www.postgresql.org/docs/18/predefined-roles.html)
+
+The rehearsal passed these checks after restarting the isolated 18.7
+instance. PostgreSQL reported all 11 tables with the intended restore owner,
+33 valid indexes, and validated constraints. Alembic current and head were
+`0002`, and `alembic check` reported no drift. Row counts, primary keys and
+full-row fingerprints matched the archive for every table. The checks found
+no orphans or same-owner mismatches, and all ten identity sequences matched
+the archive and passed the next-ID calculation. The role with
+`pg_read_all_data` privileges saw no rows in the ten RLS-enabled tables.
+Separate `UserSession` checks matched the expected keys for each restored
+account and returned an empty result for a nonexistent account.
+
+After review, stop the isolated instance with `pg_ctl` against its exact data
+directory. With operator approval, dispose of the restored production data
+according to the encrypted-storage retention policy. Retain the original
+archive according to its backup schedule.
 
 ## Import a single-user SQLite backup
 
