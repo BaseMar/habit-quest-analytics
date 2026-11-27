@@ -31,15 +31,20 @@ from src.services.recurring_habit_service import create_recurring_habit, generat
 
 
 @pytest.mark.parametrize("scheme", ["postgres", "postgresql", "postgresql+psycopg"])
-def test_postgresql_url_selects_psycopg_and_keeps_connection_parameters(monkeypatch, scheme):
-    monkeypatch.setenv("DATABASE_URL", f"{scheme}://user:p%40ss@localhost:5433/habits?sslmode=require")
+@pytest.mark.parametrize("tls_options", [
+    {"sslmode": "require"},
+    {"sslmode": "verify-full", "sslrootcert": "certs/prod-ca-2021.crt"},
+], ids=["require", "verify-full"])
+def test_postgresql_url_selects_psycopg_and_keeps_connection_parameters(monkeypatch, scheme, tls_options):
+    query = "&".join(f"{key}={value}" for key, value in tls_options.items())
+    monkeypatch.setenv("DATABASE_URL", f"{scheme}://user:p%40ss@localhost:5433/habits?{query}")
 
     url = db.get_database_url()
 
     assert url.drivername == "postgresql+psycopg"
     assert url.password == "p@ss"
     assert url.port == 5433
-    assert url.query["sslmode"] == "require"
+    assert dict(url.query) == tls_options
 
 
 def test_import_preserves_history_and_generates_new_ids(postgres, tmp_path):

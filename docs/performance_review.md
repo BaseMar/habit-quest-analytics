@@ -239,8 +239,8 @@ locked recheck lets both readers succeed with one planned check-in and zero XP.
 The PostgreSQL regressions also verified that a concurrent completion keeps its
 XP and timestamps and that a task deleted before the lock follows the existing
 not-found path. The steady-state Checklist regression still passes at two SQL
-statements. The timings above describe Phase 5. Remote verification of the
-Phase 6A fix is pending. [Release roadmap](roadmap.md)
+statements. The timings above describe Phase 5. The Phase 6A fix passed remote
+CI. [Release roadmap](roadmap.md)
 
 ## Architecture findings
 

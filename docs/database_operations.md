@@ -55,6 +55,44 @@ and grants separately. See the [data model](data_model.md) for ownership rules.
   PostgreSQL error details and maintenance CLI output can still contain row
   values. Review and redact diagnostics before sharing them.
 
+### Streamlit Community Cloud TLS
+
+The production Supabase Free project uses the Session Pooler on port `5432`
+with SSL Enforcement enabled. The manual post-reboot Guest Demo and Google
+sign-in checks used `sslmode=require`. The intended configuration verifies
+the server certificate chain and the Session Pooler hostname using the
+[public Supabase CA](../certs/prod-ca-2021.crt).
+
+```text
+sslmode=verify-full&sslrootcert=certs/prod-ca-2021.crt
+```
+
+1. Publish the CA file to the branch deployed by Community Cloud. Community
+   Cloud starts the app from the repository root, so the relative path is
+   correct even when the entry point is in a subdirectory. Use forward slashes
+   and start local commands from the repository root when using this path.
+   [Streamlit Community Cloud file organization](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/file-organization)
+2. In Community Cloud Secrets, have the authorized operator replace the
+   existing `sslmode` and set `sslrootcert` in the top-level `DATABASE_URL`.
+   Keep the exact Session Pooler hostname from Supabase's **Connect** panel,
+   port `5432`, and the other connection fields. Use `?` for the first URL
+   query parameter and `&` between parameters. The app passes both TLS
+   parameters through to Psycopg. [Supabase Session Pooler TLS example](https://supabase.com/docs/guides/database/psql) · [PostgreSQL TLS parameters](https://www.postgresql.org/docs/18/libpq-ssl.html)
+3. Reboot the app to start with fresh database connections. Sign in with an
+   authorized test account and open a database-backed page. Repeat the Guest
+   Demo smoke test separately. The guest demo uses SQLite, so it verifies
+   guest availability. Record the hosted PostgreSQL verification against the
+   deployed revision and keep any diagnostics free of connection secrets.
+
+The bundled root is valid until **2031-04-26 10:56:53 UTC**. Track expiration
+and Supabase CA rotation notices, and replace the certificate before expiry
+or when Supabase announces a replacement. Download the successor from the
+project's **Database Settings** in the official dashboard. Verify its CA
+constraints, validity dates, and SHA-256 fingerprint before publishing.
+Deploy the replacement and repeat the authenticated smoke test with
+`verify-full` enabled. If the path changes, update `sslrootcert` in Secrets
+with the deployment. [Supabase SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement)
+
 ## Back up and verify a restore
 
 For a standalone PostgreSQL rehearsal, point the PostgreSQL client environment

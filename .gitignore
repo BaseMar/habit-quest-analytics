@@ -15,6 +15,10 @@ env/
 .env
 .env.*
 
+# TLS assets
+/certs/*
+!/certs/prod-ca-2021.crt
+
 # Streamlit
 .streamlit/secrets.toml
 streamlit.*.log

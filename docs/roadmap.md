@@ -92,9 +92,10 @@ test accounts for cross-account checks.
   rechecks before inserting. Both readers now succeed and leave one planned
   check-in with zero XP, preserving existing statuses, timestamps, and XP.
   The full suite passed 400 tests with disposable PostgreSQL and 377 with
-  23 skips without it. The integration selection passed 31 tests and the
-  guard verified all 23 required PostgreSQL cases. Remote verification of the
-  fix is pending. Phase 6 hosted verification and final QA remain open.
+  23 skips without it. The integration selection passed 31 tests locally.
+  Phase 6A remote CI passed at `4682615` with 400 full-suite tests, zero
+  failures or skips, and all 23 required PostgreSQL cases.
+  [GitHub Actions run 45968632494](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45968632494)
 - [ ] Run end-to-end functional checks across planning, routine lifecycle,
   project sessions, check-ins, analytics, progression, and account switching.
   Review status labels, form errors, empty states, and chart readability in
@@ -105,12 +106,19 @@ test accounts for cross-account checks.
   implementation. Recheck them against the release candidate.
 - [x] Update the ERD with `UserAccount` and ownership relationships.
 - [ ] Capture current app screenshots with synthetic or guest data.
+- [ ] Phase 6B. Verify hosted PostgreSQL connections with `sslmode=verify-full`.
+  Manual checks confirmed Supabase Free, the Session Pooler on port `5432`,
+  and SSL Enforcement enabled. The Streamlit Cloud reboot, Google sign-in,
+  and Guest Demo smoke tests passed with the current `sslmode=require`
+  configuration. The public CA and relative path are prepared locally.
+  Certificate deployment, the hosted Secrets update, and authenticated
+  verification after reboot are pending. [TLS deployment steps](database_operations.md#streamlit-community-cloud-tls)
 - [ ] Verify the deployed app, Google sign-in, and guest demo end to end.
-  During Phase 6 hosted verification, confirm the Supabase connection mode,
-  TLS settings, runtime and maintenance role privileges, RLS exposure, and
-  available connection limits under representative sessions. Confirm the
-  project's backup retention and PITR availability or its approved logical
-  backup procedure, with a restore rehearsal in an isolated target.
+  During Phase 6 hosted verification, confirm runtime and maintenance role
+  privileges, RLS exposure, and available connection limits under
+  representative sessions. Confirm the project's backup retention and PITR
+  availability or its approved logical backup procedure, with a restore
+  rehearsal in an isolated target.
 - [ ] During Phase 6, verify hosted process memory and concurrent-session
   behavior with authorized synthetic accounts and guest sessions. Record the
   available process RSS or platform memory metric, response behavior, and
