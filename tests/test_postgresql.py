@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time
+from functools import partial
 from threading import Barrier, local
 from uuid import uuid4
 
@@ -19,10 +20,13 @@ from src.database.models import (
 from src.database.seed import ensure_default_categories
 from src.database.user_session import UserSession
 from src.services.account_service import register_google_account
-from src.services.checklist_service import complete_checkin
+from src.services.checklist_service import complete_checkin, ensure_checkin, get_month_checklist, update_checkin_status
+from src.services.command_center_service import get_command_center_data
 from src.services.goal_service import create_goal, delete_goal, get_goal_progress
 from src.services.goal_session_planner_service import plan_goal_sessions
-from src.services.quest_service import create_quest, create_scheduled_quest, get_categories
+from src.services.quest_service import (
+    create_quest, create_scheduled_quest, delete_one_time_quest_if_unresolved, get_categories,
+)
 from src.services.recurring_habit_service import create_recurring_habit, generate_recurring_habit_for_month
 
 
@@ -250,7 +254,7 @@ def test_postgresql_rls_blocks_an_unprivileged_role(postgres):
 DAY = date(2026, 11, 23)
 
 
-def _race(postgres, marker, action):
+def _race(postgres, marker, action, other_action=None, *, boundary="before_cursor_execute"):
     """Release both workers at their first competing database statement."""
     barrier = Barrier(2)
     worker = local()
@@ -260,13 +264,13 @@ def _race(postgres, marker, action):
             worker.synchronized = True
             barrier.wait(timeout=10)
 
-    event.listen(postgres, "before_cursor_execute", synchronize)
+    event.listen(postgres, boundary, synchronize)
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [executor.submit(action) for _ in range(2)]
+            futures = [executor.submit(work) for work in (action, other_action or action)]
             return [future.result(timeout=30) for future in futures]
     finally:
-        event.remove(postgres, "before_cursor_execute", synchronize)
+        event.remove(postgres, boundary, synchronize)
 
 
 def test_postgresql_concurrent_google_registration_provisions_once(postgres):
@@ -299,6 +303,117 @@ def test_postgresql_concurrent_checkin_completion_awards_xp_once(postgres):
         checkin = session.scalars(select(QuestCheckin)).one()
         assert (checkin.id, checkin.status, checkin.xp_awarded) == (outcomes[0][0], "Completed", xp)
         assert checkin.completed_at is not None
+
+
+def _checkin_state(checkin):
+    return (
+        checkin.id, checkin.quest_id, checkin.user_id, checkin.checkin_date,
+        checkin.status, checkin.xp_awarded, checkin.completed_at, checkin.skipped_at,
+        checkin.failed_at, checkin.created_at, checkin.updated_at,
+    )
+
+
+def _is_daily_checkin_lookup(statement):
+    return "FROM quest_checkins" in statement and all(
+        f"quest_checkins.{column} =" in statement for column in ("quest_id", "checkin_date")
+    )
+
+
+@pytest.mark.parametrize(
+    ("first_page", "second_page"),
+    [("summary", "summary"), ("checklist", "checklist"), ("summary", "checklist")],
+    ids=["summary-summary", "checklist-checklist", "summary-checklist"],
+)
+def test_postgresql_concurrent_legacy_checkin_backfill(postgres, first_page, second_page):
+    owner = register_google_account("legacy-owner", "legacy@example.invalid")
+    other = register_google_account("other-owner", "other@example.invalid")
+    with UserSession(bind=postgres, user_id=owner, autoflush=False) as session:
+        quest = Quest(title="Legacy task", due_date=DAY, xp_reward=20)
+        session.add(quest)
+        session.commit()
+        quest_id = quest.id
+        history = {}
+        for status in ("Completed", "Skipped", "Failed"):
+            previous = Quest(title=f"Existing {status}", due_date=DAY, xp_reward=20)
+            session.add(previous)
+            session.flush()
+            checkin = update_checkin_status(previous.id, DAY, status, session=session)
+            history[checkin.id] = _checkin_state(checkin)
+    with UserSession(bind=postgres, user_id=other, autoflush=False) as session:
+        foreign = Quest(title="Other legacy task", due_date=DAY, xp_reward=20)
+        existing = Quest(title="Other completed task", due_date=DAY, xp_reward=20)
+        session.add_all([foreign, existing])
+        session.flush()
+        foreign_id = foreign.id
+        foreign_history = _checkin_state(complete_checkin(existing.id, DAY, session=session))
+
+    def read(page):
+        with UserSession(bind=postgres, user_id=owner, autoflush=False) as session:
+            commits = []
+            event.listen(session, "after_commit", lambda _: commits.append(True))
+            if page == "summary":
+                result = get_command_center_data(today=DAY, session=session)
+                statuses = {item["quest_id"]: item["status"] for item in result["today_work_items"]}
+            else:
+                result = get_month_checklist(DAY.year, DAY.month, session=session)
+                statuses = {row["quest_id"]: row["cells"][DAY]["status"] for row in result["rows"]}
+            assert statuses == {quest_id: "Planned", **{state[1]: state[4] for state in history.values()}}
+            assert session.in_transaction()
+            return len(commits)
+
+    # Both first lookups have returned no row before either worker can insert or lock.
+    commits = _race(
+        postgres, _is_daily_checkin_lookup, partial(read, first_page), partial(read, second_page),
+        boundary="after_cursor_execute",
+    )
+    assert sorted(commits) == [0, 1]
+    with UserSession(bind=postgres, user_id=owner) as session:
+        rows = session.scalars(select(QuestCheckin)).all()
+        backfilled = next(checkin for checkin in rows if checkin.quest_id == quest_id)
+        assert (backfilled.user_id, backfilled.checkin_date, backfilled.status, backfilled.xp_awarded) == (
+            owner, DAY, "Planned", 0,
+        )
+        assert (backfilled.completed_at, backfilled.skipped_at, backfilled.failed_at) == (None, None, None)
+        assert {checkin.id: _checkin_state(checkin) for checkin in rows if checkin.id != backfilled.id} == history
+        with pytest.raises(ValueError, match=f"Quest with id {foreign_id} was not found"):
+            ensure_checkin(foreign_id, DAY, session=session)
+    with UserSession(bind=postgres, user_id=other) as session:
+        assert session.get(Quest, quest_id) is None
+        assert session.get(Quest, foreign_id).title == "Other legacy task"
+        assert [_checkin_state(checkin) for checkin in session.scalars(select(QuestCheckin))] == [foreign_history]
+
+
+@pytest.mark.parametrize("operation", ["completion", "deletion"])
+def test_postgresql_legacy_checkin_backfill_rechecks_after_concurrent_write(postgres, operation):
+    owner = register_google_account("legacy-writer", "legacy-writer@example.invalid")
+    with UserSession(bind=postgres, user_id=owner, autoflush=False) as reader:
+        quest = Quest(title="Legacy task", due_date=DAY, xp_reward=20)
+        reader.add(quest)
+        reader.commit()
+        quest_id = quest.id
+        written = []
+
+        @event.listens_for(reader.connection(), "after_cursor_execute")
+        def write_after_lookup(_connection, _cursor, statement, *_):
+            if not written and _is_daily_checkin_lookup(statement):
+                with UserSession(bind=postgres, user_id=owner, autoflush=False) as writer:
+                    if operation == "completion":
+                        written.append(_checkin_state(complete_checkin(quest_id, DAY, session=writer)))
+                    else:
+                        written.append(delete_one_time_quest_if_unresolved(quest_id, session=writer))
+
+        if operation == "completion":
+            checkin = ensure_checkin(quest_id, DAY, session=reader)
+            assert [_checkin_state(checkin)] == written
+            assert checkin.status == "Completed" and checkin.xp_awarded == 20
+            assert checkin.completed_at is not None
+            assert reader.scalars(select(QuestCheckin)).all() == [checkin]
+        else:
+            with pytest.raises(ValueError, match=f"Quest with id {quest_id} was not found"):
+                ensure_checkin(quest_id, DAY, session=reader)
+            assert len(written) == 1 and written[0]["deleted"]
+            assert reader.get(Quest, quest_id) is None
+            assert reader.scalars(select(QuestCheckin)).all() == []
 
 
 def test_postgresql_concurrent_routine_generation_rolls_back_the_loser(postgres):

@@ -230,20 +230,24 @@ resulting state. Times below are single observations, in milliseconds.
 A disposable PostgreSQL probe synchronized two Summary reads just before
 inserting the same legacy check-in. One completed, and one got unique-constraint
 error `23505`. The database retained one planned row with zero XP. A fresh
-read succeeded. The compatibility write still needs a retry when that race occurs.
+read succeeded after the failure.
 
-This is a targeted `v1.0.0` release gate. Add a focused PostgreSQL concurrency
-regression and make the legacy backfill safe for concurrent Summary and Monthly
-Checklist reads before release. Both reads should succeed and leave exactly one
-account-scoped planned check-in with zero XP while preserving existing statuses
-and XP. [Release roadmap](roadmap.md)
+Phase 6A reproduced the same failure with Summary versus Summary, Checklist
+versus Checklist, and mixed readers. The fix keeps the existing-row fast path
+and uses the same account-scoped Quest lock as status updates on a miss. The
+locked recheck lets both readers succeed with one planned check-in and zero XP.
+The PostgreSQL regressions also verified that a concurrent completion keeps its
+XP and timestamps and that a task deleted before the lock follows the existing
+not-found path. The steady-state Checklist regression still passes at two SQL
+statements. The timings above describe Phase 5. Remote verification of the
+Phase 6A fix is pending. [Release roadmap](roadmap.md)
 
 ## Architecture findings
 
 | Area | Responsibilities and maintenance implications |
 | --- | --- |
 | Analytics | The service validates filters, loads scoped activity, and builds DataFrame payloads. Most aggregation helpers can be tested with supplied rows. SQL, orchestration, and chart-ready transforms share one module, which makes cross-cutting edits risky when they also touch legacy fallback or date semantics. The tests already exercise period boundaries, unfiltered weekly pulse, full-history streaks, and XP. Keep that coverage before reorganizing transforms. |
-| Summary and Checklist | Summary already uses database-side aggregation and limits hydrated rows to today's and overdue work. Both services retain compatibility writes for scheduled legacy quests without check-ins. Each missing row uses its own transaction. The unique quest/date constraint prevents duplicates. The reproduced first-read conflict is tracked separately as a pre-release fix. |
+| Summary and Checklist | Summary already uses database-side aggregation and limits hydrated rows to today's and overdue work. Both services retain compatibility writes for scheduled legacy quests without check-ins. Phase 6A serializes first writes with a Quest row lock and commits only when it creates a row. The unique quest/date constraint remains in place. |
 | Projects | The portfolio, single-project progress, and forecast share the same effort and XP rules. The scheduler delegates locking and row access to `goal_session_data.py` and keeps preview separate from the transactional write. A project Workspace render still makes separate progress and forecast calls, and forecast may re-read linked data. This path is distinct from portfolio batching. |
 | Planner and routines | `schedule_service.py` is a calendar helper. Quest and routine services own writes, recurrence rules, and occurrence generation. Planner bounds its visible date range but loads all check-ins for each matching quest. The benchmark uses one check-in per quest, so it leaves open the cost on a long multi-check-in legacy quest. Routine lifecycle history in the management tab has a per-occurrence read loop. The timed routine operation is the Habit Analytics view and includes streaks. |
 | Call sites and reruns | Planner and the Projects & Routines workspace gate expensive work on the active tab. Habit Analytics builds its payload once per rerun and uses the same result for the active tab. Summary reuses today's results and adds a read only when reviewing a different date. Profile fetches once per rerun. The review keeps account and guest data out of global caches. |
@@ -286,5 +290,6 @@ and PostgreSQL concurrency and migrations.
 | Full pytest without `TEST_POSTGRESQL_URL` | 376 | 0 | 18 |
 | Explicit CI integration selection | 26 | 0 | 0 |
 
-The existing CI JUnit guard verified all 18 required PostgreSQL cases locally.
-`compileall` and `git diff --check` passed. Phase 5 awaits its published CI run.
+The Phase 5 CI run at `911445f` verified 394 full-suite tests, 26 integration
+selection tests, and all 18 required PostgreSQL cases with zero skips.
+`compileall` and `git diff --check` passed. [GitHub Actions run 45908335077](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45908335077)

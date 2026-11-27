@@ -82,17 +82,19 @@ test accounts for cross-account checks.
   synthetic check-ins per account and varied project count at fixed volume.
   The large-profile Checklist, portfolio, and Character Profile paths went
   from 790, 79, and 3 SQL statements to 2, 3, and 2. All 40 benchmark result
-  fingerprints matched the baseline. The local full suite passed 394 tests
-  with PostgreSQL and 376 with 18 skips without it. The CI selection passed
-  26 tests and its guard verified all 18 required PostgreSQL cases. Phase 5
-  remote verification is pending. Defer broad analytics refactoring and index
-  proposals. [Performance review](performance_review.md)
-- [ ] Fix the concurrent legacy check-in backfill before releasing `v1.0.0`.
-  Two simultaneous Summary reads of the same missing check-in reproduced
-  PostgreSQL unique-constraint error `23505` in one reader. Add a focused
-  PostgreSQL regression that overlaps separate sessions. Both Summary and
-  Monthly Checklist reads must succeed and leave exactly one account-scoped
-  planned check-in with zero XP. Preserve existing check-in statuses and XP.
+  fingerprints matched the baseline. Phase 5 passed CI at `911445f` with 394
+  full-suite tests and 26 integration selection tests. All 18 required
+  PostgreSQL cases passed with zero skips. Defer broad analytics refactoring
+  and index proposals. [GitHub Actions run 45908335077](https://github.com/BaseMar/habit-quest-analytics/actions/runs/45908335077) · [Performance review](performance_review.md)
+- [x] Fix the concurrent legacy check-in backfill before releasing `v1.0.0`.
+  Phase 6A reproduced error `23505` in all three Summary and Monthly Checklist
+  reader pairings. The fix locks the account-scoped quest on a miss and
+  rechecks before inserting. Both readers now succeed and leave one planned
+  check-in with zero XP, preserving existing statuses, timestamps, and XP.
+  The full suite passed 400 tests with disposable PostgreSQL and 377 with
+  23 skips without it. The integration selection passed 31 tests and the
+  guard verified all 23 required PostgreSQL cases. Remote verification of the
+  fix is pending. Phase 6 hosted verification and final QA remain open.
 - [ ] Run end-to-end functional checks across planning, routine lifecycle,
   project sessions, check-ins, analytics, progression, and account switching.
   Review status labels, form errors, empty states, and chart readability in

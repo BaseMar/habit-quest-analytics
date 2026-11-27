@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, event
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from src.database.models import Base, Category, Goal, Quest, QuestCheckin
@@ -103,6 +104,20 @@ def test_ensure_checkin_returns_existing_checkin_without_duplicate(session):
 
     assert second.id == first.id
     assert session.query(QuestCheckin).count() == 1
+
+
+def test_ensure_checkin_rolls_back_unrelated_write_failure(session):
+    day = date(2026, 7, 1)
+    quest_id = _create_raw_quest(session, "Legacy task", due_date=day).id
+    category = session.query(Category).one()
+    category.name = None
+
+    with session.no_autoflush, pytest.raises(IntegrityError, match="categories.name"):
+        ensure_checkin(quest_id, day, session=session)
+
+    assert category.name == "Health"
+    assert session.query(QuestCheckin).count() == 0
+    assert ensure_checkin(quest_id, day, session=session).status == "Planned"
 
 
 def test_month_checklist_loads_existing_checkins_without_per_quest_queries(session):

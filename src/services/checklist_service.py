@@ -101,6 +101,12 @@ def ensure_checkin(quest_id: int, checkin_date: date, session=None) -> QuestChec
     try:
         quest = _get_quest_or_raise(session, quest_id)
         checkin = _get_checkin(session, quest.id, checkin_date)
+        if checkin is not None:
+            return checkin
+
+        # Serialize first writes with status updates, then read again after any lock wait.
+        quest = _get_quest_or_raise(session, quest.id, lock=True)
+        checkin = _get_checkin(session, quest.id, checkin_date)
         if checkin is None:
             checkin = QuestCheckin(
                 quest_id=quest.id,
